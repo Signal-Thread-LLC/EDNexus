@@ -1,0 +1,39 @@
+name: 🐞 Bug report
+description: Something isn't working as expected
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What went wrong?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected vs. actual
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: "OS, .NET version, EDNexus commit"
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant journal line / log output
+      description: Paste the offending `Journal` line or app log. Redact anything sensitive.
+      render: text

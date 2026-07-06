@@ -1,0 +1,36 @@
+name: 🧩 Phase task
+description: A task that belongs to a roadmap phase
+title: "[Phase] "
+labels: []
+body:
+  - type: dropdown
+    id: phase
+    attributes:
+      label: Phase
+      options:
+        - "Phase 3 - Colonisation tracker"
+        - "Phase 4 - Market & routes"
+        - "Phase 5 - Materials & exobiology"
+        - "Phase 6 - Overlay & voice"
+        - "Unscheduled / backlog"
+    validations:
+      required: true
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+    validations:
+      required: true
+  - type: textarea
+    id: tasks
+    attributes:
+      label: Tasks
+      value: |
+        - [ ]
+        - [ ]
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria

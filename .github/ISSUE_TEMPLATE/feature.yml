@@ -1,0 +1,48 @@
+name: ✨ Feature request
+description: Propose a new capability for EDNexus
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: Keep each request scoped to a single capability.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / motivation
+      description: What in-game workflow is painful or missing today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What should EDNexus do?
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - engine
+        - ui
+        - colonisation
+        - market
+        - routes
+        - exobio
+        - overlay
+        - infra
+    validations:
+      required: true
+  - type: textarea
+    id: journal
+    attributes:
+      label: Relevant journal events / status files
+      description: Which `Journal` events or `*.json` sidecar files does this rely on?
+      placeholder: "e.g. ColonisationConstructionDepot, Cargo.json"
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Bullet list of conditions that mean this is done.
