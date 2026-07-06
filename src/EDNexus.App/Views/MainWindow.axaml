@@ -1,0 +1,169 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:EDNexus.App.ViewModels"
+        x:Class="EDNexus.App.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="EDNexus — Commander Console"
+        Width="980" Height="660" MinWidth="720" MinHeight="480"
+        Background="#0A0A0C">
+
+  <Window.Resources>
+    <Color x:Key="Amber">#FFF07100</Color>
+    <SolidColorBrush x:Key="AmberBrush" Color="#FFF07100" />
+    <SolidColorBrush x:Key="AmberDim" Color="#66F07100" />
+    <SolidColorBrush x:Key="CardBg" Color="#14161A" />
+    <SolidColorBrush x:Key="CardBorder" Color="#242830" />
+    <SolidColorBrush x:Key="Ink" Color="#E7E9EE" />
+    <SolidColorBrush x:Key="InkDim" Color="#8A909C" />
+  </Window.Resources>
+
+  <Window.Styles>
+    <Style Selector="Border.card">
+      <Setter Property="Background" Value="{StaticResource CardBg}" />
+      <Setter Property="BorderBrush" Value="{StaticResource CardBorder}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Padding" Value="16" />
+      <Setter Property="Margin" Value="8" />
+    </Style>
+    <Style Selector="TextBlock.cardHeader">
+      <Setter Property="Foreground" Value="{StaticResource AmberBrush}" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Margin" Value="0,0,0,10" />
+      <Setter Property="LetterSpacing" Value="2" />
+    </Style>
+    <Style Selector="TextBlock.label">
+      <Setter Property="Foreground" Value="{StaticResource InkDim}" />
+      <Setter Property="FontSize" Value="12" />
+    </Style>
+    <Style Selector="TextBlock.value">
+      <Setter Property="Foreground" Value="{StaticResource Ink}" />
+      <Setter Property="FontSize" Value="15" />
+      <Setter Property="FontWeight" Value="Medium" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style Selector="TextBlock.big">
+      <Setter Property="Foreground" Value="{StaticResource Ink}" />
+      <Setter Property="FontSize" Value="22" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+  </Window.Styles>
+
+  <DockPanel LastChildFill="True">
+
+    <!-- Header -->
+    <Border DockPanel.Dock="Top" Background="#101216" BorderBrush="{StaticResource CardBorder}"
+            BorderThickness="0,0,0,1" Padding="20,14">
+      <Grid ColumnDefinitions="Auto,*,Auto">
+        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+          <Border Width="10" Height="10" CornerRadius="5" Background="{StaticResource AmberBrush}" />
+          <TextBlock Text="EDNEXUS" Foreground="{StaticResource Ink}" FontSize="18"
+                     FontWeight="Bold" LetterSpacing="4" VerticalAlignment="Center" />
+          <TextBlock Text="COMMANDER CONSOLE" Foreground="{StaticResource InkDim}" FontSize="11"
+                     LetterSpacing="3" VerticalAlignment="Center" Margin="4,3,0,0" />
+        </StackPanel>
+
+        <StackPanel Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center">
+          <TextBlock Text="{Binding CommanderName}" Foreground="{StaticResource Ink}"
+                     FontSize="16" FontWeight="SemiBold" HorizontalAlignment="Right" />
+          <TextBlock Text="{Binding Balance}" Foreground="{StaticResource AmberBrush}"
+                     FontSize="13" HorizontalAlignment="Right" />
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <!-- Footer / status bar -->
+    <Border DockPanel.Dock="Bottom" Background="#101216" BorderBrush="{StaticResource CardBorder}"
+            BorderThickness="0,1,0,0" Padding="20,8">
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Grid.Column="0" Text="{Binding JournalStatus}" Classes="label"
+                   TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+        <TextBlock Grid.Column="1" Text="{Binding LastUpdated, StringFormat='updated {0}'}"
+                   Classes="label" VerticalAlignment="Center" />
+      </Grid>
+    </Border>
+
+    <!-- Body -->
+    <ScrollViewer>
+      <WrapPanel Margin="12" Orientation="Horizontal">
+
+        <!-- Location -->
+        <Border Classes="card" Width="452">
+          <StackPanel>
+            <TextBlock Classes="cardHeader" Text="LOCATION" />
+            <TextBlock Classes="big" Text="{Binding SystemName}" />
+            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,6,0,0">
+              <TextBlock Classes="label" Text="Body" />
+              <TextBlock Classes="value" FontSize="13" Text="{Binding Body}" />
+            </StackPanel>
+            <TextBlock Classes="value" FontSize="13" Foreground="{StaticResource AmberBrush}"
+                       Text="{Binding LocationStatus}" Margin="0,8,0,0" />
+          </StackPanel>
+        </Border>
+
+        <!-- Ship -->
+        <Border Classes="card" Width="452">
+          <StackPanel>
+            <TextBlock Classes="cardHeader" Text="SHIP" />
+            <TextBlock Classes="value" Text="{Binding Ship}" />
+            <TextBlock Classes="label" Text="Fuel" Margin="0,14,0,4" />
+            <Grid ColumnDefinitions="*,Auto">
+              <ProgressBar Grid.Column="0" Minimum="0" Maximum="1" Value="{Binding FuelFraction}"
+                           Height="8" Foreground="{StaticResource AmberBrush}"
+                           Background="#22262E" VerticalAlignment="Center" />
+              <TextBlock Grid.Column="1" Classes="value" FontSize="13" Margin="12,0,0,0"
+                         Text="{Binding Fuel}" />
+            </Grid>
+          </StackPanel>
+        </Border>
+
+        <!-- Materials -->
+        <Border Classes="card" Width="452">
+          <StackPanel>
+            <TextBlock Classes="cardHeader" Text="MATERIALS" />
+            <Grid ColumnDefinitions="*,*,*">
+              <StackPanel Grid.Column="0">
+                <TextBlock Classes="big" Text="{Binding RawMaterials}" />
+                <TextBlock Classes="label" Text="Raw" />
+              </StackPanel>
+              <StackPanel Grid.Column="1">
+                <TextBlock Classes="big" Text="{Binding ManufacturedMaterials}" />
+                <TextBlock Classes="label" Text="Manufactured" />
+              </StackPanel>
+              <StackPanel Grid.Column="2">
+                <TextBlock Classes="big" Text="{Binding EncodedMaterials}" />
+                <TextBlock Classes="label" Text="Encoded" />
+              </StackPanel>
+            </Grid>
+            <TextBlock Classes="label" Text="{Binding MaterialsSummary}" Margin="0,10,0,0" />
+          </StackPanel>
+        </Border>
+
+        <!-- Cargo -->
+        <Border Classes="card" Width="452">
+          <StackPanel>
+            <TextBlock Classes="cardHeader" Text="CARGO HOLD" />
+            <TextBlock Classes="value" Text="{Binding CargoSummary}" Margin="0,0,0,10" />
+            <ItemsControl ItemsSource="{Binding Cargo}" MaxHeight="220">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:CargoLine">
+                  <Grid ColumnDefinitions="Auto,*" Margin="0,3">
+                    <Border Grid.Column="0" Background="#22262E" CornerRadius="4"
+                            Padding="8,2" MinWidth="44">
+                      <TextBlock Text="{Binding Count}" Foreground="{StaticResource AmberBrush}"
+                                 FontWeight="SemiBold" FontSize="13" HorizontalAlignment="Center" />
+                    </Border>
+                    <TextBlock Grid.Column="1" Text="{Binding Name}" Classes="value" FontSize="13"
+                               Margin="10,0,0,0" VerticalAlignment="Center" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </Border>
+
+      </WrapPanel>
+    </ScrollViewer>
+  </DockPanel>
+</Window>

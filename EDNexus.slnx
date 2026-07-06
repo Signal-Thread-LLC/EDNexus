@@ -1,0 +1,7 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/EDNexus.App/EDNexus.App.csproj" />
+    <Project Path="src/EDNexus.Cli/EDNexus.Cli.csproj" />
+    <Project Path="src/EDNexus.Core/EDNexus.Core.csproj" />
+  </Folder>
+</Solution>
