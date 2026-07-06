@@ -65,20 +65,55 @@ internal static class SamplePools
         ("agriculturalmedicines", "Agricultural Medicines"),
     };
 
-    // (journal symbol, localised, category) for a station commodity market board. A spread of
-    // metals / minerals / chemicals so the market card and hold valuation have variety.
+    // (journal symbol, localised, category) for a station commodity market board — a broad spread
+    // across the game's real market categories so the card and hold valuation have plenty of variety.
     public static readonly (string Sym, string Loc, string Cat)[] MarketGoods =
     {
-        ("gold", "Gold", "Metals"), ("silver", "Silver", "Metals"),
+        // Metals
+        ("aluminium", "Aluminium", "Metals"), ("beryllium", "Beryllium", "Metals"),
+        ("cobalt", "Cobalt", "Metals"), ("copper", "Copper", "Metals"),
+        ("gallium", "Gallium", "Metals"), ("gold", "Gold", "Metals"),
+        ("indium", "Indium", "Metals"), ("lithium", "Lithium", "Metals"),
         ("palladium", "Palladium", "Metals"), ("platinum", "Platinum", "Metals"),
-        ("painite", "Painite", "Minerals"), ("bertrandite", "Bertrandite", "Minerals"),
+        ("silver", "Silver", "Metals"), ("tantalum", "Tantalum", "Metals"),
+        ("titanium", "Titanium", "Metals"), ("uranium", "Uranium", "Metals"),
+        // Minerals
+        ("bauxite", "Bauxite", "Minerals"), ("bertrandite", "Bertrandite", "Minerals"),
+        ("bromellite", "Bromellite", "Minerals"), ("coltan", "Coltan", "Minerals"),
+        ("gallite", "Gallite", "Minerals"), ("indite", "Indite", "Minerals"),
+        ("lepidolite", "Lepidolite", "Minerals"),
         ("lowtemperaturediamond", "Low Temperature Diamonds", "Minerals"),
-        ("tritium", "Tritium", "Chemicals"), ("hydrogenfuel", "Hydrogen Fuel", "Chemicals"),
-        ("water", "Water", "Chemicals"), ("beryllium", "Beryllium", "Metals"),
-        ("indium", "Indium", "Metals"), ("cobalt", "Cobalt", "Metals"),
+        ("painite", "Painite", "Minerals"), ("rutile", "Rutile", "Minerals"),
+        ("uraninite", "Uraninite", "Minerals"), ("opal", "Void Opals", "Minerals"),
+        // Chemicals
+        ("explosives", "Explosives", "Chemicals"), ("hydrogenfuel", "Hydrogen Fuel", "Chemicals"),
+        ("hydrogenperoxide", "Hydrogen Peroxide", "Chemicals"), ("liquidoxygen", "Liquid Oxygen", "Chemicals"),
+        ("mineraloil", "Mineral Oil", "Chemicals"), ("tritium", "Tritium", "Chemicals"),
+        ("water", "Water", "Chemicals"),
+        // Foods
+        ("algae", "Algae", "Foods"), ("animalmeat", "Animal Meat", "Foods"),
+        ("coffee", "Coffee", "Foods"), ("fish", "Fish", "Foods"),
+        ("foodcartridges", "Food Cartridges", "Foods"), ("fruitandvegetables", "Fruit and Vegetables", "Foods"),
+        ("grain", "Grain", "Foods"), ("tea", "Tea", "Foods"),
+        // Consumer items
+        ("clothing", "Clothing", "Consumer Items"), ("consumertechnology", "Consumer Technology", "Consumer Items"),
+        ("domesticappliances", "Domestic Appliances", "Consumer Items"),
+        // Industrial materials
+        ("ceramiccomposites", "Ceramic Composites", "Industrial Materials"),
+        ("polymers", "Polymers", "Industrial Materials"), ("semiconductors", "Semiconductors", "Industrial Materials"),
+        ("superconductors", "Superconductors", "Industrial Materials"),
+        // Medicines
         ("agriculturalmedicines", "Agricultural Medicines", "Medicines"),
-        ("progenitorcells", "Progenitor Cells", "Medicines"),
-        ("coffee", "Coffee", "Foods"), ("tea", "Tea", "Foods"),
+        ("basicmedicines", "Basic Medicines", "Medicines"), ("progenitorcells", "Progenitor Cells", "Medicines"),
+        // Machinery
+        ("powergenerators", "Power Generators", "Machinery"), ("waterpurifiers", "Water Purifiers", "Machinery"),
+        ("cropharvesters", "Crop Harvesters", "Machinery"),
+        // Technology
+        ("computercomponents", "Computer Components", "Technology"),
+        ("medicaldiagnosticequipment", "Medical Diagnostic Equipment", "Technology"),
+        ("robotics", "Robotics", "Technology"),
+        // Weapons
+        ("nonlethalweapons", "Non-Lethal Weapons", "Weapons"), ("reactivearmour", "Reactive Armour", "Weapons"),
     };
 
     // (journal symbol, localised) for the commodities colonisation depots ask for.
