@@ -4,6 +4,7 @@
         x:Class="EDNexus.App.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Title="EDNexus — Commander Console"
+        Icon="/Assets/ednexus.png"
         Width="980" Height="660" MinWidth="720" MinHeight="480"
         Background="#0A0A0C">
 

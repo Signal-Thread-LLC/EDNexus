@@ -2,6 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="EDNexus.App.Views.SettingsWindow"
         Title="EDNexus — Settings"
+        Icon="/Assets/ednexus.png"
         Width="520" SizeToContent="Height"
         WindowStartupLocation="CenterOwner"
         CanResize="False" Background="#14161A">
