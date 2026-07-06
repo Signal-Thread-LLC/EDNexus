@@ -34,6 +34,31 @@ dotnet run --project src/EDNexus.Cli -- --once
 The journal folder is auto-detected (Windows Saved Games, and the Steam/Proton prefix on Linux).
 Override it with the `EDNEXUS_JOURNAL_DIR` environment variable.
 
+## Privacy & crash reporting
+
+EDNexus can send **anonymized** crash and error reports (via [Sentry](https://sentry.io)) so bugs
+get found and fixed. It is **opt-in**: nothing is sent until you agree to the first-run prompt, and
+you can change your mind any time in **Settings**.
+
+**What is sent** (only with your consent):
+- App version, operating system, and the error with its stack trace
+- A random *install id* generated on your machine — not linked to your commander, account, or OS user
+
+**What is never sent:**
+- Your commander name, systems visited, or any journal contents
+- Your OS/user name, or file paths that contain it (scrubbed before sending — see `PiiScrubber`)
+
+The Sentry DSN is **not stored in this repository**. It is injected at release-build time from a CI
+secret (`SENTRY_DSN`), so source builds have no DSN and reporting stays disabled. Developers can set
+`EDNEXUS_SENTRY_DSN` locally to test.
+
+## Releases
+
+Tagging a release (`git tag v0.1.0 && git push --tags`) triggers `.github/workflows/release.yml`,
+which publishes a self-contained Windows build with the DSN injected from the `SENTRY_DSN` secret and
+(if `SENTRY_AUTH_TOKEN` is set) uploads debug symbols for readable stack traces. See the workflow
+header for the required Actions secrets.
+
 ## Roadmap
 
 - [x] Journal engine (watcher, event bus, commander state)

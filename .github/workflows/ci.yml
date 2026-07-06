@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore EDNexus.slnx
+
+      - name: Build
+        run: dotnet build EDNexus.slnx --configuration Release --no-restore
+
+      # No SentryDsn / SENTRY_AUTH_TOKEN here, so this build embeds no DSN and uploads no symbols.
+      - name: Test
+        run: dotnet test EDNexus.slnx --configuration Release --no-build --verbosity normal

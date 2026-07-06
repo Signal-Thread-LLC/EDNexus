@@ -1,0 +1,60 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']            # e.g. git tag v0.1.0 && git push --tags
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version, e.g. 0.1.0 (defaults to the tag)'
+        required: false
+
+# The Sentry DSN and auth token live ONLY in repo/org Actions secrets and are injected at build
+# time — they are never committed. Configure them at:
+#   Settings → Secrets and variables → Actions
+#     SENTRY_DSN         (required to enable crash reporting in released builds)
+#     SENTRY_AUTH_TOKEN  (optional; enables debug-symbol upload for readable stack traces)
+jobs:
+  release:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Derive version
+        id: ver
+        shell: bash
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish (DSN injected from secret; symbols uploaded if token present)
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+        run: >
+          dotnet publish src/EDNexus.App/EDNexus.App.csproj
+          --configuration Release
+          --runtime win-x64 --self-contained true
+          -p:Version=${{ steps.ver.outputs.version }}
+          -p:SentryDsn=${{ secrets.SENTRY_DSN }}
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          --output dist
+
+      - name: Package
+        shell: pwsh
+        run: Compress-Archive -Path dist/* -DestinationPath "EDNexus-${{ steps.ver.outputs.version }}-win-x64.zip"
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: EDNexus-*.zip
+          generate_release_notes: true
