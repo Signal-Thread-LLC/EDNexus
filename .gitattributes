@@ -7,3 +7,6 @@
 *.csproj text
 *.yml  text eol=lf
 *.iss  text
+*.svg  text
+*.png  binary
+*.ico  binary

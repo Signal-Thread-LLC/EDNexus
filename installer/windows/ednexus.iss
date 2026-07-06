@@ -28,6 +28,7 @@ DefaultDirName={autopf}\Signal & Thread\EDNexus
 DefaultGroupName=EDNexus
 DisableProgramGroupPage=yes
 UninstallDisplayIcon={app}\EDNexus.App.exe
+SetupIconFile=..\..\assets\icons\ednexus.ico
 OutputDir=out
 OutputBaseFilename=EDNexus-{#AppVersion}-setup
 Compression=lzma2
