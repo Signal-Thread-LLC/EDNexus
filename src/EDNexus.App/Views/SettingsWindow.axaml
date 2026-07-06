@@ -19,6 +19,18 @@
       </StackPanel>
     </Border>
 
+    <!-- Developer options — hidden entirely when the dev tools are stripped/disabled (FeatureFlags). -->
+    <StackPanel x:Name="DevSection" Spacing="8" IsVisible="False">
+      <TextBlock Text="DEVELOPER OPTIONS" Foreground="#F07100" FontSize="12" FontWeight="SemiBold" LetterSpacing="2" />
+      <Border Background="#0F1114" CornerRadius="6" Padding="16">
+        <StackPanel Spacing="10">
+          <CheckBox x:Name="DevModeToggle" Content="Enable developer mode" Foreground="#E7E9EE" />
+          <TextBlock Foreground="#8A909C" FontSize="12" TextWrapping="Wrap"
+                     Text="Adds a 🎲 control to each dashboard card to fabricate random-but-valid state, plus &quot;Randomize all&quot; and &quot;Reset to live data&quot;. For testing only — this resets to off every launch and is not saved." />
+        </StackPanel>
+      </Border>
+    </StackPanel>
+
     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
       <Button Content="Close" Click="OnClose" Padding="16,8" />
       <Button Content="Save" Click="OnSave" Padding="16,8"

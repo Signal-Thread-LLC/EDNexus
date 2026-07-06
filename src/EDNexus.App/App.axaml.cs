@@ -4,13 +4,12 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using EDNexus.App.ViewModels;
 using EDNexus.App.Views;
-using EDNexus.Core;
 
 namespace EDNexus.App;
 
 public partial class App : Application
 {
-    private EngineHost? _host;
+    private MainWindowViewModel? _vm;
 
     public override void Initialize() => AvaloniaXamlLoader.Load(this);
 
@@ -20,15 +19,11 @@ public partial class App : Application
         {
             var boot = Program.Services;
 
-            _host = new EngineHost();
-            boot.Crash.Attach(_host.Bus); // report journal handler errors
-
-            var vm = new MainWindowViewModel(_host, boot);
+            var vm = _vm = new MainWindowViewModel(boot);
             var window = new MainWindow { DataContext = vm };
             desktop.MainWindow = window;
-            desktop.ShutdownRequested += (_, _) => _host.Dispose();
+            desktop.ShutdownRequested += (_, _) => vm.Dispose();
 
-            _host.Start();
             vm.Start();
 
             // First run only: ask for consent (opt-in). Closing the dialog leaves it unasked.

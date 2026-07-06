@@ -1,3 +1,4 @@
+using EDNexus.Core.Colonisation;
 using EDNexus.Core.Journal;
 using EDNexus.Core.State;
 
@@ -23,6 +24,7 @@ Console.WriteLine($"Journal directory: {dir}");
 var bus = new JournalEventBus();
 var state = new CommanderState();
 _ = new StateTracker(bus, state);
+var colonisation = new ColonisationTracker(bus, state);
 
 var liveCounts = new SortedDictionary<string, int>();
 bus.SubscribeAny(e =>
@@ -37,6 +39,7 @@ var watcher = new JournalWatcher(dir, bus);
 Console.WriteLine("Replaying latest journal to warm up state...\n");
 watcher.Replay();
 PrintState(state);
+PrintColonisation(colonisation, state);
 
 if (args.Contains("--once"))
     return 0;
@@ -53,6 +56,7 @@ await watcher.RunAsync(cts.Token);
 
 Console.WriteLine();
 PrintState(state);
+PrintColonisation(colonisation, state);
 if (liveCounts.Count > 0)
 {
     Console.WriteLine("\nLive events this session:");
@@ -83,5 +87,33 @@ static void PrintState(CommanderState s)
         Console.WriteLine("  --- hold ---");
         foreach (var kv in s.Cargo.OrderByDescending(k => k.Value))
             Console.WriteLine($"      {kv.Value,4}  {kv.Key}");
+    }
+}
+
+static void PrintColonisation(ColonisationTracker tracker, CommanderState s)
+{
+    var site = tracker.ActiveSite;
+    if (site is null) return;
+
+    Console.WriteLine("\n======== Colonisation ========");
+    var where = site.StationName ?? site.StarSystem ?? $"market {site.MarketId}";
+    var status = site.Complete ? "COMPLETE" : site.Failed ? "FAILED" : $"{site.Progress * 100:0.0}%";
+    Console.WriteLine($"  Site      : {where}");
+    Console.WriteLine($"  Progress  : {status}  ({site.CompletedCount}/{site.Resources.Count} commodities, {site.TotalRemaining:N0} t remaining)");
+
+    var list = site.BuildShoppingList(s.Cargo);
+    if (list.Count == 0)
+    {
+        Console.WriteLine("  Nothing outstanding — depot fully supplied.");
+        return;
+    }
+
+    Console.WriteLine("  --- shopping list (worst shortfall first) ---");
+    Console.WriteLine($"      {"remaining",9}  {"in hold",8}  {"to buy",8}  commodity");
+    foreach (var item in list)
+    {
+        var hold = item.InHold > 0 ? item.Carrying.ToString("N0") : "-";
+        var flag = item.CoveredByHold ? " ✓ carrying enough" : "";
+        Console.WriteLine($"      {item.Remaining,9:N0}  {hold,8}  {item.StillNeeded,8:N0}  {item.Name}{flag}");
     }
 }

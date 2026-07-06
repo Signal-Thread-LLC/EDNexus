@@ -14,6 +14,11 @@ public partial class SettingsWindow : Window
     {
         _boot = boot;
         CrashToggle.IsChecked = boot.Settings.CrashReportingEnabled == true;
+
+        // The whole section disappears when the dev tools are compiled out / disabled.
+        DevSection.IsVisible = boot.Dev.Available;
+        DevModeToggle.IsChecked = boot.Dev.Enabled;
+
         UpdateStatus();
     }
 
@@ -35,6 +40,7 @@ public partial class SettingsWindow : Window
         if (_boot is not null)
         {
             _boot.ApplyCrashReportingChoice(CrashToggle.IsChecked == true);
+            _boot.Dev.Enabled = DevModeToggle.IsChecked == true; // runtime-only; not persisted
             UpdateStatus();
         }
         Close();

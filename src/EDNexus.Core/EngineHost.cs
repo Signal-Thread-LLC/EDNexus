@@ -1,3 +1,4 @@
+using EDNexus.Core.Colonisation;
 using EDNexus.Core.Journal;
 using EDNexus.Core.State;
 
@@ -17,6 +18,7 @@ public sealed class EngineHost : IDisposable
 
     public JournalEventBus Bus { get; } = new();
     public CommanderState State { get; } = new();
+    public ColonisationTracker Colonisation { get; }
     public string? JournalDirectory { get; }
     public bool JournalFound => JournalDirectory is not null;
 
@@ -24,6 +26,7 @@ public sealed class EngineHost : IDisposable
     {
         JournalDirectory = journalDir ?? JournalPaths.Resolve();
         _tracker = new StateTracker(Bus, State);
+        Colonisation = new ColonisationTracker(Bus, State);
         if (JournalDirectory is not null)
             _watcher = new JournalWatcher(JournalDirectory, Bus);
     }
