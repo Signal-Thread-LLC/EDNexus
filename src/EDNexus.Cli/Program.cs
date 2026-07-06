@@ -1,5 +1,6 @@
 using EDNexus.Core.Colonisation;
 using EDNexus.Core.Journal;
+using EDNexus.Core.Market;
 using EDNexus.Core.State;
 
 // EDNexus.Cli — a headless harness for the journal engine.
@@ -25,6 +26,7 @@ var bus = new JournalEventBus();
 var state = new CommanderState();
 _ = new StateTracker(bus, state);
 var colonisation = new ColonisationTracker(bus, state);
+var market = new MarketTracker(bus, state);
 
 var liveCounts = new SortedDictionary<string, int>();
 bus.SubscribeAny(e =>
@@ -40,6 +42,7 @@ Console.WriteLine("Replaying latest journal to warm up state...\n");
 watcher.Replay();
 PrintState(state);
 PrintColonisation(colonisation, state);
+PrintMarket(market, state);
 
 if (args.Contains("--once"))
     return 0;
@@ -57,6 +60,7 @@ await watcher.RunAsync(cts.Token);
 Console.WriteLine();
 PrintState(state);
 PrintColonisation(colonisation, state);
+PrintMarket(market, state);
 if (liveCounts.Count > 0)
 {
     Console.WriteLine("\nLive events this session:");
@@ -115,5 +119,41 @@ static void PrintColonisation(ColonisationTracker tracker, CommanderState s)
         var hold = item.InHold > 0 ? item.Carrying.ToString("N0") : "-";
         var flag = item.CoveredByHold ? " ✓ carrying enough" : "";
         Console.WriteLine($"      {item.Remaining,9:N0}  {hold,8}  {item.StillNeeded,8:N0}  {item.Name}{flag}");
+    }
+}
+
+static void PrintMarket(MarketTracker tracker, CommanderState s)
+{
+    var snap = tracker.Current;
+    if (snap is null) return;
+
+    Console.WriteLine("\n======== Market ========");
+    var where = snap.StationName ?? snap.StarSystem ?? $"market {snap.MarketId}";
+    var system = snap.StarSystem is { Length: > 0 } sys && sys != snap.StationName ? $" ({sys})" : "";
+    var sellable = snap.Commodities.Count(c => c.Sellable);
+    Console.WriteLine($"  Station   : {where}{system}");
+    Console.WriteLine($"  Board     : {snap.Commodities.Count} commodities · {sellable} the station buys");
+
+    var valuation = snap.ValuateHold(s.Cargo);
+    if (valuation.Count > 0)
+    {
+        Console.WriteLine($"  --- your hold, sold here ({snap.HoldValue(s.Cargo):N0} cr total) ---");
+        Console.WriteLine($"      {"units",6}  {"unit cr",9}  {"total cr",12}  {"vs mean",8}  commodity");
+        foreach (var i in valuation)
+        {
+            var vsMean = i.VsMean >= 0 ? $"+{i.VsMean:N0}" : i.VsMean.ToString("N0");
+            Console.WriteLine($"      {i.Units,6:N0}  {i.UnitPrice,9:N0}  {i.Total,12:N0}  {vsMean,8}  {i.Name}");
+        }
+        return;
+    }
+
+    var topSells = snap.Sellable.Take(8).ToList();
+    if (topSells.Count == 0) return;
+    Console.WriteLine("  --- best sells here (station demand) ---");
+    Console.WriteLine($"      {"sell cr",9}  {"vs mean",8}  {"demand",8}  commodity");
+    foreach (var c in topSells)
+    {
+        var vsMean = c.SellVsMean >= 0 ? $"+{c.SellVsMean:N0}" : c.SellVsMean.ToString("N0");
+        Console.WriteLine($"      {c.SellPrice,9:N0}  {vsMean,8}  {c.Demand,8:N0}  {c.Name}");
     }
 }

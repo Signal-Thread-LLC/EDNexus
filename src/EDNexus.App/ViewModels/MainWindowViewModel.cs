@@ -25,6 +25,7 @@ public sealed partial class MainWindowViewModel : CommunityToolkit.Mvvm.Componen
     private DispatcherTimer? _timer;
     private string _cargoSignature = "";
     private string _shoppingSignature = "";
+    private string _marketSignature = "";
 
     public MainWindowViewModel(Bootstrap boot)
     {
@@ -80,13 +81,25 @@ public sealed partial class MainWindowViewModel : CommunityToolkit.Mvvm.Componen
     [ObservableProperty] private string _colonisationSummary = "";
     [ObservableProperty] private double _colonisationProgress;
 
+    [ObservableProperty] private bool _hasMarket;
+    [ObservableProperty] private string _marketTitle = "—";
+    [ObservableProperty] private string _marketSummary = "";
+    [ObservableProperty] private string _marketHoldValue = "—";
+    [ObservableProperty] private string _marketListHeader = "";
+
     public ObservableCollection<CargoLine> Cargo { get; } = new();
     public ObservableCollection<ShoppingLine> ShoppingList { get; } = new();
+    public ObservableCollection<MarketLine> MarketRows { get; } = new();
 
     /// <summary>Inverse of <see cref="HasColonisation"/>, for the empty-state hint's visibility.</summary>
     public bool NoColonisation => !HasColonisation;
 
     partial void OnHasColonisationChanged(bool value) => OnPropertyChanged(nameof(NoColonisation));
+
+    /// <summary>Inverse of <see cref="HasMarket"/>, for the empty-state hint's visibility.</summary>
+    public bool NoMarket => !HasMarket;
+
+    partial void OnHasMarketChanged(bool value) => OnPropertyChanged(nameof(NoMarket));
 
     [RelayCommand]
     private async Task OpenSettings()
@@ -129,6 +142,7 @@ public sealed partial class MainWindowViewModel : CommunityToolkit.Mvvm.Componen
         _host.Start();
         _cargoSignature = "";
         _shoppingSignature = "";
+        _marketSignature = "";
         Refresh();
     }
 
@@ -154,7 +168,51 @@ public sealed partial class MainWindowViewModel : CommunityToolkit.Mvvm.Componen
 
         SyncCargo(s);
         SyncColonisation(s);
+        SyncMarket(s);
     }
+
+    private void SyncMarket(CommanderState s)
+    {
+        var snap = _host.Market.Current;
+        if (snap is null)
+        {
+            if (HasMarket) { HasMarket = false; MarketRows.Clear(); _marketSignature = ""; }
+            return;
+        }
+
+        HasMarket = true;
+        MarketTitle = snap.StationName ?? snap.StarSystem ?? "Station market";
+        var sellable = snap.Commodities.Count(c => c.Sellable);
+        MarketSummary = $"{snap.Commodities.Count} commodities · {sellable} the station buys";
+
+        var valuation = snap.ValuateHold(s.Cargo);
+        MarketHoldValue = valuation.Count > 0 ? $"{snap.HoldValue(s.Cargo):N0} cr" : "—";
+
+        // Prefer valuing the hold; when nothing aboard sells here, fall back to the station's best sells.
+        var signature = valuation.Count > 0
+            ? "hold|" + snap.MarketId + "|" + string.Join("|", valuation.Select(i => $"{i.Name}:{i.Units}:{i.UnitPrice}"))
+            : "sells|" + snap.MarketId + "|" + string.Join("|", snap.Sellable.Take(12).Select(c => $"{c.Name}:{c.SellPrice}:{c.Demand}"));
+        if (signature == _marketSignature) return;
+        _marketSignature = signature;
+
+        MarketRows.Clear();
+        if (valuation.Count > 0)
+        {
+            MarketListHeader = "YOUR HOLD, SOLD HERE";
+            foreach (var i in valuation)
+                MarketRows.Add(new MarketLine(
+                    i.Name, $"{i.Units:N0} t", $"{i.UnitPrice:N0} cr", $"{i.Total:N0} cr", FormatVsMean(i.VsMean), i.VsMean >= 0));
+        }
+        else
+        {
+            MarketListHeader = "BEST SELLS HERE";
+            foreach (var c in snap.Sellable.Take(12))
+                MarketRows.Add(new MarketLine(
+                    c.Name, $"{c.Demand:N0} dmd", $"{c.SellPrice:N0} cr", "", FormatVsMean(c.SellVsMean), c.SellVsMean >= 0));
+        }
+    }
+
+    private static string FormatVsMean(int vsMean) => vsMean >= 0 ? $"+{vsMean:N0}" : $"−{Math.Abs(vsMean):N0}";
 
     private void SyncColonisation(CommanderState s)
     {
@@ -216,3 +274,15 @@ public sealed record CargoLine(string Name, int Count);
 /// <param name="Fraction">Delivery progress for this commodity (0..1), for the per-row bar.</param>
 public sealed record ShoppingLine(
     string Name, string Remaining, string ToBuy, string HoldNote, bool Carrying, double Fraction);
+
+/// <summary>
+/// One row on the market card: a commodity with a <see cref="Qty"/> (tons in hold, or station
+/// demand), the station's <see cref="Unit"/> price, an optional line <see cref="Total"/>, and how
+/// the price compares to the galactic mean (<see cref="VsMean"/>, coloured by <see cref="Good"/>).
+/// </summary>
+public sealed record MarketLine(
+    string Name, string Qty, string Unit, string Total, string VsMean, bool Good)
+{
+    /// <summary>Inverse of <see cref="Good"/>, so the XAML can colour a below-mean price without a converter.</summary>
+    public bool Bad => !Good;
+}

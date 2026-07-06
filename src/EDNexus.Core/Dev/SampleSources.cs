@@ -65,6 +65,22 @@ internal static class SamplePools
         ("agriculturalmedicines", "Agricultural Medicines"),
     };
 
+    // (journal symbol, localised, category) for a station commodity market board. A spread of
+    // metals / minerals / chemicals so the market card and hold valuation have variety.
+    public static readonly (string Sym, string Loc, string Cat)[] MarketGoods =
+    {
+        ("gold", "Gold", "Metals"), ("silver", "Silver", "Metals"),
+        ("palladium", "Palladium", "Metals"), ("platinum", "Platinum", "Metals"),
+        ("painite", "Painite", "Minerals"), ("bertrandite", "Bertrandite", "Minerals"),
+        ("lowtemperaturediamond", "Low Temperature Diamonds", "Minerals"),
+        ("tritium", "Tritium", "Chemicals"), ("hydrogenfuel", "Hydrogen Fuel", "Chemicals"),
+        ("water", "Water", "Chemicals"), ("beryllium", "Beryllium", "Metals"),
+        ("indium", "Indium", "Metals"), ("cobalt", "Cobalt", "Metals"),
+        ("agriculturalmedicines", "Agricultural Medicines", "Medicines"),
+        ("progenitorcells", "Progenitor Cells", "Medicines"),
+        ("coffee", "Coffee", "Foods"), ("tea", "Tea", "Foods"),
+    };
+
     // (journal symbol, localised) for the commodities colonisation depots ask for.
     public static readonly (string Sym, string Loc)[] Construction =
     {
@@ -325,6 +341,105 @@ public sealed class ColonisationSampleSource : JournalSampleSource
             {
                 var (sym, loc, remaining) = carried[i];
                 var count = i == 0 ? remaining + rng.Next(0, 50) : Math.Max(1, remaining / 2);
+                total += count;
+                inventory.Add(new JsonObject
+                {
+                    ["Name"] = sym,
+                    ["Name_Localised"] = loc,
+                    ["Count"] = count,
+                    ["Stolen"] = 0,
+                });
+            }
+
+            events.Add(Event("Cargo", o =>
+            {
+                o["Vessel"] = "Ship";
+                o["Count"] = total;
+                o["Inventory"] = inventory;
+            }));
+            events.Add(Event("Status", o => o["Cargo"] = total));
+        }
+
+        return events;
+    }
+}
+
+/// <summary>
+/// A random station commodity market for the Market card: a full board (some goods the station
+/// buys, some it sells) plus a small cargo hold carrying a few of the commodities the station has
+/// demand for — so the "your hold, sold here" valuation lights up.
+/// </summary>
+public sealed class MarketSampleSource : JournalSampleSource
+{
+    public override string CardKey => "market";
+    public override string DisplayName => "Market";
+
+    public override IReadOnlyList<string> Sample(Random rng)
+    {
+        var system = Pick(rng, SamplePools.Systems);
+        var station = Pick(rng, SamplePools.Stations);
+        var marketId = 3_700_000_000L + rng.Next(0, 99_999_999);
+
+        var picks = SamplePools.PickDistinct(rng, SamplePools.MarketGoods, rng.Next(10, SamplePools.MarketGoods.Length + 1));
+        var items = new JsonArray();
+        var demanded = new List<(string Sym, string Loc)>();
+
+        foreach (var (sym, loc, cat) in picks)
+        {
+            var mean = rng.Next(200, 200_000);
+            var item = new JsonObject
+            {
+                ["Name"] = $"${sym}_name;",
+                ["Name_Localised"] = loc,
+                ["Category_Localised"] = cat,
+                ["MeanPrice"] = mean,
+                ["Rare"] = false,
+            };
+
+            // A commodity is usually either supplied (the station sells it) or demanded (it buys it).
+            if (rng.Next(2) == 0)
+            {
+                // Demanded: the station buys it from the commander for roughly its mean price.
+                var sell = (int)Math.Round(mean * (0.85 + rng.NextDouble() * 0.4));
+                item["BuyPrice"] = 0;
+                item["SellPrice"] = sell;
+                item["Stock"] = 0;
+                item["Demand"] = rng.Next(1, 25_000);
+                demanded.Add((sym, loc));
+            }
+            else
+            {
+                // Supplied: the station sells it to the commander; no meaningful demand.
+                item["BuyPrice"] = (int)Math.Round(mean * (0.8 + rng.NextDouble() * 0.3));
+                item["SellPrice"] = 0;
+                item["Stock"] = rng.Next(1, 40_000);
+                item["Demand"] = 0;
+            }
+
+            items.Add(item);
+        }
+
+        var events = new List<string>
+        {
+            Event("Market", o =>
+            {
+                o["MarketID"] = marketId;
+                o["StationName"] = station;
+                o["StarSystem"] = system;
+                o["Items"] = items;
+            }),
+        };
+
+        // Stock the hold with a couple of the commodities the station has demand for, so the card's
+        // valuation shows real numbers. If nothing is demanded the card falls back to "best sells".
+        var carried = SamplePools.PickDistinct(rng, demanded, Math.Min(4, demanded.Count));
+        if (carried.Count > 0)
+        {
+            var inventory = new JsonArray();
+            var total = 0;
+            foreach (var (sym, loc) in carried)
+            {
+                var count = rng.Next(4, 200);
                 total += count;
                 inventory.Add(new JsonObject
                 {
