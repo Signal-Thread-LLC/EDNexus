@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Standalone, application-agnostic client for the Inara API (https://inara.cz/inara-api-docs/).
+    It has NO dependency on EDNexus and no dependency on EliteDangerous.Eddn: it is a thin transport
+    that builds the { header, events } request, POSTs it, and parses the response. Deciding WHICH
+    events to send and WHEN is the caller's job, which keeps this reusable and independently
+    extractable into its own repo/package later.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <PackageId>EliteDangerous.Inara</PackageId>
+    <Description>A reusable .NET client for the Inara (inara.cz) commander API.</Description>
+    <Authors>Signal &amp; Thread LLC</Authors>
+    <Version Condition="'$(Version)' == ''">0.1.0</Version>
+  </PropertyGroup>
+
+</Project>

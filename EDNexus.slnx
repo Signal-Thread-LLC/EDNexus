@@ -3,6 +3,8 @@
     <Project Path="src/EDNexus.App/EDNexus.App.csproj" />
     <Project Path="src/EDNexus.Cli/EDNexus.Cli.csproj" />
     <Project Path="src/EDNexus.Core/EDNexus.Core.csproj" />
+    <Project Path="src/EliteDangerous.Eddn/EliteDangerous.Eddn.csproj" />
+    <Project Path="src/EliteDangerous.Inara/EliteDangerous.Inara.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/EDNexus.Tests/EDNexus.Tests.csproj" />

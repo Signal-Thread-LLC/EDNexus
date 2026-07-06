@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Standalone, application-agnostic client for the Elite Dangerous Data Network (EDDN).
+    It has NO dependency on EDNexus: callers feed it raw journal/status JSON and it handles the
+    EDDN protocol (envelope, whitelist, sanitisation, augmentation, upload). This keeps the library
+    reusable by other tools and independently extractable into its own repo/package later.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <PackageId>EliteDangerous.Eddn</PackageId>
+    <Description>A reusable .NET client for uploading Elite Dangerous journal and market data to the Elite Dangerous Data Network (EDDN).</Description>
+    <Authors>Signal &amp; Thread LLC</Authors>
+    <Version Condition="'$(Version)' == ''">0.1.0</Version>
+  </PropertyGroup>
+
+</Project>
