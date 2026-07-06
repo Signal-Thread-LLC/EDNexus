@@ -23,7 +23,8 @@ OUT="$HERE/out"
 INSTALL_DIR="/opt/signal-and-thread/ednexus"
 
 rm -rf "$STAGE" "$OUT"
-mkdir -p "$OUT" "$STAGE$INSTALL_DIR" "$STAGE/usr/local/bin" "$STAGE/usr/share/applications"
+mkdir -p "$OUT" "$STAGE$INSTALL_DIR" "$STAGE/usr/local/bin" \
+  "$STAGE/usr/share/applications" "$STAGE/usr/share/icons/hicolor/256x256/apps"
 
 echo "==> Publishing EDNexus.App ($RUNTIME, self-contained)..."
 # InvariantGlobalization avoids a hard ICU dependency, keeping the package portable across distros.
@@ -44,8 +45,9 @@ exec "$INSTALL_DIR/EDNexus.App" "\$@"
 EOF
 chmod +x "$STAGE/usr/local/bin/ednexus"
 
-# Desktop entry.
+# Desktop entry + app icon.
 cp "$HERE/ednexus.desktop" "$STAGE/usr/share/applications/ednexus.desktop"
+cp "$ROOT/assets/icons/ednexus-256.png" "$STAGE/usr/share/icons/hicolor/256x256/apps/ednexus.png"
 
 echo "==> Packaging .deb with fpm..."
 fpm -s dir -t deb \

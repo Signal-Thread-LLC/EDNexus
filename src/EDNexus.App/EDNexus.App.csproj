@@ -8,9 +8,16 @@
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <!-- Embeds the icon into EDNexus.App.exe (used by the shortcut / taskbar). -->
+    <ApplicationIcon>..\..\assets\icons\ednexus.ico</ApplicationIcon>
     <!-- Overridable by CI: dotnet publish -p:Version=1.2.3 -->
     <Version Condition="'$(Version)' == ''">0.1.0</Version>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The window/taskbar icon, addressable as avares://EDNexus.App/Assets/ednexus.png -->
+    <AvaloniaResource Include="..\..\assets\icons\ednexus-256.png" Link="Assets\ednexus.png" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\EDNexus.Core\EDNexus.Core.csproj" />
