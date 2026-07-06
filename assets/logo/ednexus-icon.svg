@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img">
+  <title>EDNexus icon</title>
+  <desc>A HUD-style amber hexagon with six spokes converging on a central hub, on a dark tile.</desc>
+  <rect width="512" height="512" rx="112" fill="#0E1013"/>
+  <rect x="8" y="8" width="496" height="496" rx="104" fill="none" stroke="#242830" stroke-width="4"/>
+  <g stroke="#F07100" stroke-width="8" stroke-linecap="round" opacity="0.5">
+    <line x1="256" y1="256" x2="256" y2="106"/>
+    <line x1="256" y1="256" x2="385.9" y2="181"/>
+    <line x1="256" y1="256" x2="385.9" y2="331"/>
+    <line x1="256" y1="256" x2="256" y2="406"/>
+    <line x1="256" y1="256" x2="126.1" y2="331"/>
+    <line x1="256" y1="256" x2="126.1" y2="181"/>
+  </g>
+  <polygon points="256,106 385.9,181 385.9,331 256,406 126.1,331 126.1,181"
+           fill="none" stroke="#F07100" stroke-width="14" stroke-linejoin="round"/>
+  <g fill="#F07100">
+    <circle cx="256" cy="106" r="12"/>
+    <circle cx="385.9" cy="181" r="12"/>
+    <circle cx="385.9" cy="331" r="12"/>
+    <circle cx="256" cy="406" r="12"/>
+    <circle cx="126.1" cy="331" r="12"/>
+    <circle cx="126.1" cy="181" r="12"/>
+  </g>
+  <circle cx="256" cy="256" r="34" fill="#0E1013" stroke="#F07100" stroke-width="10"/>
+  <circle cx="256" cy="256" r="14" fill="#FF8C2E"/>
+</svg>

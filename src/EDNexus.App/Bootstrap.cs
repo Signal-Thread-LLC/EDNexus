@@ -10,6 +10,9 @@ public sealed class Bootstrap
     public AppSettings Settings { get; }
     public CrashReporting Crash { get; }
 
+    /// <summary>Runtime developer-tools state (not persisted; off every launch).</summary>
+    public DeveloperOptions Dev { get; } = new();
+
     public Bootstrap(SettingsStore store, AppSettings settings, CrashReporting crash)
     {
         Store = store;

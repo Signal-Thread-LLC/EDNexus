@@ -1,5 +1,9 @@
 # EDNexus
 
+<p align="center">
+  <img src="assets/logo/ednexus-lockup.svg" width="460" alt="EDNexus — commander console for Elite Dangerous">
+</p>
+
 A single, does-it-all commander console for **Elite Dangerous** — built to replace the sprawl of
 separate market, route, exobiology, colonisation, and materials tools with one cross-platform app.
 

@@ -17,6 +17,11 @@ public partial class SettingsWindow : Window
         EddnToggle.IsChecked = boot.Settings.Reporting.Eddn.Enabled;
         InaraToggle.IsChecked = boot.Settings.Reporting.Inara.Enabled;
         InaraApiKey.Text = boot.Settings.Reporting.Inara.ApiKey;
+
+        // The whole section disappears when the dev tools are compiled out / disabled.
+        DevSection.IsVisible = boot.Dev.Available;
+        DevModeToggle.IsChecked = boot.Dev.Enabled;
+
         UpdateStatus();
     }
 
@@ -42,6 +47,7 @@ public partial class SettingsWindow : Window
                 EddnToggle.IsChecked == true,
                 InaraToggle.IsChecked == true,
                 InaraApiKey.Text ?? string.Empty);
+            _boot.Dev.Enabled = DevModeToggle.IsChecked == true; // runtime-only; not persisted
             UpdateStatus();
         }
         Close();

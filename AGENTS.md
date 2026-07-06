@@ -17,13 +17,17 @@ dotnet build EDNexus.slnx
 # Run the desktop app
 dotnet run --project src/EDNexus.App
 
-# Headless engine harness — replays the latest journal and prints commander state.
+# Headless engine harness — replays the latest journal and prints commander state
+# (plus the active colonisation depot + shopping list, when one is in range).
 # This is the fastest way to validate engine/feature changes against real data.
 dotnet run --project src/EDNexus.Cli -- --once
+
+# Unit tests (xUnit).
+dotnet test EDNexus.slnx
 ```
 
-There is no test project yet; the CLI `--once` harness is the current validation path. When you add
-`EDNexus.Tests`, wire it into the same commands here.
+The CLI `--once` harness is the primary way to validate against real journal data; `EDNexus.Tests`
+covers the pure engine logic. Both should stay green.
 
 ## Architecture
 
@@ -55,6 +59,13 @@ Key types live in `src/EDNexus.Core`: `JournalWatcher`, `JournalEntry`, `Journal
    OS-specific (overlay, native TTS) goes behind an interface with a no-op fallback.
 5. **Never commit** real journal files, tokens, or `bin/`/`obj/`.
 6. **Match surrounding style** — nullable enabled, file-scoped namespaces, XML docs on public types.
+7. **Developer mode.** Every card is exercisable without the game running via `EDNexus.Core.Dev`:
+   each feature inherits a `JournalSampleSource` that emits random-but-valid journal events through
+   the real bus (so it also exercises the parsers). When you add a card, add a matching sample
+   source and register it in `DeveloperMode.Sources`. It's enabled from **Settings → Developer
+   Options** (off every launch, not persisted) and the whole subsystem is gated by
+   `FeatureFlags.DeveloperTools` — set the `DISABLE_DEVTOOLS` build symbol or `EDNEXUS_DEVTOOLS=false`
+   to strip it. Keep dev tooling behind that flag.
 
 ## How work is organised
 
