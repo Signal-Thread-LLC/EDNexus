@@ -40,3 +40,8 @@ Thumbs.db
 # Local overrides
 *.local.json
 appsettings.*.Local.json
+
+# Installer build output
+installer/**/publish/
+installer/**/stage/
+installer/**/out/

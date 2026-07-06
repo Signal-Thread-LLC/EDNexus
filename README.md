@@ -52,12 +52,37 @@ The Sentry DSN is **not stored in this repository**. It is injected at release-b
 secret (`SENTRY_DSN`), so source builds have no DSN and reporting stays disabled. Developers can set
 `EDNEXUS_SENTRY_DSN` locally to test.
 
+## Installation
+
+Installers are self-contained (no separate .NET install needed).
+
+- **Windows** — run `EDNexus-<version>-setup.exe`. Installs to
+  `C:\Program Files\Signal & Thread\EDNexus\` (path is changeable in the wizard). Built with
+  [Inno Setup](https://jrsoftware.org/isinfo.php).
+- **Linux** — `sudo apt install ./ednexus_<version>_amd64.deb`. Installs to
+  `/opt/signal-and-thread/ednexus/` with an `ednexus` launcher on your `PATH`. Built with
+  [FPM](https://github.com/jordansissel/fpm).
+
+Preferences are stored in **`Documents\EDNexus`** (Windows) / **`~/EDNexus`** (Linux) — never in the
+install directory, so the app folder can stay read-only.
+
+### Building the installers locally
+
+```powershell
+# Windows (needs Inno Setup 6: choco install innosetup)
+installer\windows\build.ps1 -Version 0.1.0
+```
+```sh
+# Linux (needs fpm: gem install fpm)
+installer/linux/build-deb.sh 0.1.0
+```
+
 ## Releases
 
 Tagging a release (`git tag v0.1.0 && git push --tags`) triggers `.github/workflows/release.yml`,
-which publishes a self-contained Windows build with the DSN injected from the `SENTRY_DSN` secret and
-(if `SENTRY_AUTH_TOKEN` is set) uploads debug symbols for readable stack traces. See the workflow
-header for the required Actions secrets.
+which builds the Windows installer and Linux `.deb` — injecting the DSN from the `SENTRY_DSN` secret
+(and uploading debug symbols when `SENTRY_AUTH_TOKEN` is set) — and attaches them to a GitHub Release.
+See the workflow header for the required Actions secrets.
 
 ## Roadmap
 

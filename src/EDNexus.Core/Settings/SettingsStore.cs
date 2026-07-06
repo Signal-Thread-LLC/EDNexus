@@ -16,8 +16,11 @@ public sealed class SettingsStore
 
     public static string DefaultPath()
     {
+        // Preferences live under the user's Documents folder (Documents\EDNexus on Windows;
+        // $HOME/EDNexus on Linux/macOS) — deliberately NOT the install directory, since a
+        // Program Files / /opt install is read-only for normal users.
         var dir = System.IO.Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "EDNexus");
+            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "EDNexus");
         return System.IO.Path.Combine(dir, "settings.json");
     }
 
