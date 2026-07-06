@@ -1,0 +1,65 @@
+name: 🤖 Agent task
+description: A self-contained brief an AI coding agent can act on without extra context
+title: "[Agent] "
+labels: ["agent-ready"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Fill every required field so an agent (or a fresh contributor) can complete this
+        without reading the rest of the backlog. Vague briefs produce vague PRs.
+  - type: textarea
+    id: objective
+    attributes:
+      label: Objective
+      description: One or two sentences — what should exist when this is done?
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options: [engine, ui, colonisation, market, routes, exobio, overlay, infra]
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context & background
+      description: Why this matters, relevant journal events, links to related issues.
+  - type: textarea
+    id: entrypoints
+    attributes:
+      label: Entry points
+      description: Files / classes to start from and where new code should live.
+      placeholder: |
+        - src/EDNexus.Core/... (new service)
+        - Reads CommanderState; only StateTracker mutates state
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      value: |
+        - [ ]
+        - [ ]
+    validations:
+      required: true
+  - type: textarea
+    id: verification
+    attributes:
+      label: Verification
+      description: Exact commands / steps the agent must run to prove it works.
+      value: |
+        ```sh
+        dotnet build EDNexus.slnx
+        dotnet run --project src/EDNexus.Cli -- --once
+        ```
+    validations:
+      required: true
+  - type: textarea
+    id: out-of-scope
+    attributes:
+      label: Out of scope
+      description: What this task must NOT change, to keep the PR reviewable.
