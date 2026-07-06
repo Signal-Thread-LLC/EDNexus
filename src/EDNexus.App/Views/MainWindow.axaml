@@ -64,11 +64,18 @@
                      LetterSpacing="3" VerticalAlignment="Center" Margin="4,3,0,0" />
         </StackPanel>
 
-        <StackPanel Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center">
-          <TextBlock Text="{Binding CommanderName}" Foreground="{StaticResource Ink}"
-                     FontSize="16" FontWeight="SemiBold" HorizontalAlignment="Right" />
-          <TextBlock Text="{Binding Balance}" Foreground="{StaticResource AmberBrush}"
-                     FontSize="13" HorizontalAlignment="Right" />
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="14"
+                    HorizontalAlignment="Right" VerticalAlignment="Center">
+          <StackPanel VerticalAlignment="Center">
+            <TextBlock Text="{Binding CommanderName}" Foreground="{StaticResource Ink}"
+                       FontSize="16" FontWeight="SemiBold" HorizontalAlignment="Right" />
+            <TextBlock Text="{Binding Balance}" Foreground="{StaticResource AmberBrush}"
+                       FontSize="13" HorizontalAlignment="Right" />
+          </StackPanel>
+          <Button Command="{Binding OpenSettingsCommand}" Content="⚙" FontSize="16"
+                  Width="36" Height="36" Padding="0" VerticalAlignment="Center"
+                  HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                  Background="#1B1E24" Foreground="{StaticResource Ink}" ToolTip.Tip="Settings" />
         </StackPanel>
       </Grid>
     </Border>
@@ -76,10 +83,12 @@
     <!-- Footer / status bar -->
     <Border DockPanel.Dock="Bottom" Background="#101216" BorderBrush="{StaticResource CardBorder}"
             BorderThickness="0,1,0,0" Padding="20,8">
-      <Grid ColumnDefinitions="*,Auto">
+      <Grid ColumnDefinitions="*,Auto,Auto">
         <TextBlock Grid.Column="0" Text="{Binding JournalStatus}" Classes="label"
                    TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-        <TextBlock Grid.Column="1" Text="{Binding LastUpdated, StringFormat='updated {0}'}"
+        <TextBlock Grid.Column="1" Text="{Binding PrivacyStatus}" Classes="label"
+                   Margin="0,0,16,0" VerticalAlignment="Center" />
+        <TextBlock Grid.Column="2" Text="{Binding LastUpdated, StringFormat='updated {0}'}"
                    Classes="label" VerticalAlignment="Center" />
       </Grid>
     </Border>

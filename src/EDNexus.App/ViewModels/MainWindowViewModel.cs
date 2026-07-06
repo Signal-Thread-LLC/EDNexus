@@ -1,6 +1,10 @@
 using System.Collections.ObjectModel;
+using Avalonia;
+using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using EDNexus.App.Views;
 using EDNexus.Core;
 using EDNexus.Core.State;
 
@@ -14,15 +18,18 @@ namespace EDNexus.App.ViewModels;
 public sealed partial class MainWindowViewModel : CommunityToolkit.Mvvm.ComponentModel.ObservableObject
 {
     private readonly EngineHost _host;
+    private readonly Bootstrap _boot;
     private DispatcherTimer? _timer;
     private string _cargoSignature = "";
 
-    public MainWindowViewModel(EngineHost host)
+    public MainWindowViewModel(EngineHost host, Bootstrap boot)
     {
         _host = host;
+        _boot = boot;
         JournalStatus = host.JournalFound
             ? $"● Watching  {host.JournalDirectory}"
             : "✕ Journal folder not found — set EDNEXUS_JOURNAL_DIR";
+        RefreshPrivacyStatus();
     }
 
     public void Start()
@@ -34,6 +41,7 @@ public sealed partial class MainWindowViewModel : CommunityToolkit.Mvvm.Componen
     }
 
     [ObservableProperty] private string _journalStatus = "";
+    [ObservableProperty] private string _privacyStatus = "";
     [ObservableProperty] private string _commanderName = "—";
     [ObservableProperty] private string _balance = "0 cr";
     [ObservableProperty] private string _ship = "—";
@@ -50,6 +58,19 @@ public sealed partial class MainWindowViewModel : CommunityToolkit.Mvvm.Componen
     [ObservableProperty] private string _lastUpdated = "—";
 
     public ObservableCollection<CargoLine> Cargo { get; } = new();
+
+    [RelayCommand]
+    private async Task OpenSettings()
+    {
+        var owner = (Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.MainWindow;
+        var dialog = new SettingsWindow(_boot);
+        if (owner is not null) await dialog.ShowDialog(owner);
+        else dialog.Show();
+        RefreshPrivacyStatus();
+    }
+
+    private void RefreshPrivacyStatus()
+        => PrivacyStatus = _boot.Crash.IsActive ? "crash reporting on" : "crash reporting off";
 
     private void Refresh()
     {
@@ -76,7 +97,6 @@ public sealed partial class MainWindowViewModel : CommunityToolkit.Mvvm.Componen
 
     private void SyncCargo(CommanderState s)
     {
-        // Only rebuild the list when the hold actually changed, to avoid flicker.
         var signature = string.Join("|", s.Cargo.OrderBy(k => k.Key).Select(k => $"{k.Key}:{k.Value}"));
         if (signature == _cargoSignature) return;
         _cargoSignature = signature;

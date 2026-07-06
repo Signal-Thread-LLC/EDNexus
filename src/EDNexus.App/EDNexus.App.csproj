@@ -8,6 +8,8 @@
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <!-- Overridable by CI: dotnet publish -p:Version=1.2.3 -->
+    <Version Condition="'$(Version)' == ''">0.1.0</Version>
   </PropertyGroup>
 
   <ItemGroup>
@@ -19,6 +21,35 @@
     <PackageReference Include="Avalonia.Fonts.Inter" Version="12.0.5" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="12.0.5" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="Sentry" Version="6.6.0" />
   </ItemGroup>
+
+  <!--
+    Sentry DSN is injected at release build time from a CI secret and baked into assembly metadata
+    (read back by SentryConfig.ResolveDsn). It is NEVER committed to the repo. Local/dev builds leave
+    it empty, so crash reporting stays disabled unless EDNEXUS_SENTRY_DSN is set at runtime.
+      dotnet publish ... -p:SentryDsn=$SENTRY_DSN
+  -->
+  <PropertyGroup>
+    <SentryDsn Condition="'$(SentryDsn)' == ''"></SentryDsn>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(SentryDsn)' != ''">
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>SentryDsn</_Parameter1>
+      <_Parameter2>$(SentryDsn)</_Parameter2>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+  <!--
+    Debug-symbol + source upload for readable stack traces / release health. Runs ONLY when
+    SENTRY_AUTH_TOKEN is present (i.e. the release workflow), so ordinary builds never upload.
+    Override the slugs with -p:SentryOrg=... -p:SentryProject=... if they differ.
+  -->
+  <PropertyGroup Condition="'$(SENTRY_AUTH_TOKEN)' != ''">
+    <SentryOrg Condition="'$(SentryOrg)' == ''">signal-thread-llc</SentryOrg>
+    <SentryProject Condition="'$(SentryProject)' == ''">ednexus</SentryProject>
+    <SentryUploadSymbols>true</SentryUploadSymbols>
+    <SentryUploadSources>true</SentryUploadSources>
+  </PropertyGroup>
 
 </Project>

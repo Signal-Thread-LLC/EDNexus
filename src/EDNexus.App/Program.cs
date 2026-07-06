@@ -1,13 +1,29 @@
 using Avalonia;
+using EDNexus.App.Telemetry;
+using EDNexus.Core.Settings;
 
 namespace EDNexus.App;
 
 internal static class Program
 {
-    // Avalonia needs an STA thread and must be initialized before any control is created.
+    /// <summary>Process-wide services, created before the UI so startup crashes can be reported.</summary>
+    public static Bootstrap Services { get; private set; } = null!;
+
     [STAThread]
     public static void Main(string[] args)
-        => BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+    {
+        var store = new SettingsStore();
+        var settings = store.Load();
+
+        // Dispose flushes any pending Sentry events on exit. TryStart is a no-op unless the user
+        // has previously opted in AND a DSN is present in this build.
+        using var crash = new CrashReporting();
+        crash.TryStart(settings);
+
+        Services = new Bootstrap(store, settings, crash);
+
+        BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+    }
 
     public static AppBuilder BuildAvaloniaApp()
         => AppBuilder.Configure<App>()

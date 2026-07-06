@@ -1,0 +1,27 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="EDNexus.App.Views.SettingsWindow"
+        Title="EDNexus — Settings"
+        Width="520" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False" Background="#14161A">
+  <StackPanel Margin="24" Spacing="16">
+    <TextBlock Text="SETTINGS" Foreground="#F07100" FontSize="12" FontWeight="SemiBold" LetterSpacing="2" />
+
+    <Border Background="#0F1114" CornerRadius="6" Padding="16">
+      <StackPanel Spacing="10">
+        <CheckBox x:Name="CrashToggle" Content="Send anonymous crash &amp; error reports"
+                  Foreground="#E7E9EE" />
+        <TextBlock Foreground="#8A909C" FontSize="12" TextWrapping="Wrap"
+                   Text="App version, OS, and errors with stack traces, plus a random install id. Never your commander name, systems, journal contents, or user name / paths." />
+        <TextBlock x:Name="StatusLine" Foreground="#8A909C" FontSize="11" />
+      </StackPanel>
+    </Border>
+
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
+      <Button Content="Close" Click="OnClose" Padding="16,8" />
+      <Button Content="Save" Click="OnSave" Padding="16,8"
+              Background="#F07100" Foreground="#101216" FontWeight="SemiBold" />
+    </StackPanel>
+  </StackPanel>
+</Window>

@@ -1,0 +1,29 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="EDNexus.App.Views.ConsentWindow"
+        Title="Help improve EDNexus"
+        Width="520" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False" Background="#14161A">
+  <StackPanel Margin="24" Spacing="14">
+    <TextBlock Text="Share anonymous crash reports?" Foreground="#F07100"
+               FontSize="17" FontWeight="SemiBold" />
+    <TextBlock Foreground="#E7E9EE" TextWrapping="Wrap" FontSize="13" LineHeight="20"
+               Text="EDNexus can send anonymized crash and error reports so bugs get fixed faster. Reporting is off unless you turn it on, and you can change this any time in Settings." />
+    <Border Background="#0F1114" CornerRadius="6" Padding="14">
+      <StackPanel Spacing="6">
+        <TextBlock Text="What is sent" Foreground="#8A909C" FontSize="11" FontWeight="SemiBold" />
+        <TextBlock Foreground="#C7CBD3" FontSize="12" TextWrapping="Wrap"
+                   Text="• App version, OS, and the error with its stack trace&#x0a;• A random install id (not linked to your commander or account)" />
+        <TextBlock Text="What is never sent" Foreground="#8A909C" FontSize="11" FontWeight="SemiBold" Margin="0,6,0,0" />
+        <TextBlock Foreground="#C7CBD3" FontSize="12" TextWrapping="Wrap"
+                   Text="• Your commander name, systems, or journal contents&#x0a;• Your Windows/user name or file paths that contain it" />
+      </StackPanel>
+    </Border>
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
+      <Button Content="No thanks" Click="OnDecline" Padding="16,8" />
+      <Button Content="Enable reporting" Click="OnEnable" Padding="16,8"
+              Background="#F07100" Foreground="#101216" FontWeight="SemiBold" />
+    </StackPanel>
+  </StackPanel>
+</Window>
