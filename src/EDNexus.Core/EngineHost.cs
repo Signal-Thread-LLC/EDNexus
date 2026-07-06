@@ -1,4 +1,7 @@
+using System.Reflection;
 using EDNexus.Core.Journal;
+using EDNexus.Core.Reporting;
+using EDNexus.Core.Settings;
 using EDNexus.Core.State;
 
 namespace EDNexus.Core;
@@ -13,6 +16,7 @@ public sealed class EngineHost : IDisposable
     private readonly CancellationTokenSource _cts = new();
     private readonly StateTracker _tracker;
     private readonly JournalWatcher? _watcher;
+    private readonly ReporterHost? _reporters;
     private Task? _runTask;
 
     public JournalEventBus Bus { get; } = new();
@@ -20,10 +24,17 @@ public sealed class EngineHost : IDisposable
     public string? JournalDirectory { get; }
     public bool JournalFound => JournalDirectory is not null;
 
-    public EngineHost(string? journalDir = null)
+    /// <param name="journalDir">Journal folder, or null to auto-detect.</param>
+    /// <param name="settings">
+    /// When supplied, wires the EDDN/Inara data reporters (still gated on their per-service opt-in).
+    /// The CLI passes null, so its replay-only runs never transmit.
+    /// </param>
+    public EngineHost(string? journalDir = null, AppSettings? settings = null)
     {
         JournalDirectory = journalDir ?? JournalPaths.Resolve();
         _tracker = new StateTracker(Bus, State);
+        if (settings is not null)
+            _reporters = new ReporterHost(Bus, settings, ResolveVersion(), IsDevelopmentBuild);
         if (JournalDirectory is not null)
             _watcher = new JournalWatcher(JournalDirectory, Bus);
     }
@@ -41,6 +52,25 @@ public sealed class EngineHost : IDisposable
         _cts.Cancel();
         try { _runTask?.Wait(TimeSpan.FromSeconds(2)); }
         catch (AggregateException) { /* cancellation */ }
+        // Flush any queued reports before tearing down the shared HttpClient.
+        try { _reporters?.DisposeAsync().AsTask().Wait(TimeSpan.FromSeconds(3)); }
+        catch (AggregateException) { /* best effort */ }
         _cts.Dispose();
     }
+
+    private static string ResolveVersion()
+    {
+        var asm = Assembly.GetEntryAssembly() ?? typeof(EngineHost).Assembly;
+        var info = asm.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+        var version = info ?? asm.GetName().Version?.ToString() ?? "0.0.0";
+        var plus = version.IndexOf('+');   // strip any "+<gitsha>" build-metadata suffix
+        return plus >= 0 ? version[..plus] : version;
+    }
+
+    private static bool IsDevelopmentBuild =>
+#if DEBUG
+        true;
+#else
+        false;
+#endif
 }

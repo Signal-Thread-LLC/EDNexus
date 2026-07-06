@@ -17,9 +17,11 @@ and folds that into a single live commander state that every feature reads from.
 
 | Project | Role |
 |---|---|
-| `src/EDNexus.Core` | Engine: journal watcher → event bus → commander state |
+| `src/EDNexus.Core` | Engine: journal watcher → event bus → commander state, plus the reporting bridge |
 | `src/EDNexus.App` | Avalonia dashboard |
 | `src/EDNexus.Cli` | Headless harness (`--once` replays the latest journal and prints state) |
+| `src/EliteDangerous.Eddn` | Standalone, reusable EDDN upload client (no EDNexus dependency) |
+| `src/EliteDangerous.Inara` | Standalone, reusable Inara API client (no EDNexus dependency) |
 
 ## Running
 
@@ -51,6 +53,28 @@ you can change your mind any time in **Settings**.
 The Sentry DSN is **not stored in this repository**. It is injected at release-build time from a CI
 secret (`SENTRY_DSN`), so source builds have no DSN and reporting stays disabled. Developers can set
 `EDNEXUS_SENTRY_DSN` locally to test.
+
+## Data reporting (EDDN & Inara)
+
+EDNexus can feed the two community services every commander tool is expected to. Both are **opt-in,
+default off**, and are toggled in **Settings**:
+
+- **EDDN** — contributes **anonymized** market, scan, and travel data to the
+  [Elite Dangerous Data Network](https://github.com/EDCD/EDDN). The relay obfuscates the uploader id,
+  and messages carry only game-world data (no personal identity). Uploads happen live as you play.
+- **Inara** — syncs **your** commander (identity, credits, ranks, and travel) to your
+  [Inara](https://inara.cz) profile using your personal Inara API key. To respect Inara's rate
+  guidance, it only sends on session start, docking, FSD jumps, and session end — never continuously.
+
+Neither reporter sends anything until you enable it. Replaying an old journal (e.g. the CLI `--once`
+harness) never transmits — only live events are reported.
+
+The two clients live in **standalone libraries** (`EliteDangerous.Eddn`, `EliteDangerous.Inara`) with
+no dependency on the EDNexus engine, so they can be reused by other tools or split out later. EDNexus
+drives them through a small bridge in `EDNexus.Core/Reporting`.
+
+> Filling gaps the journal misses via the **Frontier CAPI** is planned but not yet implemented — it
+> needs an approved Frontier developer client id. The reporting layer leaves a clean seam for it.
 
 ## Installation
 

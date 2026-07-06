@@ -1,0 +1,241 @@
+using EDNexus.Core.Journal;
+using EDNexus.Core.Settings;
+using EliteDangerous.Inara;
+
+namespace EDNexus.Core.Reporting;
+
+/// <summary>
+/// Connects the journal event bus to the reusable <see cref="EliteDangerous.Inara"/> client, honouring
+/// Inara's "don't spam us" guidance: events are accumulated into a batch and the batch is only sent on
+/// the moments that matter — <b>session start</b> (LoadGame), <b>docking</b>, <b>FSD jump</b>, and
+/// <b>session end</b> (Shutdown / dispose) — and never more often than a cooldown. It captures commander
+/// identity from historical replay too, but only ever transmits live events, and only while enabled.
+/// </summary>
+public sealed class InaraBridge : IAsyncDisposable
+{
+    private static readonly TimeSpan SessionStartDebounce = TimeSpan.FromSeconds(8);
+    private static readonly TimeSpan MinInterval = TimeSpan.FromSeconds(30);
+
+    private readonly AppSettings _settings;
+    private readonly InaraClient _client;
+    private readonly TimeSpan _debounceDelay;
+    private readonly TimeSpan _minInterval;
+    private readonly object _gate = new();
+
+    // Captured identity (from any event, incl. historical) so we can attribute live sends.
+    private string? _commander;
+    private string? _frontierId;
+    private string? _shipType;
+    private long? _shipId;
+    private string? _shipName;
+    private string? _shipIdent;
+    private string? _system;
+
+    private readonly Dictionary<string, int> _rankValues = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, double> _rankProgress = new(StringComparer.Ordinal);
+
+    // The pending batch (events observed since the last flush). Set-events are deduped by name;
+    // travel events accumulate.
+    private readonly List<InaraEvent> _pending = new();
+
+    private Task _tail = Task.CompletedTask;
+    private CancellationTokenSource? _debounce;
+    private DateTimeOffset _lastFlush = DateTimeOffset.MinValue;
+    private bool _stopped;   // set on a hard error (e.g. bad API key); cleared when disabled again
+
+    public InaraBridge(JournalEventBus bus, AppSettings settings, InaraClient client)
+        : this(bus, settings, client, SessionStartDebounce, MinInterval) { }
+
+    /// <summary>Test-only constructor allowing the debounce/throttle windows to be shortened.</summary>
+    internal InaraBridge(JournalEventBus bus, AppSettings settings, InaraClient client, TimeSpan debounceDelay, TimeSpan minInterval)
+    {
+        _settings = settings;
+        _client = client;
+        _debounceDelay = debounceDelay;
+        _minInterval = minInterval;
+
+        bus.Subscribe("Commander", e => Capture(() => _commander = e.GetString("Name") ?? _commander));
+        bus.Subscribe("LoadGame", OnLoadGame);
+        bus.Subscribe("Loadout", OnLoadout);
+        bus.Subscribe("Rank", OnRank);
+        bus.Subscribe("Progress", OnProgress);
+        bus.Subscribe("Reputation", OnReputation);
+        bus.Subscribe("Location", e => Capture(() => TrackLocation(e)));
+        bus.Subscribe("CarrierJump", e => Capture(() => TrackLocation(e)));
+        bus.Subscribe("Docked", OnDocked);
+        bus.Subscribe("FSDJump", OnFsdJump);
+        bus.Subscribe("Shutdown", _ => FlushImmediate());
+    }
+
+    private bool Enabled => _settings.Reporting.Inara.Enabled
+                            && !string.IsNullOrWhiteSpace(_settings.Reporting.Inara.ApiKey);
+
+    // --- Identity / stat capture (accumulate; no send on its own). ---
+
+    private void OnLoadGame(JournalEntry e) => Capture(() =>
+    {
+        _commander = e.GetString("Commander") ?? _commander;
+        _frontierId = e.GetString("FID") ?? _frontierId;
+        TrackLocation(e);
+        if (e.GetInt64("Credits") is long credits)
+            AddOrReplaceSet(InaraEvent.SetCommanderCredits(e.Timestamp, credits, e.GetInt64("Loan")));
+
+        // Session start: give the immediately-following Rank/Reputation/Loadout events a moment to
+        // land, then send the assembled snapshot.
+        if (!e.IsHistorical) ScheduleFlush(_debounceDelay);
+    });
+
+    private void OnLoadout(JournalEntry e) => Capture(() =>
+    {
+        _shipType = e.GetString("Ship") ?? _shipType;
+        _shipId = e.GetInt64("ShipID") ?? _shipId;
+        _shipName = e.GetString("ShipName") ?? _shipName;
+        _shipIdent = e.GetString("ShipIdent") ?? _shipIdent;
+        if (_shipType is not null)
+            AddOrReplaceSet(InaraEvent.SetCommanderShip(e.Timestamp, _shipType, _shipId, _shipName, _shipIdent));
+    });
+
+    private void OnRank(JournalEntry e) => Capture(() =>
+    {
+        foreach (var name in RankNames)
+            if (e.GetInt64(name) is long v) _rankValues[name.ToLowerInvariant()] = (int)v;
+        AddRanks(e.Timestamp);
+    });
+
+    private void OnProgress(JournalEntry e) => Capture(() =>
+    {
+        foreach (var name in RankNames)
+            if (e.GetInt64(name) is long p) _rankProgress[name.ToLowerInvariant()] = p / 100.0;
+        AddRanks(e.Timestamp);
+    });
+
+    private void OnReputation(JournalEntry e) => Capture(() =>
+    {
+        var factions = new List<(string, double)>();
+        foreach (var f in new[] { "Empire", "Federation", "Alliance", "Independent" })
+            if (e.GetDouble(f) is double rep) factions.Add((f.ToLowerInvariant(), rep));
+        if (factions.Count > 0)
+            AddOrReplaceSet(InaraEvent.SetCommanderReputationMajorFaction(e.Timestamp, factions));
+    });
+
+    // --- Flush triggers. ---
+
+    private void OnDocked(JournalEntry e) => Capture(() =>
+    {
+        TrackLocation(e);
+        if (!e.IsHistorical && _system is not null && e.GetString("StationName") is string station)
+        {
+            _pending.Add(InaraEvent.AddCommanderTravelDock(e.Timestamp, _system, station, e.GetInt64("MarketID"), _shipType));
+            _pending.Add(InaraEvent.SetCommanderTravelLocation(e.Timestamp, _system, station, e.GetInt64("MarketID")));
+            FlushImmediate();
+        }
+    });
+
+    private void OnFsdJump(JournalEntry e) => Capture(() =>
+    {
+        TrackLocation(e);
+        if (!e.IsHistorical && _system is not null)
+        {
+            _pending.Add(InaraEvent.AddCommanderTravelFSDJump(e.Timestamp, _system, e.GetDouble("JumpDist") ?? 0, _shipType));
+            _pending.Add(InaraEvent.SetCommanderTravelLocation(e.Timestamp, _system));
+            FlushImmediate();
+        }
+    });
+
+    // --- Batch plumbing. ---
+
+    private void TrackLocation(JournalEntry e) => _system = e.GetString("StarSystem") ?? _system;
+
+    private void AddRanks(DateTimeOffset ts)
+    {
+        if (_rankValues.Count == 0) return;
+        var ranks = _rankValues.Select(kv => (kv.Key, kv.Value, _rankProgress.GetValueOrDefault(kv.Key)));
+        AddOrReplaceSet(InaraEvent.SetCommanderRankPilot(ts, ranks));
+    }
+
+    /// <summary>Adds a "set" event, replacing any earlier one of the same name so we never send stale dupes.</summary>
+    private void AddOrReplaceSet(InaraEvent ev)
+    {
+        _pending.RemoveAll(p => p.EventName == ev.EventName);
+        _pending.Add(ev);
+    }
+
+    private void Capture(Action mutate)
+    {
+        lock (_gate) mutate();
+    }
+
+    private void ScheduleFlush(TimeSpan delay)
+    {
+        _debounce?.Cancel();
+        var cts = new CancellationTokenSource();
+        _debounce = cts;
+        _ = Task.Run(async () =>
+        {
+            try { await Task.Delay(delay, cts.Token).ConfigureAwait(false); }
+            catch (TaskCanceledException) { return; }
+            FlushNow();
+        });
+    }
+
+    private void FlushImmediate()
+    {
+        _debounce?.Cancel();
+        FlushNow();
+    }
+
+    /// <summary>Snapshots the batch and chains an async send. Runs whatever thread triggered it.</summary>
+    private void FlushNow()
+    {
+        InaraIdentity? identity;
+        List<InaraEvent> batch;
+        lock (_gate)
+        {
+            if (!Enabled) { _stopped = false; return; }  // disabling clears any prior hard-error stop
+            if (_stopped || _pending.Count == 0 || _commander is null) return;
+
+            identity = new InaraIdentity
+            {
+                ApiKey = _settings.Reporting.Inara.ApiKey,
+                CommanderName = _commander,
+                CommanderFrontierID = _frontierId,
+            };
+            batch = new List<InaraEvent>(_pending);
+            _pending.Clear();
+
+            var prev = _tail;
+            _tail = SendAsync(prev, identity, batch);
+        }
+    }
+
+    private async Task SendAsync(Task previous, InaraIdentity identity, List<InaraEvent> batch)
+    {
+        try { await previous.ConfigureAwait(false); } catch { }
+
+        // "As requested by the site": never exceed the minimum interval between sends.
+        var since = DateTimeOffset.UtcNow - _lastFlush;
+        if (since < _minInterval)
+        {
+            try { await Task.Delay(_minInterval - since).ConfigureAwait(false); }
+            catch { }
+        }
+
+        var response = await _client.SendAsync(identity, batch).ConfigureAwait(false);
+        _lastFlush = DateTimeOffset.UtcNow;
+
+        if (response.IsHardError)
+            lock (_gate) _stopped = true;   // e.g. invalid API key — stop until re-enabled
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        FlushImmediate();
+        Task tail;
+        lock (_gate) tail = _tail;
+        try { await tail.ConfigureAwait(false); } catch { }
+        _client.Dispose();
+    }
+
+    private static readonly string[] RankNames =
+        { "Combat", "Trade", "Explore", "Soldier", "Exobiologist", "Empire", "Federation", "CQC" };
+}

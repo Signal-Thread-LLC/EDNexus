@@ -20,7 +20,7 @@ public partial class App : Application
         {
             var boot = Program.Services;
 
-            _host = new EngineHost();
+            _host = new EngineHost(settings: boot.Settings);
             boot.Crash.Attach(_host.Bus); // report journal handler errors
 
             var vm = new MainWindowViewModel(_host, boot);
