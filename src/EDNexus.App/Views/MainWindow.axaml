@@ -15,6 +15,7 @@
     <SolidColorBrush x:Key="CardBorder" Color="#242830" />
     <SolidColorBrush x:Key="Ink" Color="#E7E9EE" />
     <SolidColorBrush x:Key="InkDim" Color="#8A909C" />
+    <SolidColorBrush x:Key="Good" Color="#FF5FD08B" />
   </Window.Resources>
 
   <Window.Styles>
@@ -48,6 +49,23 @@
       <Setter Property="FontSize" Value="22" />
       <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
+    <Style Selector="Button.dice">
+      <Setter Property="Background" Value="#1B1E24" />
+      <Setter Property="Foreground" Value="{StaticResource Ink}" />
+      <Setter Property="Width" Value="26" />
+      <Setter Property="Height" Value="22" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="VerticalAlignment" Value="Top" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="ToolTip.Tip" Value="Randomize this card" />
+    </Style>
+    <Style Selector="Button.devbar">
+      <Setter Property="Background" Value="#1B1E24" />
+      <Setter Property="Foreground" Value="{StaticResource Ink}" />
+      <Setter Property="Padding" Value="12,6" />
+    </Style>
   </Window.Styles>
 
   <DockPanel LastChildFill="True">
@@ -80,6 +98,19 @@
       </Grid>
     </Border>
 
+    <!-- Developer mode action bar -->
+    <Border DockPanel.Dock="Top" Background="#141013" BorderBrush="{StaticResource CardBorder}"
+            BorderThickness="0,0,0,1" Padding="20,10" IsVisible="{Binding DevMode}">
+      <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+        <TextBlock Text="DEV MODE" Foreground="{StaticResource AmberBrush}" FontSize="11"
+                   FontWeight="SemiBold" LetterSpacing="2" VerticalAlignment="Center" />
+        <Button Classes="devbar" Command="{Binding RandomizeAllCommand}" Content="🎲 Randomize all" />
+        <Button Classes="devbar" Command="{Binding ResetToLiveCommand}" Content="↺ Reset to live data" />
+        <TextBlock Text="Fabricated state is pushed through the real journal pipeline — the 🎲 on each card reshuffles just that card."
+                   Classes="label" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+      </StackPanel>
+    </Border>
+
     <!-- Footer / status bar -->
     <Border DockPanel.Dock="Bottom" Background="#101216" BorderBrush="{StaticResource CardBorder}"
             BorderThickness="0,1,0,0" Padding="20,8">
@@ -100,7 +131,11 @@
         <!-- Location -->
         <Border Classes="card" Width="452">
           <StackPanel>
-            <TextBlock Classes="cardHeader" Text="LOCATION" />
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Grid.Column="0" Classes="cardHeader" Text="LOCATION" />
+              <Button Grid.Column="1" Classes="dice" Content="🎲" IsVisible="{Binding DevMode}"
+                      Command="{Binding RandomizeCardCommand}" CommandParameter="location" />
+            </Grid>
             <TextBlock Classes="big" Text="{Binding SystemName}" />
             <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,6,0,0">
               <TextBlock Classes="label" Text="Body" />
@@ -114,7 +149,11 @@
         <!-- Ship -->
         <Border Classes="card" Width="452">
           <StackPanel>
-            <TextBlock Classes="cardHeader" Text="SHIP" />
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Grid.Column="0" Classes="cardHeader" Text="SHIP" />
+              <Button Grid.Column="1" Classes="dice" Content="🎲" IsVisible="{Binding DevMode}"
+                      Command="{Binding RandomizeCardCommand}" CommandParameter="ship" />
+            </Grid>
             <TextBlock Classes="value" Text="{Binding Ship}" />
             <TextBlock Classes="label" Text="Fuel" Margin="0,14,0,4" />
             <Grid ColumnDefinitions="*,Auto">
@@ -130,7 +169,11 @@
         <!-- Materials -->
         <Border Classes="card" Width="452">
           <StackPanel>
-            <TextBlock Classes="cardHeader" Text="MATERIALS" />
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Grid.Column="0" Classes="cardHeader" Text="MATERIALS" />
+              <Button Grid.Column="1" Classes="dice" Content="🎲" IsVisible="{Binding DevMode}"
+                      Command="{Binding RandomizeCardCommand}" CommandParameter="materials" />
+            </Grid>
             <Grid ColumnDefinitions="*,*,*">
               <StackPanel Grid.Column="0">
                 <TextBlock Classes="big" Text="{Binding RawMaterials}" />
@@ -152,7 +195,11 @@
         <!-- Cargo -->
         <Border Classes="card" Width="452">
           <StackPanel>
-            <TextBlock Classes="cardHeader" Text="CARGO HOLD" />
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Grid.Column="0" Classes="cardHeader" Text="CARGO HOLD" />
+              <Button Grid.Column="1" Classes="dice" Content="🎲" IsVisible="{Binding DevMode}"
+                      Command="{Binding RandomizeCardCommand}" CommandParameter="cargo" />
+            </Grid>
             <TextBlock Classes="value" Text="{Binding CargoSummary}" Margin="0,0,0,10" />
             <ItemsControl ItemsSource="{Binding Cargo}" MaxHeight="220">
               <ItemsControl.ItemTemplate>
@@ -169,6 +216,63 @@
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
             </ItemsControl>
+          </StackPanel>
+        </Border>
+
+        <!-- Colonisation -->
+        <Border Classes="card" Width="920">
+          <StackPanel>
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Grid.Column="0" Classes="cardHeader" Text="COLONISATION" />
+              <Button Grid.Column="1" Classes="dice" Content="🎲" IsVisible="{Binding DevMode}"
+                      Command="{Binding RandomizeCardCommand}" CommandParameter="colonisation" />
+            </Grid>
+
+            <TextBlock Classes="label" IsVisible="{Binding NoColonisation}" TextWrapping="Wrap"
+                       Text="No construction site in range. Dock at a colonisation construction ship and open its Construction Services panel to load the depot." />
+
+            <StackPanel IsVisible="{Binding HasColonisation}">
+              <TextBlock Classes="big" Text="{Binding ColonisationTitle}" TextWrapping="Wrap" />
+              <Grid ColumnDefinitions="*,Auto" Margin="0,10,0,4">
+                <ProgressBar Grid.Column="0" Minimum="0" Maximum="1" Value="{Binding ColonisationProgress}"
+                             Height="10" Foreground="{StaticResource AmberBrush}" Background="#22262E"
+                             VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" Classes="value" FontSize="15" Margin="12,0,0,0"
+                           Text="{Binding ColonisationStatus}" Foreground="{StaticResource AmberBrush}"
+                           VerticalAlignment="Center" />
+              </Grid>
+              <TextBlock Classes="label" Text="{Binding ColonisationSummary}" Margin="0,0,0,12" />
+
+              <Grid ColumnDefinitions="*,110,100,150" Margin="0,0,0,2">
+                <TextBlock Grid.Column="0" Classes="label" Text="COMMODITY" />
+                <TextBlock Grid.Column="1" Classes="label" Text="REMAINING" HorizontalAlignment="Right" />
+                <TextBlock Grid.Column="2" Classes="label" Text="TO BUY" HorizontalAlignment="Right" />
+                <TextBlock Grid.Column="3" Classes="label" Text="IN HOLD" HorizontalAlignment="Right" />
+              </Grid>
+
+              <ItemsControl ItemsSource="{Binding ShoppingList}" MaxHeight="360">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:ShoppingLine">
+                    <Grid ColumnDefinitions="*,110,100,150" Margin="0,5">
+                      <StackPanel Grid.Column="0" Margin="0,0,12,0" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Name}" Classes="value" FontSize="13" />
+                        <ProgressBar Minimum="0" Maximum="1" Value="{Binding Fraction}" Height="4"
+                                     Foreground="{StaticResource AmberDim}" Background="#1B1E24"
+                                     Margin="0,4,0,0" />
+                      </StackPanel>
+                      <TextBlock Grid.Column="1" Text="{Binding Remaining}" Classes="value" FontSize="13"
+                                 HorizontalAlignment="Right" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="2" Text="{Binding ToBuy}" Classes="value" FontSize="13"
+                                 Foreground="{StaticResource AmberBrush}"
+                                 HorizontalAlignment="Right" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="3" Text="{Binding HoldNote}" FontSize="12"
+                                 Foreground="{StaticResource Good}" IsVisible="{Binding Carrying}"
+                                 HorizontalAlignment="Right" VerticalAlignment="Center" />
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
           </StackPanel>
         </Border>
 
