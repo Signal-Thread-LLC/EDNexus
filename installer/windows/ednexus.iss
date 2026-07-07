@@ -11,7 +11,7 @@
 #define AppName "EDNexus"
 #define AppPublisher "Signal & Thread LLC"
 #ifndef AppVersion
-  #define AppVersion "0.1.0"
+  #define AppVersion "0.0.1"
 #endif
 #ifndef PublishDir
   #define PublishDir "publish"

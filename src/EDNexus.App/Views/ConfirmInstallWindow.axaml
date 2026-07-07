@@ -1,0 +1,25 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="EDNexus.App.Views.ConfirmInstallWindow"
+        Title="Install update" Icon="/Assets/ednexus.png"
+        Width="520" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False" Background="#14161A">
+  <StackPanel Margin="24" Spacing="14">
+    <TextBlock Text="Install downloaded update?" Foreground="#F07100"
+               FontSize="17" FontWeight="SemiBold" />
+    <TextBlock Foreground="#E7E9EE" TextWrapping="Wrap" FontSize="13" LineHeight="20"
+               Text="EDNexus has downloaded an update to your temp folder. Installing will run the downloaded file. Make sure you trust this source. The app will not auto-run installers without your confirmation." />
+    <Border Background="#0F1114" CornerRadius="6" Padding="14">
+      <StackPanel Spacing="6">
+        <TextBlock Text="File" Foreground="#8A909C" FontSize="11" FontWeight="SemiBold" />
+        <TextBlock x:Name="FilePath" Foreground="#C7CBD3" FontSize="12" TextWrapping="Wrap" />
+      </StackPanel>
+    </Border>
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
+      <Button Content="Cancel" Click="OnDecline" Padding="16,8" />
+      <Button Content="Install" Click="OnEnable" Padding="16,8"
+              Background="#F07100" Foreground="#101216" FontWeight="SemiBold" />
+    </StackPanel>
+  </StackPanel>
+</Window>

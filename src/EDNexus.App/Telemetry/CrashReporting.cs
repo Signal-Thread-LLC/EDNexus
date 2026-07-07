@@ -50,6 +50,19 @@ public sealed class CrashReporting : IDisposable
 
         SentrySdk.ConfigureScope(s => s.User = new SentryUser { Id = _installId });
         IsActive = true;
+
+        // Also register global unhandled exception handlers so the local log file records crashes
+        AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+        {
+            if (e.ExceptionObject is Exception ex)
+                Capture(ex);
+        };
+        TaskScheduler.UnobservedTaskException += (_, e) =>
+        {
+            Capture(e.Exception);
+            e.SetObserved();
+        };
+
         return true;
     }
 
@@ -64,6 +77,18 @@ public sealed class CrashReporting : IDisposable
     /// <summary>Report a handled exception (only when active).</summary>
     public void Capture(Exception ex)
     {
+        // Always write crash details to the local log file for diagnostics.
+        try
+        {
+            System.Diagnostics.Trace.TraceError("Captured exception: " + ex);
+            // Write a simple crash marker so the UI can expose logs only after a crash.
+            var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "EDNexus");
+            Directory.CreateDirectory(dir);
+            var marker = Path.Combine(dir, "last_crash.txt");
+            File.WriteAllText(marker, DateTime.UtcNow.ToString("o") + "\n" + ex.ToString());
+        }
+        catch { }
+
         if (IsActive) SentrySdk.CaptureException(ex);
     }
 

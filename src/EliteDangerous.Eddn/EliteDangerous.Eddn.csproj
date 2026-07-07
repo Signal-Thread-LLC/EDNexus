@@ -14,7 +14,7 @@
     <PackageId>EliteDangerous.Eddn</PackageId>
     <Description>A reusable .NET client for uploading Elite Dangerous journal and market data to the Elite Dangerous Data Network (EDDN).</Description>
     <Authors>Signal &amp; Thread LLC</Authors>
-    <Version Condition="'$(Version)' == ''">0.1.0</Version>
+    <Version Condition="'$(Version)' == ''">0.0.1</Version>
   </PropertyGroup>
 
 </Project>

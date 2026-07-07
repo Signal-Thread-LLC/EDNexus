@@ -1,3 +1,6 @@
+using System;
+using System.Diagnostics;
+using System.IO;
 using Avalonia;
 using EDNexus.App.Telemetry;
 using EDNexus.Core.Settings;
@@ -12,6 +15,23 @@ internal static class Program
     [STAThread]
     public static void Main(string[] args)
     {
+        // Initialize file-based tracing to a per-user local appdata logs folder so runtime logs are available locally.
+        try
+        {
+            var logDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "EDNexus", "logs");
+            Directory.CreateDirectory(logDir);
+            var file = Path.Combine(logDir, $"ednexus-{DateTime.UtcNow:yyyyMMdd_HHmmss}.log");
+            var tw = new StreamWriter(File.Open(file, FileMode.Create, FileAccess.Write, FileShare.Read)) { AutoFlush = true };
+            Trace.Listeners.Add(new TextWriterTraceListener(tw));
+            Trace.AutoFlush = true;
+            Trace.TraceInformation($"EDNexus starting, log file: {file}");
+        }
+        catch (Exception ex)
+        {
+            // Best-effort file logging — don't block startup on failure.
+            Console.WriteLine($"Failed to initialise file logging: {ex}");
+        }
+
         var store = new SettingsStore();
         var settings = store.Load();
 
@@ -21,6 +41,17 @@ internal static class Program
         crash.TryStart(settings);
 
         Services = new Bootstrap(store, settings, crash);
+
+        // Start a non-blocking background auto-update check only if the user opted in.
+        if (settings.AutoDownloadUpdates)
+        {
+            System.Diagnostics.Trace.TraceInformation("Program: starting background auto-update check");
+            _ = System.Threading.Tasks.Task.Run(async () =>
+            {
+                var res = await EDNexus.App.Services.AutoUpdateService2.CheckForUpdatesAsync().ConfigureAwait(false);
+                System.Diagnostics.Trace.TraceInformation($"Program: background auto-update finished Found={res.Found}, Message={res.Message}, Verified={res.Verified}");
+            });
+        }
 
         BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
     }

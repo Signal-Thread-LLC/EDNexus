@@ -40,4 +40,13 @@ public sealed class Bootstrap
         Settings.Reporting.Inara.ApiKey = inaraApiKey.Trim();
         Store.Save(Settings);
     }
+
+    /// <summary>Persist the user's auto-update preference.</summary>
+    public void ApplyAutoDownloadChoice(bool enabled)
+    {
+        Settings.AutoDownloadUpdates = enabled;
+        Store.Save(Settings);
+        System.Diagnostics.Trace.TraceInformation($"Settings: AutoDownloadUpdates set to {enabled}");
+    }
+
 }

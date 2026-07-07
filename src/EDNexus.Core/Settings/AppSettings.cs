@@ -10,6 +10,12 @@ public sealed class AppSettings
     public bool? CrashReportingEnabled { get; set; }
 
     /// <summary>
+    /// When true, downloaded updates are automatically fetched at startup (platform-specific asset
+    /// from the GitHub Releases feed). Default is false to avoid surprise network activity.
+    /// </summary>
+    public bool AutoDownloadUpdates { get; set; } = false;
+
+    /// <summary>
     /// Random, locally-generated correlation id. It is the only stable key attached to reports and
     /// maps to nothing outside this machine — it is not derived from the commander or the OS user.
     /// </summary>

@@ -41,6 +41,28 @@
       </StackPanel>
     </Border>
 
+    <TextBlock Text="UPDATES" Foreground="#F07100" FontSize="12" FontWeight="SemiBold" LetterSpacing="2" />
+    <Border Background="#0F1114" CornerRadius="6" Padding="16">
+      <StackPanel Spacing="10">
+        <CheckBox x:Name="AutoDownloadToggle" Content="Automatically download updates on startup"
+                  Foreground="#E7E9EE" />
+        <TextBlock Foreground="#8A909C" FontSize="12" TextWrapping="Wrap"
+                   Text="When enabled, EDNexus will fetch the latest GitHub release asset for your platform and download it to your temp folder. Installation must still be performed by the user." />
+
+        <StackPanel Orientation="Horizontal" Spacing="10">
+          <TextBlock Text="Version:" Foreground="#E7E9EE" VerticalAlignment="Center" />
+          <TextBlock x:Name="VersionLine" Foreground="#8A909C" />
+          <TextBlock Width="24" />
+          <TextBlock Text="Update:" Foreground="#E7E9EE" VerticalAlignment="Center" />
+          <TextBlock x:Name="UpdateLine" Foreground="#8A909C" />
+        </StackPanel>
+
+        <StackPanel Spacing="6">
+          <Button x:Name="CheckNowButton" Content="Check for updates now" Click="OnCheckNow" Padding="10" HorizontalAlignment="Left" />
+        </StackPanel>
+      </StackPanel>
+    </Border>
+
     <!-- Developer options — hidden entirely when the dev tools are stripped/disabled (FeatureFlags). -->
     <StackPanel x:Name="DevSection" Spacing="8" IsVisible="False">
       <TextBlock Text="DEVELOPER OPTIONS" Foreground="#F07100" FontSize="12" FontWeight="SemiBold" LetterSpacing="2" />
@@ -54,6 +76,7 @@
     </StackPanel>
 
     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
+      <Button Content="Open logs" Click="OnOpenLogs" Padding="16,8" />
       <Button Content="Close" Click="OnClose" Padding="16,8" />
       <Button Content="Save" Click="OnSave" Padding="16,8"
               Background="#F07100" Foreground="#101216" FontWeight="SemiBold" />

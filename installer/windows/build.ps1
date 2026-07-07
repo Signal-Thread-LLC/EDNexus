@@ -8,7 +8,7 @@
   The Sentry DSN, if present in $env:SENTRY_DSN, is injected into the published app (kept out of the repo).
 #>
 param(
-  [string]$Version = "0.1.0",
+  [string]$Version = "0.0.1",
   [string]$Configuration = "Release",
   [string]$Runtime = "win-x64"
 )

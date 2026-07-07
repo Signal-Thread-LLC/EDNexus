@@ -1,4 +1,6 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
+using System.IO;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Threading;
@@ -35,7 +37,29 @@ public sealed partial class MainWindowViewModel : CommunityToolkit.Mvvm.Componen
             ? $"● Watching  {_host.JournalDirectory}"
             : "✕ Journal folder not found — set EDNEXUS_JOURNAL_DIR";
         RefreshPrivacyStatus();
-    }
+
+        // Listen for background updater notifications so the UI can show a bottom update bar.
+        EDNexus.App.Services.AutoUpdateService.UpdateDownloaded += path =>
+        {
+            // Marshal to the UI thread
+            Dispatcher.UIThread.Post(() =>
+            {
+                UpdatePath = path;
+                UpdateAvailable = true;
+                System.Diagnostics.Trace.TraceInformation($"UI: UpdateDownloaded event received (AutoUpdateService) path={path}");
+            });
+        };
+
+        // Also listen to the improved updater (AutoUpdateService2) used at startup.
+        EDNexus.App.Services.AutoUpdateService2.UpdateDownloaded += path =>
+        {
+            Dispatcher.UIThread.Post(() =>
+            {
+                UpdatePath = path;
+                UpdateAvailable = true;
+                System.Diagnostics.Trace.TraceInformation($"UI: UpdateDownloaded event received (AutoUpdateService2) path={path}");
+            });
+        };    }
 
     /// <summary>Create a fresh engine host and wire crash reporting to its bus.</summary>
     private EngineHost BuildHost()
@@ -77,6 +101,10 @@ public sealed partial class MainWindowViewModel : CommunityToolkit.Mvvm.Componen
 
     [ObservableProperty] private bool _devMode;
 
+    // Update bar properties
+    [ObservableProperty] private bool _updateAvailable;
+    [ObservableProperty] private string _updatePath = "";
+
     [ObservableProperty] private bool _hasColonisation;
     [ObservableProperty] private string _colonisationTitle = "—";
     [ObservableProperty] private string _colonisationStatus = "—";
@@ -112,6 +140,52 @@ public sealed partial class MainWindowViewModel : CommunityToolkit.Mvvm.Componen
         else dialog.Show();
         RefreshPrivacyStatus();
         DevMode = _boot.Dev.Enabled; // reflect a dev-mode toggle made in the settings dialog
+    }
+
+    [RelayCommand]
+    private void OpenUpdateFolder()
+    {
+        if (string.IsNullOrEmpty(UpdatePath)) return;
+        try
+        {
+            var dir = Path.GetDirectoryName(UpdatePath) ?? Path.GetTempPath();
+            var psi = new ProcessStartInfo
+            {
+                FileName = dir,
+                UseShellExecute = true
+            };
+            Process.Start(psi);
+        }
+        catch { }
+    }
+
+    [RelayCommand]
+    private async Task InstallUpdate()
+    {
+        if (string.IsNullOrEmpty(UpdatePath)) return;
+        var owner = (Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.MainWindow;
+        var dlg = new EDNexus.App.Views.ConfirmInstallWindow();
+        dlg.SetFilePath(UpdatePath);
+        if (owner is null)
+        {
+            // No owner (rare in tests). Show non-modal confirmation and abort install — safer than auto-running.
+            dlg.Show();
+            return;
+        }
+
+        var result = await dlg.ShowDialog<bool>(owner);
+        if (!result) return;
+
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = UpdatePath,
+                UseShellExecute = true
+            };
+            Process.Start(psi);
+        }
+        catch { }
     }
 
     private void RefreshPrivacyStatus()
