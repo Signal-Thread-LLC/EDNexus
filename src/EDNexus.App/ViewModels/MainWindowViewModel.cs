@@ -1,4 +1,6 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
+using System.IO;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Threading;
@@ -35,6 +37,17 @@ public sealed partial class MainWindowViewModel : CommunityToolkit.Mvvm.Componen
             ? $"● Watching  {_host.JournalDirectory}"
             : "✕ Journal folder not found — set EDNEXUS_JOURNAL_DIR";
         RefreshPrivacyStatus();
+
+        // Listen for background updater notifications so the UI can show a bottom update bar.
+        EDNexus.App.Services.AutoUpdateService.UpdateDownloaded += path =>
+        {
+            // Marshal to the UI thread
+            Dispatcher.UIThread.Post(() =>
+            {
+                UpdatePath = path;
+                UpdateAvailable = true;
+            });
+        };
     }
 
     /// <summary>Create a fresh engine host and wire crash reporting to its bus.</summary>
@@ -77,6 +90,10 @@ public sealed partial class MainWindowViewModel : CommunityToolkit.Mvvm.Componen
 
     [ObservableProperty] private bool _devMode;
 
+    // Update bar properties
+    [ObservableProperty] private bool _updateAvailable;
+    [ObservableProperty] private string _updatePath = "";
+
     [ObservableProperty] private bool _hasColonisation;
     [ObservableProperty] private string _colonisationTitle = "—";
     [ObservableProperty] private string _colonisationStatus = "—";
@@ -112,6 +129,23 @@ public sealed partial class MainWindowViewModel : CommunityToolkit.Mvvm.Componen
         else dialog.Show();
         RefreshPrivacyStatus();
         DevMode = _boot.Dev.Enabled; // reflect a dev-mode toggle made in the settings dialog
+    }
+
+    [RelayCommand]
+    private void OpenUpdateFolder()
+    {
+        if (string.IsNullOrEmpty(UpdatePath)) return;
+        try
+        {
+            var dir = Path.GetDirectoryName(UpdatePath) ?? Path.GetTempPath();
+            var psi = new ProcessStartInfo
+            {
+                FileName = dir,
+                UseShellExecute = true
+            };
+            Process.Start(psi);
+        }
+        catch { }
     }
 
     private void RefreshPrivacyStatus()

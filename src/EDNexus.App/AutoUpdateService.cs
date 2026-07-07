@@ -17,6 +17,9 @@ namespace EDNexus.App.Services
     {
         private static readonly HttpClient Http = new HttpClient();
 
+        /// <summary>Raised when an update asset has been downloaded; argument is the full file path.</summary>
+        public static event Action<string>? UpdateDownloaded;
+
         public static async Task CheckForUpdatesAsync()
         {
             try
@@ -53,6 +56,9 @@ namespace EDNexus.App.Services
                     }
 
                     System.Diagnostics.Trace.TraceInformation($"EDNexus update downloaded to {dest}");
+
+                    // Notify listeners (UI) that an update was downloaded.
+                    UpdateDownloaded?.Invoke(dest);
                     return;
                 }
             }
