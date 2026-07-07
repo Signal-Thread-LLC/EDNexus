@@ -1,5 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using System.Diagnostics;
+using System.IO;
 
 namespace EDNexus.App.Views;
 
@@ -56,4 +58,25 @@ public partial class SettingsWindow : Window
     }
 
     private void OnClose(object? sender, RoutedEventArgs e) => Close();
+
+    private void OnOpenLogs(object? sender, RoutedEventArgs e)
+    {
+        try
+        {
+            // Default log location: same directory as settings (Documents/EDNexus)
+            var settingsPath = _boot?.Store?.Path ?? EDNexus.Core.Settings.SettingsStore.DefaultPath();
+            var dir = Path.GetDirectoryName(settingsPath) ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "EDNexus");
+            var psi = new ProcessStartInfo
+            {
+                FileName = dir,
+                UseShellExecute = true
+            };
+            Process.Start(psi);
+        }
+        catch
+        {
+            // Best-effort; failure to open explorer must not crash the settings dialog.
+        }
+    }
 }
+

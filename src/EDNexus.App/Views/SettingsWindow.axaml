@@ -64,6 +64,7 @@
     </StackPanel>
 
     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
+      <Button Content="Open logs" Click="OnOpenLogs" Padding="16,8" />
       <Button Content="Close" Click="OnClose" Padding="16,8" />
       <Button Content="Save" Click="OnSave" Padding="16,8"
               Background="#F07100" Foreground="#101216" FontWeight="SemiBold" />
