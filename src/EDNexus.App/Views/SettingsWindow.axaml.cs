@@ -66,17 +66,6 @@ public partial class SettingsWindow : Window
         try
         {
             var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "EDNexus", "logs");
-            var marker = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "EDNexus", "last_crash.txt");
-            if (!File.Exists(marker))
-            {
-                var info = new InfoWindow();
-                info.SetText("No logs available", "Logs are stored locally and are only exposed after a crash. No crash has been recorded since the last cleanup.");
-                var owner = (Application.Current?.ApplicationLifetime as Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime)?.MainWindow;
-                if (owner is not null) info.ShowDialog(owner);
-                else info.Show();
-                return;
-            }
-
             Directory.CreateDirectory(dir);
             var psi = new ProcessStartInfo
             {
