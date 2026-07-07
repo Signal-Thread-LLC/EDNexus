@@ -48,7 +48,16 @@ public sealed partial class MainWindowViewModel : CommunityToolkit.Mvvm.Componen
                 UpdateAvailable = true;
             });
         };
-    }
+
+        // Also listen to the improved updater (AutoUpdateService2) used at startup.
+        EDNexus.App.Services.AutoUpdateService2.UpdateDownloaded += path =>
+        {
+            Dispatcher.UIThread.Post(() =>
+            {
+                UpdatePath = path;
+                UpdateAvailable = true;
+            });
+        };    }
 
     /// <summary>Create a fresh engine host and wire crash reporting to its bus.</summary>
     private EngineHost BuildHost()
