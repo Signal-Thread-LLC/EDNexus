@@ -1,9 +1,10 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 
-Copyright: 2026 Signal-Thread-LLC
+Copyright: 2026 Signal & Thread, LLC
 
 Files: *
-Copyright: Signal-Thread-LLC
+Copyright: Signal & Thread, LLC
+Contact: license@signal-and-thread.com
 License: MIT
 
 License: MIT
