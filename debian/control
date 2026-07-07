@@ -1,0 +1,13 @@
+Source: ednexus
+Section: utils
+Priority: optional
+Maintainer: Signal-Thread-LLC <maintainer@signal-and-thread.org>
+Build-Depends: debhelper-compat (= 13), dotnet-sdk-7.0
+Standards-Version: 4.6.0
+Homepage: https://github.com/Signal-Thread-LLC/EDNexus
+
+Package: ednexus
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, libice6, libx11-6, libxrandr2, libxss1, libxcursor1, libxinerama1, libxcomposite1, libxdamage1, libxfixes3, libxi6, libxtst6, libgl1-mesa-glx, libegl1
+Description: EDNexus desktop app
+ EDNexus is a cross-platform Elite Dangerous companion app that requires X11 runtime libraries on Linux.

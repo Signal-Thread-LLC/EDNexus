@@ -49,6 +49,22 @@ chmod +x "$STAGE/usr/local/bin/ednexus"
 cp "$HERE/ednexus.desktop" "$STAGE/usr/share/applications/ednexus.desktop"
 cp "$ROOT/assets/icons/ednexus-256.png" "$STAGE/usr/share/icons/hicolor/256x256/apps/ednexus.png"
 
+echo "==> Packaging .deb (prefer debian/ if present)..."
+if [ -f "$ROOT/debian/control" ]; then
+  echo "==> Found debian/control; building with dpkg-buildpackage..."
+  sudo apt-get update
+  sudo apt-get install -y build-essential devscripts dpkg-dev debhelper-compat fakeroot
+  (cd "$ROOT" && dpkg-buildpackage -us -uc -b)
+  # Move produced .deb(s) to out
+  for d in "$ROOT"/../*.deb; do
+    if [ -f "$d" ]; then
+      mv "$d" "$OUT/" || true
+    fi
+  done
+  echo "==> Done: $(ls -1 "$OUT"/*.deb 2>/dev/null || true)"
+  exit 0
+fi
+
 echo "==> Packaging .deb with fpm..."
 fpm -s dir -t deb \
   -n ednexus -v "$VERSION" -a amd64 \
