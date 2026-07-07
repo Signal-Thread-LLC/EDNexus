@@ -5,6 +5,7 @@
     <Project Path="src/EDNexus.Core/EDNexus.Core.csproj" />
     <Project Path="src/EliteDangerous.Eddn/EliteDangerous.Eddn.csproj" />
     <Project Path="src/EliteDangerous.Inara/EliteDangerous.Inara.csproj" />
+    <Project Path="src/EliteDangerous.Spansh/EliteDangerous.Spansh.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/EDNexus.Tests/EDNexus.Tests.csproj" />

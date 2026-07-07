@@ -1,6 +1,8 @@
+using System.Linq;
 using EDNexus.Core.Colonisation;
 using EDNexus.Core.Dev;
 using EDNexus.Core.Journal;
+using EDNexus.Core.Market;
 using EDNexus.Core.State;
 using Xunit;
 
@@ -79,5 +81,25 @@ public class DeveloperModeTests
 
         var list = colonisation.ActiveSite!.BuildShoppingList(state.Cargo);
         Assert.Contains(list, i => i.InHold > 0);   // at least one commodity is carried
+    }
+
+    [Fact]
+    public void Market_sample_loads_a_board_and_values_the_hold()
+    {
+        var bus = new JournalEventBus();
+        var state = new CommanderState();
+        _ = new StateTracker(bus, state);
+        var market = new MarketTracker(bus, state);
+
+        new DeveloperMode().Randomize(bus, Seeded(), cardKey: "market");
+
+        var snap = market.Current;
+        Assert.NotNull(snap);
+        Assert.NotEmpty(snap!.Commodities);
+        Assert.False(string.IsNullOrEmpty(snap.StationName));  // carried on the Market event
+        Assert.Contains(snap.Commodities, c => c.Sellable);    // the station buys something
+
+        // The sampler stocks the hold with commodities the station has demand for.
+        Assert.NotEmpty(snap.ValuateHold(state.Cargo));
     }
 }

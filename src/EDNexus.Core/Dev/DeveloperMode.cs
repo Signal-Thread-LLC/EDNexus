@@ -16,6 +16,7 @@ public sealed class DeveloperMode
         new MaterialsSampleSource(),
         new CargoSampleSource(),
         new ColonisationSampleSource(),
+        new MarketSampleSource(),
     };
 
     /// <summary>
