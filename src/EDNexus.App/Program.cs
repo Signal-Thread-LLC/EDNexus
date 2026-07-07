@@ -22,6 +22,9 @@ internal static class Program
 
         Services = new Bootstrap(store, settings, crash);
 
+        // Start a non-blocking background auto-update check (downloads latest release asset to temp).
+        _ = System.Threading.Tasks.Task.Run(() => EDNexus.App.Services.AutoUpdateService.CheckForUpdatesAsync());
+
         BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
     }
 
