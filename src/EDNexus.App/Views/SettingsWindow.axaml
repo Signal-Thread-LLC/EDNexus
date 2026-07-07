@@ -19,6 +19,28 @@
       </StackPanel>
     </Border>
 
+    <TextBlock Text="DATA REPORTING" Foreground="#F07100" FontSize="12" FontWeight="SemiBold" LetterSpacing="2" />
+
+    <Border Background="#0F1114" CornerRadius="6" Padding="16">
+      <StackPanel Spacing="10">
+        <CheckBox x:Name="EddnToggle" Content="Contribute anonymized data to EDDN"
+                  Foreground="#E7E9EE" />
+        <TextBlock Foreground="#8A909C" FontSize="12" TextWrapping="Wrap"
+                   Text="Uploads market, scan, and travel data to the community Elite Dangerous Data Network. The relay obfuscates your uploader id — no personal identity is shared." />
+      </StackPanel>
+    </Border>
+
+    <Border Background="#0F1114" CornerRadius="6" Padding="16">
+      <StackPanel Spacing="10">
+        <CheckBox x:Name="InaraToggle" Content="Sync my commander to Inara"
+                  Foreground="#E7E9EE" />
+        <TextBlock Foreground="#8A909C" FontSize="12" TextWrapping="Wrap"
+                   Text="Sends your identity, credits, ranks, and travel to your Inara profile on session start, docking, and FSD jumps. Requires your personal Inara API key (Inara → Profile → API keys)." />
+        <TextBox x:Name="InaraApiKey" PlaceholderText="Inara API key"
+                 Foreground="#E7E9EE" Background="#14161A" />
+      </StackPanel>
+    </Border>
+
     <!-- Developer options — hidden entirely when the dev tools are stripped/disabled (FeatureFlags). -->
     <StackPanel x:Name="DevSection" Spacing="8" IsVisible="False">
       <TextBlock Text="DEVELOPER OPTIONS" Foreground="#F07100" FontSize="12" FontWeight="SemiBold" LetterSpacing="2" />

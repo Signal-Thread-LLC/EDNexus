@@ -40,7 +40,8 @@ public sealed partial class MainWindowViewModel : CommunityToolkit.Mvvm.Componen
     /// <summary>Create a fresh engine host and wire crash reporting to its bus.</summary>
     private EngineHost BuildHost()
     {
-        var host = new EngineHost();
+        // Passing settings wires the EDDN/Inara reporters (still gated on their per-service opt-in).
+        var host = new EngineHost(settings: _boot.Settings);
         _boot.Crash.Attach(host.Bus); // report journal handler errors
         return host;
     }

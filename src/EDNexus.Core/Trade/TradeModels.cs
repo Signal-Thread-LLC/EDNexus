@@ -51,7 +51,8 @@ public interface ITradeSearch
 
     /// <summary>
     /// Return the best matching stations for <paramref name="query"/>, nearest first. An empty list
-    /// means no station matched; transport failures surface as exceptions for the caller to handle.
+    /// means no station matched — or the lookup failed transiently; the backing client never throws
+    /// for network/HTTP problems, matching the reporting clients' convention.
     /// </summary>
     Task<IReadOnlyList<TradeStationQuote>> SearchAsync(TradeQuery query, CancellationToken ct = default);
 }

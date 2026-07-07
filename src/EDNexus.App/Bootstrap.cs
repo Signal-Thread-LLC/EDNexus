@@ -28,4 +28,16 @@ public sealed class Bootstrap
         if (enabled) Crash.TryStart(Settings);
         else Crash.Stop();
     }
+
+    /// <summary>
+    /// Persist the EDDN/Inara opt-in choices. The reporters read these flags live, so no restart is
+    /// needed for the change to take effect.
+    /// </summary>
+    public void ApplyReportingChoice(bool eddnEnabled, bool inaraEnabled, string inaraApiKey)
+    {
+        Settings.Reporting.Eddn.Enabled = eddnEnabled;
+        Settings.Reporting.Inara.Enabled = inaraEnabled;
+        Settings.Reporting.Inara.ApiKey = inaraApiKey.Trim();
+        Store.Save(Settings);
+    }
 }

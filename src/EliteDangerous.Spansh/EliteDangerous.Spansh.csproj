@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Standalone, application-agnostic client for the Spansh API (https://spansh.co.uk/api).
+    It has NO dependency on EDNexus: it is a thin transport that builds the stations/search
+    request, POSTs it, and parses the response into plain Spansh-shaped records. Deciding WHICH
+    commodity to look up and how to present it is the caller's job, which keeps this reusable and
+    independently extractable into its own repo/package later. Where EliteDangerous.Eddn and
+    EliteDangerous.Inara push data out, this pulls market data back in.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <PackageId>EliteDangerous.Spansh</PackageId>
+    <Description>A reusable .NET client for querying Elite Dangerous market and station data from the Spansh (spansh.co.uk) API.</Description>
+    <Authors>Signal &amp; Thread LLC</Authors>
+    <Version Condition="'$(Version)' == ''">0.1.0</Version>
+  </PropertyGroup>
+
+</Project>

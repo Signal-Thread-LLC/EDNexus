@@ -6,4 +6,14 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\EliteDangerous.Eddn\EliteDangerous.Eddn.csproj" />
+    <ProjectReference Include="..\EliteDangerous.Inara\EliteDangerous.Inara.csproj" />
+    <ProjectReference Include="..\EliteDangerous.Spansh\EliteDangerous.Spansh.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="EDNexus.Tests" />
+  </ItemGroup>
+
 </Project>
