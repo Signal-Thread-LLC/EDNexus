@@ -19,13 +19,17 @@ public sealed class ReporterHost : IAsyncDisposable
     private readonly EddnBridge _eddn;
     private readonly InaraBridge _inara;
 
-    public ReporterHost(JournalEventBus bus, AppSettings settings, string appVersion, bool isBeingDeveloped)
+    /// <param name="isSuppressed">
+    /// When it returns true, both reporters go silent — used to pause all outbound streaming while
+    /// developer mode is fabricating events, so synthetic data never reaches EDDN or Inara.
+    /// </param>
+    public ReporterHost(JournalEventBus bus, AppSettings settings, string appVersion, bool isBeingDeveloped, Func<bool>? isSuppressed = null)
     {
         var eddnOptions = new EddnClientOptions { SoftwareName = AppName, SoftwareVersion = appVersion };
-        _eddn = new EddnBridge(bus, settings, new EddnUploader(eddnOptions, _http), new EddnJournalTransformer(eddnOptions));
+        _eddn = new EddnBridge(bus, settings, new EddnUploader(eddnOptions, _http), new EddnJournalTransformer(eddnOptions), isSuppressed);
 
         var inaraOptions = new InaraClientOptions { AppName = AppName, AppVersion = appVersion, IsBeingDeveloped = isBeingDeveloped };
-        _inara = new InaraBridge(bus, settings, new InaraClient(inaraOptions, _http));
+        _inara = new InaraBridge(bus, settings, new InaraClient(inaraOptions, _http), isSuppressed);
     }
 
     public async ValueTask DisposeAsync()

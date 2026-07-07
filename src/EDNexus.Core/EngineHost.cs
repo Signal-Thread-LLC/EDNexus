@@ -31,13 +31,17 @@ public sealed class EngineHost : IDisposable
     /// When supplied, wires the EDDN/Inara data reporters (still gated on their per-service opt-in).
     /// The CLI passes null, so its replay-only runs never transmit.
     /// </param>
-    public EngineHost(string? journalDir = null, AppSettings? settings = null)
+    /// <param name="reportingSuppressed">
+    /// Optional live predicate; while it returns true the reporters go silent. The app wires this to
+    /// developer mode so fabricated events never reach EDDN or Inara.
+    /// </param>
+    public EngineHost(string? journalDir = null, AppSettings? settings = null, Func<bool>? reportingSuppressed = null)
     {
         JournalDirectory = journalDir ?? JournalPaths.Resolve();
         _tracker = new StateTracker(Bus, State);
         Colonisation = new ColonisationTracker(Bus, State);
         if (settings is not null)
-            _reporters = new ReporterHost(Bus, settings, ResolveVersion(), IsDevelopmentBuild);
+            _reporters = new ReporterHost(Bus, settings, ResolveVersion(), IsDevelopmentBuild, reportingSuppressed);
         if (JournalDirectory is not null)
             _watcher = new JournalWatcher(JournalDirectory, Bus);
     }
