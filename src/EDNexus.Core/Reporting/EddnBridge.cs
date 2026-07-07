@@ -12,21 +12,29 @@ namespace EDNexus.Core.Reporting;
 public sealed class EddnBridge : IAsyncDisposable
 {
     private readonly AppSettings _settings;
+    private readonly Func<bool> _isSuppressed;
     private readonly EddnState _state = new();
     private readonly EddnJournalTransformer _transformer;
     private readonly EddnUploader _uploader;
 
-    public EddnBridge(JournalEventBus bus, AppSettings settings, EddnUploader uploader, EddnJournalTransformer transformer)
+    public EddnBridge(JournalEventBus bus, AppSettings settings, EddnUploader uploader,
+        EddnJournalTransformer transformer, Func<bool>? isSuppressed = null)
     {
         _settings = settings;
         _uploader = uploader;
         _transformer = transformer;
+        _isSuppressed = isSuppressed ?? (static () => false);
 
         bus.SubscribeAny(OnEvent);
     }
 
     private void OnEvent(JournalEntry e)
     {
+        // While developer mode is fabricating events onto the bus, stay completely out of the way:
+        // don't upload and don't even warm the rolling context, so synthetic data can't leak to EDDN
+        // or corrupt the location fix used to augment real events later.
+        if (_isSuppressed()) return;
+
         // Warm the rolling context from all events — even historical — so a live event that arrives
         // before the next FSDJump/LoadGame can still be augmented and identified.
         _state.Observe(e.Raw);

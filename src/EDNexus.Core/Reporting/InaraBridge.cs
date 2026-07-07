@@ -18,6 +18,7 @@ public sealed class InaraBridge : IAsyncDisposable
 
     private readonly AppSettings _settings;
     private readonly InaraClient _client;
+    private readonly Func<bool> _isSuppressed;
     private readonly TimeSpan _debounceDelay;
     private readonly TimeSpan _minInterval;
     private readonly object _gate = new();
@@ -43,14 +44,15 @@ public sealed class InaraBridge : IAsyncDisposable
     private DateTimeOffset _lastFlush = DateTimeOffset.MinValue;
     private bool _stopped;   // set on a hard error (e.g. bad API key); cleared when disabled again
 
-    public InaraBridge(JournalEventBus bus, AppSettings settings, InaraClient client)
-        : this(bus, settings, client, SessionStartDebounce, MinInterval) { }
+    public InaraBridge(JournalEventBus bus, AppSettings settings, InaraClient client, Func<bool>? isSuppressed = null)
+        : this(bus, settings, client, SessionStartDebounce, MinInterval, isSuppressed) { }
 
     /// <summary>Test-only constructor allowing the debounce/throttle windows to be shortened.</summary>
-    internal InaraBridge(JournalEventBus bus, AppSettings settings, InaraClient client, TimeSpan debounceDelay, TimeSpan minInterval)
+    internal InaraBridge(JournalEventBus bus, AppSettings settings, InaraClient client, TimeSpan debounceDelay, TimeSpan minInterval, Func<bool>? isSuppressed = null)
     {
         _settings = settings;
         _client = client;
+        _isSuppressed = isSuppressed ?? (static () => false);
         _debounceDelay = debounceDelay;
         _minInterval = minInterval;
 
@@ -162,6 +164,9 @@ public sealed class InaraBridge : IAsyncDisposable
 
     private void Capture(Action mutate)
     {
+        // While developer mode fabricates events, don't capture or batch them — this keeps synthetic
+        // data out of the Inara profile. Real capture/sends resume once dev mode is switched off.
+        if (_isSuppressed()) return;
         lock (_gate) mutate();
     }
 
@@ -187,6 +192,8 @@ public sealed class InaraBridge : IAsyncDisposable
     /// <summary>Snapshots the batch and chains an async send. Runs whatever thread triggered it.</summary>
     private void FlushNow()
     {
+        if (_isSuppressed()) return;   // dev mode active — the Shutdown/debounce paths must not send either
+
         InaraIdentity? identity;
         List<InaraEvent> batch;
         lock (_gate)

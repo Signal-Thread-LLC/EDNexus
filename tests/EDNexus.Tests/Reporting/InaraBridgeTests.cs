@@ -28,11 +28,11 @@ public class InaraBridgeTests
     }
 
     // Builds a bridge with zero debounce/throttle so triggers fire immediately in tests.
-    private static (InaraBridge, RecordingHandler) NewBridge(JournalEventBus bus, AppSettings settings)
+    private static (InaraBridge, RecordingHandler) NewBridge(JournalEventBus bus, AppSettings settings, Func<bool>? isSuppressed = null)
     {
         var handler = new RecordingHandler(body: """{ "header": { "eventStatus": 200 } }""");
         var client = new InaraClient(ClientOptions, new HttpClient(handler));
-        var bridge = new InaraBridge(bus, settings, client, TimeSpan.Zero, TimeSpan.Zero);
+        var bridge = new InaraBridge(bus, settings, client, TimeSpan.Zero, TimeSpan.Zero, isSuppressed);
         return (bridge, handler);
     }
 
@@ -97,6 +97,21 @@ public class InaraBridgeTests
 
         await WaitForAsync(() => handler.Bodies.Any(b => b.Contains("addCommanderTravelFSDJump")));
         Assert.Contains(handler.Bodies, b => b.Contains("addCommanderTravelFSDJump") && b.Contains("Alpha Centauri"));
+    }
+
+    [Fact]
+    public async Task Suppressed_reporter_never_sends_even_when_enabled()
+    {
+        var bus = new JournalEventBus();
+        // Reporter is fully enabled, but developer mode is active — nothing must go out.
+        var (bridge, handler) = NewBridge(bus, EnabledSettings(), isSuppressed: () => true);
+        await using var _ = bridge;
+
+        bus.Publish(Live("""{ "timestamp": "2020-01-01T00:00:00Z", "event": "LoadGame", "Commander": "Jameson", "FID": "F1", "Credits": 100 }"""));
+        bus.Publish(Live("""{ "timestamp": "2020-01-01T00:10:00Z", "event": "Docked", "StarSystem": "Sol", "StationName": "X", "MarketID": 1 }"""));
+
+        await Task.Delay(150);
+        Assert.Equal(0, handler.CallCount);
     }
 
     [Fact]

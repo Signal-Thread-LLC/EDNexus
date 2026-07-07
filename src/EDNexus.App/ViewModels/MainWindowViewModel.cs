@@ -40,7 +40,8 @@ public sealed partial class MainWindowViewModel : CommunityToolkit.Mvvm.Componen
     private EngineHost BuildHost()
     {
         // Passing settings wires the EDDN/Inara reporters (still gated on their per-service opt-in).
-        var host = new EngineHost(settings: _boot.Settings);
+        // While developer mode is on, reporting is paused so fabricated events never reach EDDN/Inara.
+        var host = new EngineHost(settings: _boot.Settings, reportingSuppressed: () => _boot.Dev.Enabled);
         _boot.Crash.Attach(host.Bus); // report journal handler errors
         return host;
     }
