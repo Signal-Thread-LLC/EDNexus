@@ -88,6 +88,7 @@ public partial class SettingsWindow : Window
             _boot.Dev.Enabled = DevModeToggle.IsChecked == true; // runtime-only; not persisted
             UpdateStatus();
             UpdateVersionAndUpdateLine();
+            System.Diagnostics.Trace.TraceInformation("Settings: saved by user");
         }
         Close();
     }
@@ -119,11 +120,13 @@ public partial class SettingsWindow : Window
         {
             CheckNowButton.IsEnabled = false;
             UpdateLine.Text = "Checking for updates...";
+            System.Diagnostics.Trace.TraceInformation("Settings: user initiated update check");
             var res = await EDNexus.App.Services.AutoUpdateService2.CheckForUpdatesAsync();
+            System.Diagnostics.Trace.TraceInformation($"Settings: update check result Found={res.Found}, Message={res.Message}, Verified={res.Verified}");
             if (res.Found)
             {
                 if (res.Path is not null)
-                    UpdateLine.Text = res.Verified ? $"Downloaded & verified: {Path.GetFileName(res.Path)}" : $"Downloaded: {Path.GetFileName(res.Path)} (unverified)";
+                    UpdateLine.Text = res.Verified ? $"Downloaded & verified" : $"Downloaded (unverified)";
                 else
                     UpdateLine.Text = res.Message;
             }
@@ -136,6 +139,7 @@ public partial class SettingsWindow : Window
         catch (Exception ex)
         {
             UpdateLine.Text = $"Check failed: {ex.Message}";
+            System.Diagnostics.Trace.TraceWarning($"Settings: update check failed: {ex}");
         }
         finally
         {

@@ -46,6 +46,7 @@ public sealed class Bootstrap
     {
         Settings.AutoDownloadUpdates = enabled;
         Store.Save(Settings);
+        System.Diagnostics.Trace.TraceInformation($"Settings: AutoDownloadUpdates set to {enabled}");
     }
 
 }

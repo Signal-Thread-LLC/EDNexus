@@ -45,7 +45,12 @@ internal static class Program
         // Start a non-blocking background auto-update check only if the user opted in.
         if (settings.AutoDownloadUpdates)
         {
-                    _ = System.Threading.Tasks.Task.Run(() => EDNexus.App.Services.AutoUpdateService2.CheckForUpdatesAsync());
+            System.Diagnostics.Trace.TraceInformation("Program: starting background auto-update check");
+            _ = System.Threading.Tasks.Task.Run(async () =>
+            {
+                var res = await EDNexus.App.Services.AutoUpdateService2.CheckForUpdatesAsync().ConfigureAwait(false);
+                System.Diagnostics.Trace.TraceInformation($"Program: background auto-update finished Found={res.Found}, Message={res.Message}, Verified={res.Verified}");
+            });
         }
 
         BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);

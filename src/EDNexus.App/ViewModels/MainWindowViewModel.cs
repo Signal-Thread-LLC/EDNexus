@@ -46,6 +46,7 @@ public sealed partial class MainWindowViewModel : CommunityToolkit.Mvvm.Componen
             {
                 UpdatePath = path;
                 UpdateAvailable = true;
+                System.Diagnostics.Trace.TraceInformation($"UI: UpdateDownloaded event received (AutoUpdateService) path={path}");
             });
         };
 
@@ -56,6 +57,7 @@ public sealed partial class MainWindowViewModel : CommunityToolkit.Mvvm.Componen
             {
                 UpdatePath = path;
                 UpdateAvailable = true;
+                System.Diagnostics.Trace.TraceInformation($"UI: UpdateDownloaded event received (AutoUpdateService2) path={path}");
             });
         };    }
 
