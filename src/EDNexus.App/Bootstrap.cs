@@ -47,4 +47,5 @@ public sealed class Bootstrap
         Settings.AutoDownloadUpdates = enabled;
         Store.Save(Settings);
     }
+
 }

@@ -28,6 +28,7 @@ public partial class SettingsWindow : Window
         DevModeToggle.IsChecked = boot.Dev.Enabled;
 
         UpdateStatus();
+        UpdateVersionAndUpdateLine();
     }
 
     private void UpdateStatus()
@@ -43,6 +44,37 @@ public partial class SettingsWindow : Window
         };
     }
 
+    private void UpdateVersionAndUpdateLine()
+    {
+        try
+        {
+            var ver = System.Diagnostics.FileVersionInfo.GetVersionInfo(typeof(Program).Assembly.Location).ProductVersion;
+            VersionLine.Text = ver ?? "(unknown)";
+        }
+        catch
+        {
+            VersionLine.Text = "(unknown)";
+        }
+
+        try
+        {
+            // If the updater has already downloaded an update, show the path; otherwise indicate not available.
+            var updatePath = EDNexus.App.Services.AutoUpdateService2.LastDownloadedPath;
+            if (!string.IsNullOrEmpty(updatePath))
+            {
+                UpdateLine.Text = "Downloaded: " + Path.GetFileName(updatePath);
+            }
+            else
+            {
+                UpdateLine.Text = "No update downloaded.";
+            }
+        }
+        catch
+        {
+            UpdateLine.Text = "(unknown)";
+        }
+    }
+
     private void OnSave(object? sender, RoutedEventArgs e)
     {
         if (_boot is not null)
@@ -55,6 +87,7 @@ public partial class SettingsWindow : Window
             _boot.ApplyAutoDownloadChoice(AutoDownloadToggle.IsChecked == true);
             _boot.Dev.Enabled = DevModeToggle.IsChecked == true; // runtime-only; not persisted
             UpdateStatus();
+            UpdateVersionAndUpdateLine();
         }
         Close();
     }
@@ -77,6 +110,36 @@ public partial class SettingsWindow : Window
         catch
         {
             // Best-effort; failure to open explorer must not crash the settings dialog.
+        }
+    }
+
+    private async void OnCheckNow(object? sender, RoutedEventArgs e)
+    {
+        try
+        {
+            CheckNowButton.IsEnabled = false;
+            UpdateLine.Text = "Checking for updates...";
+            var res = await EDNexus.App.Services.AutoUpdateService2.CheckForUpdatesAsync();
+            if (res.Found)
+            {
+                if (res.Path is not null)
+                    UpdateLine.Text = res.Verified ? $"Downloaded & verified: {Path.GetFileName(res.Path)}" : $"Downloaded: {Path.GetFileName(res.Path)} (unverified)";
+                else
+                    UpdateLine.Text = res.Message;
+            }
+            else
+            {
+                UpdateLine.Text = $"No update: {res.Message}";
+            }
+            UpdateVersionAndUpdateLine();
+        }
+        catch (Exception ex)
+        {
+            UpdateLine.Text = $"Check failed: {ex.Message}";
+        }
+        finally
+        {
+            CheckNowButton.IsEnabled = true;
         }
     }
 }

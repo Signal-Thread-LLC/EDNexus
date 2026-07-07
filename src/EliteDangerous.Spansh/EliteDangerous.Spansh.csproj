@@ -16,7 +16,7 @@
     <PackageId>EliteDangerous.Spansh</PackageId>
     <Description>A reusable .NET client for querying Elite Dangerous market and station data from the Spansh (spansh.co.uk) API.</Description>
     <Authors>Signal &amp; Thread LLC</Authors>
-    <Version Condition="'$(Version)' == ''">0.1.0</Version>
+    <Version Condition="'$(Version)' == ''">0.0.1</Version>
   </PropertyGroup>
 
 </Project>

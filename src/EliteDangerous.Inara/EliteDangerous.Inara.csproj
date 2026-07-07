@@ -15,7 +15,7 @@
     <PackageId>EliteDangerous.Inara</PackageId>
     <Description>A reusable .NET client for the Inara (inara.cz) commander API.</Description>
     <Authors>Signal &amp; Thread LLC</Authors>
-    <Version Condition="'$(Version)' == ''">0.1.0</Version>
+    <Version Condition="'$(Version)' == ''">0.0.1</Version>
   </PropertyGroup>
 
 </Project>

@@ -11,7 +11,7 @@
     <!-- Embeds the icon into EDNexus.App.exe (used by the shortcut / taskbar). -->
     <ApplicationIcon>..\..\assets\icons\ednexus.ico</ApplicationIcon>
     <!-- Overridable by CI: dotnet publish -p:Version=1.2.3 -->
-    <Version Condition="'$(Version)' == ''">0.1.0</Version>
+    <Version Condition="'$(Version)' == ''">0.0.1</Version>
   </PropertyGroup>
 
   <ItemGroup>
