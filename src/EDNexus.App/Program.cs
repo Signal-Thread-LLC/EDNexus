@@ -45,7 +45,7 @@ internal static class Program
         // Start a non-blocking background auto-update check only if the user opted in.
         if (settings.AutoDownloadUpdates)
         {
-            _ = System.Threading.Tasks.Task.Run(() => EDNexus.App.Services.AutoUpdateService.CheckForUpdatesAsync());
+                    _ = System.Threading.Tasks.Task.Run(() => EDNexus.App.Services.AutoUpdateService2.CheckForUpdatesAsync());
         }
 
         BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);

@@ -8,17 +8,10 @@ using System.Threading.Tasks;
 
 namespace EDNexus.App.Services
 {
-    /// <summary>
-    /// Simple GitHub Releases-based updater: checks the latest release, finds a platform-matching
-    /// asset and downloads it to the user's temp folder. This is intentionally minimal — it only
-    /// downloads the asset and logs the destination. More UI/installer integration can be added
-    /// later.
-    /// </summary>
-    public static class AutoUpdateService
+    // Improved fallback updater: tries API, then HTML page parsing when API returns 404.
+    public static class AutoUpdateService2
     {
         private static readonly HttpClient Http = new HttpClient();
-
-        /// <summary>Raised when an update asset has been downloaded; argument is the full file path.</summary>
         public static event Action<string>? UpdateDownloaded;
 
         public static async Task CheckForUpdatesAsync()
@@ -26,17 +19,11 @@ namespace EDNexus.App.Services
             try
             {
                 Http.DefaultRequestHeaders.UserAgent.ParseAdd("EDNexus-Updater");
-                // Prefer a GitHub token for private repos: set GITHUB_TOKEN or GH_TOKEN in the environment.
                 var token = Environment.GetEnvironmentVariable("GITHUB_TOKEN") ?? Environment.GetEnvironmentVariable("GH_TOKEN");
                 if (!string.IsNullOrWhiteSpace(token))
                 {
-                    try
-                    {
-                        Http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("token", token);
-                    }
-                    catch { }
+                    try { Http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("token", token); } catch { }
                 }
-                // Request the v3 API explicitly.
                 Http.DefaultRequestHeaders.TryAddWithoutValidation("Accept", "application/vnd.github.v3+json");
 
                 var apiUrl = "https://api.github.com/repos/Signal-Thread-LLC/EDNexus/releases/latest";
@@ -44,54 +31,47 @@ namespace EDNexus.App.Services
 
                 if (resp.StatusCode == System.Net.HttpStatusCode.NotFound)
                 {
-                    System.Diagnostics.Trace.TraceWarning("AutoUpdate: releases endpoint returned 404. Falling back to HTML page parsing (public releases may still be accessible via the website).");
-                    // Try the HTML releases page as a fallback (public releases are visible via the web UI even when API access is restricted).
-                    try
+                    System.Diagnostics.Trace.TraceWarning("AutoUpdate: API returned 404 — falling back to HTML parsing of the releases page.");
+                    // HTML fallback
+                    var pageUrl = "https://github.com/Signal-Thread-LLC/EDNexus/releases/latest";
+                    using var pageResp = await Http.GetAsync(pageUrl).ConfigureAwait(false);
+                    if (!pageResp.IsSuccessStatusCode)
                     {
-                        var pageUrl = "https://github.com/Signal-Thread-LLC/EDNexus/releases/latest";
-                        using var pageResp = await Http.GetAsync(pageUrl).ConfigureAwait(false);
-                        if (!pageResp.IsSuccessStatusCode)
-                        {
-                            System.Diagnostics.Trace.TraceWarning($"AutoUpdate HTML fallback failed: {pageResp.StatusCode}");
-                            return;
-                        }
-
-                        var html = await pageResp.Content.ReadAsStringAsync().ConfigureAwait(false);
-                        var matches = Regex.Matches(html, "href\\s*=\\s*\\\"(?<h>/Signal-Thread-LLC/EDNexus/releases/download/[^\\\"]+)\\\"");
-                        foreach (Match m in matches)
-                        {
-                            var href = m.Groups["h"].Value;
-                            var assetUrl = "https://github.com" + href;
-                            var fileName = Path.GetFileName(href);
-                            if (!IsMatchPlatform(fileName)) continue;
-
-                            var dest = Path.Combine(Path.GetTempPath(), fileName ?? "EDNexus-update");
-                            using var dl = await Http.GetAsync(assetUrl).ConfigureAwait(false);
-                            if (!dl.IsSuccessStatusCode)
-                            {
-                                System.Diagnostics.Trace.TraceWarning($"AutoUpdate download failed ({dl.StatusCode}) for {assetUrl}");
-                                continue;
-                            }
-
-                            using (var contentStream = await dl.Content.ReadAsStreamAsync().ConfigureAwait(false))
-                            using (var fs = File.Create(dest))
-                            {
-                                await contentStream.CopyToAsync(fs).ConfigureAwait(false);
-                            }
-
-                            System.Diagnostics.Trace.TraceInformation($"EDNexus update downloaded to {dest}");
-                            UpdateDownloaded?.Invoke(dest);
-                            return;
-                        }
-
-                        System.Diagnostics.Trace.TraceWarning("AutoUpdate: no matching assets found on the releases page.");
+                        System.Diagnostics.Trace.TraceWarning($"AutoUpdate HTML fallback failed: {pageResp.StatusCode}");
                         return;
                     }
-                    catch (Exception ex)
+
+                    var html = await pageResp.Content.ReadAsStringAsync().ConfigureAwait(false);
+                    var pattern = "href\\s*=\\s*\\\"(?<h>/Signal-Thread-LLC/EDNexus/releases/download/[^\"\"]+)\\\"";
+                    var matches = Regex.Matches(html, pattern);
+                    foreach (Match m in matches)
                     {
-                        System.Diagnostics.Trace.TraceWarning($"AutoUpdate HTML fallback failed: {ex}");
+                        var href = m.Groups["h"].Value;
+                        var assetUrl = "https://github.com" + href;
+                        var fileName = Path.GetFileName(href);
+                        if (!IsMatchPlatform(fileName)) continue;
+
+                        var dest = Path.Combine(Path.GetTempPath(), fileName ?? "EDNexus-update");
+                        using var dl = await Http.GetAsync(assetUrl).ConfigureAwait(false);
+                        if (!dl.IsSuccessStatusCode)
+                        {
+                            System.Diagnostics.Trace.TraceWarning($"AutoUpdate download failed ({dl.StatusCode}) for {assetUrl}");
+                            continue;
+                        }
+
+                        using (var contentStream = await dl.Content.ReadAsStreamAsync().ConfigureAwait(false))
+                        using (var fs = File.Create(dest))
+                        {
+                            await contentStream.CopyToAsync(fs).ConfigureAwait(false);
+                        }
+
+                        System.Diagnostics.Trace.TraceInformation($"EDNexus update downloaded to {dest}");
+                        UpdateDownloaded?.Invoke(dest);
                         return;
                     }
+
+                    System.Diagnostics.Trace.TraceWarning("AutoUpdate: no matching assets found on the releases page.");
+                    return;
                 }
 
                 resp.EnsureSuccessStatusCode();
@@ -104,10 +84,8 @@ namespace EDNexus.App.Services
                 {
                     if (!asset.TryGetProperty("name", out var nameEl)) continue;
                     var name = nameEl.GetString() ?? string.Empty;
-
                     if (!asset.TryGetProperty("browser_download_url", out var urlEl)) continue;
                     var downloadUrl = urlEl.GetString() ?? string.Empty;
-
                     if (!IsMatchPlatform(name)) continue;
 
                     var fileName = Path.GetFileName(name);
@@ -123,8 +101,6 @@ namespace EDNexus.App.Services
                     }
 
                     System.Diagnostics.Trace.TraceInformation($"EDNexus update downloaded to {dest}");
-
-                    // Notify listeners (UI) that an update was downloaded.
                     UpdateDownloaded?.Invoke(dest);
                     return;
                 }
@@ -148,7 +124,6 @@ namespace EDNexus.App.Services
                     || name.EndsWith(".dmg", StringComparison.OrdinalIgnoreCase)
                     || name.Contains("mac", StringComparison.OrdinalIgnoreCase);
 
-            // Linux and other
             return name.Contains("linux", StringComparison.OrdinalIgnoreCase)
                 || name.EndsWith(".AppImage", StringComparison.OrdinalIgnoreCase)
                 || name.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase);
