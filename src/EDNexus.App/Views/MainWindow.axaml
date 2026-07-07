@@ -144,8 +144,9 @@
       <Grid ColumnDefinitions="*,Auto">
         <TextBlock Text="An update was downloaded" Foreground="{StaticResource Ink}" VerticalAlignment="Center" />
         <StackPanel Orientation="Horizontal" Grid.Column="1" Spacing="8" VerticalAlignment="Center">
-          <TextBlock Text="{Binding UpdatePath}" Classes="label" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="520"/>
+          <TextBlock Text="{Binding UpdatePath}" Classes="label" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="360"/>
           <Button Content="Show" Command="{Binding OpenUpdateFolderCommand}" Classes="mini" Margin="8,0,0,0"/>
+          <Button Content="Install" Command="{Binding InstallUpdateCommand}" Classes="action" Margin="8,0,0,0"/>
         </StackPanel>
       </Grid>
     </Border>

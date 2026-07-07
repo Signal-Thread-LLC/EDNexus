@@ -148,6 +148,35 @@ public sealed partial class MainWindowViewModel : CommunityToolkit.Mvvm.Componen
         catch { }
     }
 
+    [RelayCommand]
+    private async Task InstallUpdate()
+    {
+        if (string.IsNullOrEmpty(UpdatePath)) return;
+        var owner = (Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.MainWindow;
+        var dlg = new EDNexus.App.Views.ConfirmInstallWindow();
+        dlg.SetFilePath(UpdatePath);
+        if (owner is null)
+        {
+            // No owner (rare in tests). Show non-modal confirmation and abort install — safer than auto-running.
+            dlg.Show();
+            return;
+        }
+
+        var result = await dlg.ShowDialog<bool>(owner);
+        if (!result) return;
+
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = UpdatePath,
+                UseShellExecute = true
+            };
+            Process.Start(psi);
+        }
+        catch { }
+    }
+
     private void RefreshPrivacyStatus()
         => PrivacyStatus = _boot.Crash.IsActive ? "crash reporting on" : "crash reporting off";
 
