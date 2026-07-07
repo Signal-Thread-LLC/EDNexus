@@ -12,6 +12,7 @@ internal sealed class RecordingHandler : HttpMessageHandler
     private int _count;
 
     public List<string> Bodies { get; } = new();
+    public List<Uri?> Uris { get; } = new();
     public int CallCount => _count;
 
     public RecordingHandler(HttpStatusCode status = HttpStatusCode.OK, string body = "{}")
@@ -22,7 +23,7 @@ internal sealed class RecordingHandler : HttpMessageHandler
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         var body = request.Content is null ? "" : await request.Content.ReadAsStringAsync(cancellationToken);
-        lock (Bodies) Bodies.Add(body);
+        lock (Bodies) { Bodies.Add(body); Uris.Add(request.RequestUri); }
         var n = Interlocked.Increment(ref _count);
         var (status, respBody) = _responder(n);
         return new HttpResponseMessage(status) { Content = new StringContent(respBody) };

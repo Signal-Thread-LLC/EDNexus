@@ -4,6 +4,7 @@
     <Project Path="src/EDNexus.Cli/EDNexus.Cli.csproj" />
     <Project Path="src/EDNexus.Core/EDNexus.Core.csproj" />
     <Project Path="src/EliteDangerous.Eddn/EliteDangerous.Eddn.csproj" />
+    <Project Path="src/EliteDangerous.Edsm/EliteDangerous.Edsm.csproj" />
     <Project Path="src/EliteDangerous.Inara/EliteDangerous.Inara.csproj" />
     <Project Path="src/EliteDangerous.Spansh/EliteDangerous.Spansh.csproj" />
   </Folder>

@@ -145,6 +145,9 @@ internal static class SamplePools
         return $"{letters[rng.Next(26)]}{letters[rng.Next(26)]}-{digits[rng.Next(10)]}{letters[rng.Next(26)]}";
     }
 
+    /// <summary>Pick a single random element from a list.</summary>
+    public static T Pick<T>(Random rng, IReadOnlyList<T> items) => items[rng.Next(items.Count)];
+
     /// <summary>Pick <paramref name="count"/> distinct entries from a list.</summary>
     public static List<T> PickDistinct<T>(Random rng, IReadOnlyList<T> items, int count)
     {

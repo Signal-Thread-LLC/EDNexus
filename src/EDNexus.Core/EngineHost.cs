@@ -4,10 +4,13 @@ using System.Reflection;
 using EDNexus.Core.Colonisation;
 using EDNexus.Core.Journal;
 using EDNexus.Core.Market;
+using EDNexus.Core.Navigation;
 using EDNexus.Core.Reporting;
+using EDNexus.Core.Routes;
 using EDNexus.Core.Settings;
 using EDNexus.Core.State;
 using EDNexus.Core.Trade;
+using EliteDangerous.Edsm;
 using EliteDangerous.Spansh;
 
 namespace EDNexus.Core;
@@ -34,6 +37,12 @@ public sealed class EngineHost : IDisposable
     /// <summary>Cross-station "best price nearby" lookups. Backed by Spansh; swappable via <see cref="ITradeSearch"/>.</summary>
     public ITradeSearch Trade { get; }
 
+    /// <summary>Long-distance route plotting (neutron highway). Backed by Spansh; swappable via <see cref="IRoutePlotter"/>.</summary>
+    public IRoutePlotter Routes { get; }
+
+    /// <summary>System position / nearby lookups. Backed by EDSM; swappable via <see cref="ISystemLookup"/>.</summary>
+    public ISystemLookup Navigation { get; }
+
     public string? JournalDirectory { get; }
     public bool JournalFound => JournalDirectory is not null;
 
@@ -57,10 +66,17 @@ public sealed class EngineHost : IDisposable
         // inside ReporterHost, so this one is dedicated to the read-side (Spansh) queries.
         _http = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
         _http.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("EDNexus", ResolveVersion()));
-        var cacheDir = Path.Combine(Path.GetDirectoryName(SettingsStore.DefaultPath())!, "cache", "trade");
-        Trade = new SpanshTradeSearch(
-            new SpanshClient(new SpanshClientOptions { SoftwareName = "EDNexus", SoftwareVersion = ResolveVersion() }, _http),
-            new DiskResponseCache(cacheDir, TimeSpan.FromHours(6)));
+        var cacheRoot = Path.Combine(Path.GetDirectoryName(SettingsStore.DefaultPath())!, "cache");
+        var version = ResolveVersion();
+        var spansh = new SpanshClient(new SpanshClientOptions { SoftwareName = "EDNexus", SoftwareVersion = version }, _http);
+
+        // Market prices go stale quickly (6 h); plotted routes and system positions are effectively
+        // static, so they can be cached far longer.
+        Trade = new SpanshTradeSearch(spansh, new DiskResponseCache(Path.Combine(cacheRoot, "trade"), TimeSpan.FromHours(6)));
+        Routes = new SpanshRoutePlotter(spansh, new DiskResponseCache(Path.Combine(cacheRoot, "routes"), TimeSpan.FromDays(30)));
+        Navigation = new EdsmSystemLookup(
+            new EdsmClient(new EdsmClientOptions { SoftwareName = "EDNexus", SoftwareVersion = version }, _http),
+            new DiskResponseCache(Path.Combine(cacheRoot, "systems"), TimeSpan.FromDays(30)));
 
         if (settings is not null)
             _reporters = new ReporterHost(Bus, settings, ResolveVersion(), IsDevelopmentBuild, reportingSuppressed);

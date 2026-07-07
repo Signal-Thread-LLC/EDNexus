@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Standalone, application-agnostic client for the EDSM API (https://www.edsm.net/en/api-v1).
+    Like EliteDangerous.Spansh it has NO dependency on EDNexus: it is a thin transport that builds a
+    system / bodies / sphere request, GETs it, and parses the reply into plain EDSM-shaped records.
+    Deciding what to do with a system or how to present it is the caller's job, which keeps this
+    reusable and independently extractable into its own repo/package later.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <PackageId>EliteDangerous.Edsm</PackageId>
+    <Description>A reusable .NET client for querying Elite Dangerous system, body and nearby-system data from the EDSM (edsm.net) API.</Description>
+    <Authors>Signal &amp; Thread LLC</Authors>
+    <Version Condition="'$(Version)' == ''">0.1.0</Version>
+  </PropertyGroup>
+
+</Project>

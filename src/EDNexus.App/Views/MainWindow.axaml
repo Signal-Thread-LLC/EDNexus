@@ -68,6 +68,31 @@
       <Setter Property="Foreground" Value="{StaticResource Ink}" />
       <Setter Property="Padding" Value="12,6" />
     </Style>
+    <Style Selector="TextBox.field">
+      <Setter Property="Background" Value="#0E1013" />
+      <Setter Property="Foreground" Value="{StaticResource Ink}" />
+      <Setter Property="BorderBrush" Value="{StaticResource CardBorder}" />
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="Padding" Value="8,5" />
+      <Setter Property="FontSize" Value="13" />
+    </Style>
+    <Style Selector="Button.action">
+      <Setter Property="Background" Value="{StaticResource AmberBrush}" />
+      <Setter Property="Foreground" Value="#101216" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Padding" Value="14,6" />
+      <Setter Property="CornerRadius" Value="4" />
+    </Style>
+    <Style Selector="Button.action:disabled">
+      <Setter Property="Background" Value="{StaticResource AmberDim}" />
+    </Style>
+    <Style Selector="Button.mini">
+      <Setter Property="Background" Value="#1B1E24" />
+      <Setter Property="Foreground" Value="{StaticResource Ink}" />
+      <Setter Property="Padding" Value="8,4" />
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="FontSize" Value="12" />
+    </Style>
   </Window.Styles>
 
   <DockPanel LastChildFill="True">
@@ -332,6 +357,135 @@
                       <TextBlock Grid.Column="4" Text="{Binding VsMean}" FontSize="12"
                                  Foreground="{StaticResource Bad}" IsVisible="{Binding Bad}"
                                  HorizontalAlignment="Right" VerticalAlignment="Center" />
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+          </StackPanel>
+        </Border>
+
+        <!-- Route plotter -->
+        <Border Classes="card" Width="452">
+          <StackPanel>
+            <TextBlock Classes="cardHeader" Text="ROUTE PLOTTER" />
+            <TextBlock Classes="label" Text="Neutron-highway route between two systems for your ship's jump range."
+                       TextWrapping="Wrap" Margin="0,0,0,10" />
+
+            <TextBlock Classes="label" Text="FROM" />
+            <TextBox Classes="field" Text="{Binding RouteFrom}" PlaceholderText="Current system" Margin="0,2,0,8" />
+            <TextBlock Classes="label" Text="TO" />
+            <TextBox Classes="field" Text="{Binding RouteTo}" PlaceholderText="Destination system" Margin="0,2,0,8" />
+
+            <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,10">
+              <StackPanel Grid.Column="0" Margin="0,0,10,0">
+                <TextBlock Classes="label" Text="JUMP RANGE (LY)" />
+                <TextBox Classes="field" Text="{Binding RouteJumpRange}" PlaceholderText="e.g. 48.5" Margin="0,2,0,0" />
+              </StackPanel>
+              <Button Grid.Column="1" Classes="action" Content="Plot route" VerticalAlignment="Bottom"
+                      Command="{Binding PlotRouteCommand}" IsEnabled="{Binding !RouteBusy}" />
+            </Grid>
+
+            <TextBlock Classes="label" Text="{Binding RouteStatus}" TextWrapping="Wrap"
+                       IsVisible="{Binding RouteStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+            <StackPanel IsVisible="{Binding RouteHasPlan}" Margin="0,8,0,0">
+              <TextBlock Classes="label" Text="{Binding RouteSummary}" Margin="0,0,0,10" />
+
+              <Border Background="#0E1013" BorderBrush="{StaticResource CardBorder}" BorderThickness="1"
+                      CornerRadius="6" Padding="12,10" Margin="0,0,0,10">
+                <Grid ColumnDefinitions="*,Auto,Auto">
+                  <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                    <TextBlock Classes="label" Text="NEXT SYSTEM" />
+                    <TextBlock Text="{Binding RouteNextSystem}" Foreground="{StaticResource AmberBrush}"
+                               FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" />
+                  </StackPanel>
+                  <Button Grid.Column="1" Classes="mini" Content="◀" Margin="0,0,6,0"
+                          Command="{Binding PrevHopCommand}" ToolTip.Tip="Previous hop" />
+                  <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6">
+                    <Button Classes="mini" Content="Copy" Command="{Binding CopyNextSystemCommand}"
+                            ToolTip.Tip="Copy the next system to the clipboard" />
+                    <Button Classes="mini" Content="Next ▶" Command="{Binding NextHopCommand}" />
+                  </StackPanel>
+                </Grid>
+              </Border>
+
+              <ItemsControl ItemsSource="{Binding RouteHops}" MaxHeight="300">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:RouteHopLine">
+                    <Grid ColumnDefinitions="18,*,Auto" Margin="0,4">
+                      <TextBlock Grid.Column="0" Text="▸" Foreground="{StaticResource AmberBrush}"
+                                 FontWeight="Bold" IsVisible="{Binding IsCurrent}" VerticalAlignment="Center" />
+                      <StackPanel Grid.Column="1" Margin="2,0,8,0" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding System}" Classes="value" FontSize="13" TextWrapping="Wrap" />
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                          <TextBlock Text="{Binding Jumps}" Classes="label" FontSize="11" />
+                          <TextBlock Text="★ neutron" Foreground="{StaticResource Good}" FontSize="11"
+                                     IsVisible="{Binding IsNeutron}" />
+                        </StackPanel>
+                      </StackPanel>
+                      <TextBlock Grid.Column="2" Text="{Binding Remaining}" Classes="label" FontSize="11"
+                                 VerticalAlignment="Center" />
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+          </StackPanel>
+        </Border>
+
+        <!-- Trade finder -->
+        <Border Classes="card" Width="452">
+          <StackPanel>
+            <TextBlock Classes="cardHeader" Text="TRADE FINDER" />
+            <TextBlock Classes="label" Text="Best nearby stations to sell a commodity from your hold — or to source one."
+                       TextWrapping="Wrap" Margin="0,0,0,10" />
+
+            <TextBlock Classes="label" Text="COMMODITY" />
+            <TextBox Classes="field" Text="{Binding TradeCommodity}" PlaceholderText="e.g. Low Temperature Diamonds"
+                     Margin="0,2,0,8" />
+            <TextBlock Classes="label" Text="NEAR SYSTEM" />
+            <TextBox Classes="field" Text="{Binding TradeReferenceSystem}" PlaceholderText="Current system" Margin="0,2,0,8" />
+
+            <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,10">
+              <CheckBox Grid.Column="0" IsChecked="{Binding TradeSelling}" Foreground="{StaticResource Ink}"
+                        Content="Selling (offload hold)" VerticalAlignment="Bottom" />
+              <Button Grid.Column="1" Classes="action" Content="Search" VerticalAlignment="Bottom"
+                      Command="{Binding SearchTradeCommand}" IsEnabled="{Binding !TradeBusy}" />
+            </Grid>
+
+            <TextBlock Classes="label" Text="{Binding TradeStatus}" TextWrapping="Wrap"
+                       IsVisible="{Binding TradeStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+            <StackPanel IsVisible="{Binding TradeHasResults}" Margin="0,8,0,0">
+              <Grid ColumnDefinitions="*,90,70,Auto" Margin="0,0,0,2">
+                <TextBlock Grid.Column="0" Classes="label" Text="STATION" />
+                <TextBlock Grid.Column="1" Classes="label" Text="PRICE" HorizontalAlignment="Right" />
+                <TextBlock Grid.Column="2" Classes="label" Text="DIST" HorizontalAlignment="Right" />
+                <TextBlock Grid.Column="3" Classes="label" Text="" />
+              </Grid>
+              <ItemsControl ItemsSource="{Binding TradeResults}" MaxHeight="320">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:TradeResultLine">
+                    <Grid ColumnDefinitions="*,90,70,Auto" Margin="0,5">
+                      <StackPanel Grid.Column="0" Margin="0,0,8,0" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Station}" Classes="value" FontSize="13" TextWrapping="Wrap" />
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                          <TextBlock Text="{Binding System}" Classes="label" FontSize="11" />
+                          <TextBlock Text="{Binding Age}" Classes="label" FontSize="11"
+                                     Foreground="{StaticResource InkDim}" />
+                        </StackPanel>
+                      </StackPanel>
+                      <StackPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right">
+                        <TextBlock Text="{Binding Price}" Foreground="{StaticResource AmberBrush}" FontSize="13"
+                                   FontWeight="Medium" HorizontalAlignment="Right" />
+                        <TextBlock Text="{Binding Quantity}" Classes="label" FontSize="11" HorizontalAlignment="Right" />
+                      </StackPanel>
+                      <TextBlock Grid.Column="2" Text="{Binding Distance}" Classes="value" FontSize="12"
+                                 HorizontalAlignment="Right" VerticalAlignment="Center" />
+                      <Button Grid.Column="3" Classes="mini" Content="Copy" Margin="8,0,0,0"
+                              VerticalAlignment="Center" Command="{Binding $parent[ItemsControl].((vm:MainWindowViewModel)DataContext).CopySystemCommand}"
+                              CommandParameter="{Binding System}" ToolTip.Tip="Copy this system" />
                     </Grid>
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>
