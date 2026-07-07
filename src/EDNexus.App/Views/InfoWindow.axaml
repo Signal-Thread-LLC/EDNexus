@@ -1,0 +1,15 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="EDNexus.App.Views.InfoWindow"
+        Title="Info" Icon="/Assets/ednexus.png"
+        Width="480" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False" Background="#14161A">
+  <StackPanel Margin="24" Spacing="14">
+    <TextBlock x:Name="TitleText" Foreground="#F07100" FontSize="17" FontWeight="SemiBold" />
+    <TextBlock x:Name="MessageText" Foreground="#E7E9EE" TextWrapping="Wrap" FontSize="13" />
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+      <Button Content="OK" Click="OnOk" Padding="12,6" />
+    </StackPanel>
+  </StackPanel>
+</Window>

@@ -1,4 +1,6 @@
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Interactivity;
 using System.Diagnostics;
 using System.IO;
@@ -63,9 +65,19 @@ public partial class SettingsWindow : Window
     {
         try
         {
-            // Default log location: same directory as settings (Documents/EDNexus)
-            var settingsPath = _boot?.Store?.Path ?? EDNexus.Core.Settings.SettingsStore.DefaultPath();
-            var dir = Path.GetDirectoryName(settingsPath) ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "EDNexus");
+            var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "EDNexus", "logs");
+            var marker = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "EDNexus", "last_crash.txt");
+            if (!File.Exists(marker))
+            {
+                var info = new InfoWindow();
+                info.SetText("No logs available", "Logs are stored locally and are only exposed after a crash. No crash has been recorded since the last cleanup.");
+                var owner = (Application.Current?.ApplicationLifetime as Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime)?.MainWindow;
+                if (owner is not null) info.ShowDialog(owner);
+                else info.Show();
+                return;
+            }
+
+            Directory.CreateDirectory(dir);
             var psi = new ProcessStartInfo
             {
                 FileName = dir,
