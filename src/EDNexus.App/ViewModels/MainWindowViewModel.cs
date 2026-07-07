@@ -171,6 +171,7 @@ public sealed partial class MainWindowViewModel : CommunityToolkit.Mvvm.Componen
         SyncCargo(s);
         SyncColonisation(s);
         SyncMarket(s);
+        SeedPhase4Defaults(s);
     }
 
     private void SyncMarket(CommanderState s)

@@ -57,6 +57,94 @@ public sealed class SpanshClient : IDisposable
     }
 
     /// <summary>
+    /// Plot a neutron-highway route. Spansh runs this as a background job: this submits the job, then
+    /// polls for the result (spacing polls by <see cref="SpanshClientOptions.RoutePollInterval"/>) until
+    /// it is ready, the attempt budget runs out, or the job errors. Never throws — every failure comes
+    /// back as <see cref="SpanshRouteResult.Failure"/>.
+    /// </summary>
+    public async Task<SpanshRouteResult> PlotRouteAsync(SpanshRouteQuery query, CancellationToken ct = default)
+    {
+        string jobId;
+        try
+        {
+            var submitUrl =
+                $"{_options.BaseUrl.TrimEnd('/')}/route?efficiency={query.Efficiency}" +
+                $"&range={query.RangeLy.ToString(System.Globalization.CultureInfo.InvariantCulture)}" +
+                $"&from={Uri.EscapeDataString(query.From)}&to={Uri.EscapeDataString(query.To)}";
+            using var submit = await _http.PostAsync(submitUrl, content: null, ct).ConfigureAwait(false);
+            if (!submit.IsSuccessStatusCode)
+                return SpanshRouteResult.Failure($"HTTP {(int)submit.StatusCode}");
+
+            var submitBody = await submit.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+            using var submitDoc = JsonDocument.Parse(submitBody);
+            if (ReadString(submitDoc.RootElement, "job") is not { Length: > 0 } id)
+                return SpanshRouteResult.Failure(ReadString(submitDoc.RootElement, "error") ?? "no job id returned");
+            jobId = id;
+        }
+        catch (JsonException ex) { return SpanshRouteResult.Failure("unparseable submit response: " + ex.Message); }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex) { return SpanshRouteResult.Failure(ex.Message); }
+
+        // Poll the job to completion. "queued" / "running" means keep waiting; "ok" carries the route.
+        for (var attempt = 0; attempt < Math.Max(1, _options.RoutePollAttempts); attempt++)
+        {
+            if (attempt > 0 && _options.RoutePollInterval > TimeSpan.Zero)
+                await Task.Delay(_options.RoutePollInterval, ct).ConfigureAwait(false);
+
+            try
+            {
+                using var poll = await _http.GetAsync(
+                    $"{_options.BaseUrl.TrimEnd('/')}/results/{Uri.EscapeDataString(jobId)}", ct).ConfigureAwait(false);
+                if (!poll.IsSuccessStatusCode)
+                    return SpanshRouteResult.Failure($"HTTP {(int)poll.StatusCode}");
+
+                var pollBody = await poll.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+                var (done, result) = ParseRoutePoll(pollBody);
+                if (done) return result;
+            }
+            catch (JsonException ex) { return SpanshRouteResult.Failure("unparseable poll response: " + ex.Message); }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex) { return SpanshRouteResult.Failure(ex.Message); }
+        }
+
+        return SpanshRouteResult.Failure("route timed out");
+    }
+
+    /// <summary>
+    /// Inspect one poll reply. Returns <c>(done: false, …)</c> while the job is still queued/running,
+    /// and <c>(done: true, result)</c> once it has finished — successfully or with an error status.
+    /// Missing or reshaped fields degrade to failures rather than throwing.
+    /// </summary>
+    private static (bool Done, SpanshRouteResult Result) ParseRoutePoll(string body)
+    {
+        using var doc = JsonDocument.Parse(body);
+        var root = doc.RootElement;
+        var status = ReadString(root, "status");
+
+        if (string.Equals(status, "queued", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(status, "running", StringComparison.OrdinalIgnoreCase))
+            return (false, SpanshRouteResult.Failure("still running"));
+
+        if (!string.Equals(status, "ok", StringComparison.OrdinalIgnoreCase))
+            return (true, SpanshRouteResult.Failure(ReadString(root, "error") ?? $"job status '{status}'"));
+
+        if (!root.TryGetProperty("result", out var result) ||
+            !result.TryGetProperty("system_jumps", out var jumps) || jumps.ValueKind != JsonValueKind.Array)
+            return (true, SpanshRouteResult.Ok(Array.Empty<SpanshRouteWaypoint>()));
+
+        var waypoints = new List<SpanshRouteWaypoint>();
+        foreach (var hop in jumps.EnumerateArray())
+            waypoints.Add(new SpanshRouteWaypoint(
+                System: ReadString(hop, "system") ?? "Unknown",
+                Jumps: ReadInt(hop, "jumps"),
+                IsNeutron: hop.TryGetProperty("neutron_star", out var n) && n.ValueKind is JsonValueKind.True,
+                DistanceJumpedLy: ReadDouble(hop, "distance_jumped"),
+                DistanceRemainingLy: ReadDouble(hop, "distance_left")));
+
+        return (true, SpanshRouteResult.Ok(waypoints));
+    }
+
+    /// <summary>
     /// Build the <c>stations/search</c> body: rank by distance from the reference system and filter
     /// to stations that have the wanted side of the commodity's market. (Spansh filter shape.)
     /// </summary>
