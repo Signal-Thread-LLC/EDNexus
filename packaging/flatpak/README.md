@@ -12,11 +12,29 @@ Mode's Discover store. The same build also runs on Ubuntu, Debian, Fedora, Arch,
 | `io.github.Signal_Thread_LLC.EDNexus.metainfo.xml` | AppStream metadata (**required** by Flathub) |
 | `io.github.Signal_Thread_LLC.EDNexus.desktop` | Desktop entry |
 | `ednexus` | In-sandbox launcher (`/app/bin/ednexus` → the .NET apphost) |
-| `build-flatpak.sh` | Publishes the self-contained payload + prints its sha256 |
+| `build-flatpak.sh` | Publishes the payload tarball **and** the standalone `.flatpak` bundle |
 
 The app ID is `io.github.Signal_Thread_LLC.EDNexus` (hyphens aren't allowed in Flatpak IDs,
 so the `Signal-Thread-LLC` org becomes `Signal_Thread_LLC`). If you'd rather verify the
 `signal-and-thread.org` domain on Flathub, rename everything to `org.signal_and_thread.EDNexus`.
+
+## Two ways to ship
+
+1. **Standalone `.flatpak` bundle** — a single file users download from the GitHub Release and
+   sideload. No Flathub account or review needed; good for immediate distribution.
+   ```sh
+   flatpak install --user ./EDNexus-<version>.flatpak
+   flatpak run io.github.Signal_Thread_LLC.EDNexus
+   ```
+   The bundle carries the app, not the runtime; `flatpak` pulls `org.freedesktop.Platform`
+   from Flathub on install (Steam Deck has Flathub preconfigured). Trade-off vs. Flathub:
+   **no automatic updates** — the user reinstalls to upgrade.
+
+2. **Flathub** — listed in software centres (incl. the Deck's Discover) with automatic updates.
+   Requires a submission (see below) and consumes the payload tarball.
+
+Both artifacts are produced by `build-flatpak.sh` and attached to each GitHub Release by
+`.github/workflows/release.yml`.
 
 ## Why a pre-built payload (not build-from-source)
 
