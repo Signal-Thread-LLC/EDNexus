@@ -57,9 +57,15 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
-      # Self-contained linux-x64 tarball — the payload the Flatpak manifest consumes
-      # (Flathub builders have no network, so the app is published here, not there).
-      - name: Build Linux payload (tarball)
+      - name: Install Flatpak tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak flatpak-builder
+          flatpak remote-add --if-not-exists --user flathub https://flathub.org/repo/flathub.flatpakrepo
+          flatpak install -y --user flathub org.freedesktop.Platform//24.08 org.freedesktop.Sdk//24.08
+      # Produces the self-contained payload tarball (for Flathub) and a standalone .flatpak
+      # bundle users can sideload from the Release.
+      - name: Build Flatpak bundle + payload
         env:
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
         run: |
@@ -67,8 +73,10 @@ jobs:
           ./packaging/flatpak/build-flatpak.sh ${{ needs.version.outputs.version }}
       - uses: actions/upload-artifact@v4
         with:
-          name: linux-tarball
-          path: packaging/flatpak/out/*.tar.gz
+          name: linux-flatpak
+          path: |
+            packaging/flatpak/out/*.flatpak
+            packaging/flatpak/out/*.tar.gz
 
   release:
     needs: [version, windows, linux]
