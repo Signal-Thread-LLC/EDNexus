@@ -2,9 +2,9 @@
 Type=Application
 Name=EDNexus
 GenericName=Elite Dangerous commander console
-Comment=Market, routes, exobiology, colonisation and more from your journal
-Exec=/opt/signal-and-thread/ednexus/EDNexus.App
-Icon=ednexus
+Comment=Market, routes, exobiology and colonisation from your journal
+Exec=ednexus
+Icon=io.github.Signal_Thread_LLC.EDNexus
 Terminal=false
 Categories=Game;Utility;
 Keywords=Elite;Dangerous;EDNexus;

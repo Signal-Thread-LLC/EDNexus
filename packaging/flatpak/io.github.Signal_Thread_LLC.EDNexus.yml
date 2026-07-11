@@ -1,0 +1,61 @@
+# Flatpak manifest for EDNexus — Flathub-ready.
+#
+# App ID uses the io.github.<owner>.<repo> convention for GitHub-hosted projects.
+# Flatpak IDs cannot contain hyphens, so the "Signal-Thread-LLC" org becomes
+# "Signal_Thread_LLC". If you verify a domain on Flathub instead (e.g. signal-and-thread.org),
+# switch this to org.signal_and_thread.EDNexus and rename the sibling files to match.
+app-id: io.github.Signal_Thread_LLC.EDNexus
+runtime: org.freedesktop.Platform
+runtime-version: '24.08'
+sdk: org.freedesktop.Sdk
+command: ednexus
+
+finish-args:
+  # Display: Avalonia prefers Wayland and falls back to X11; DRI enables GPU acceleration.
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --share=ipc
+  - --device=dri
+  # EDNexus uploads to EDDN and queries Inara / EDSM / Spansh.
+  - --share=network
+  # Read-only access to the Elite Dangerous journals the game writes under Proton.
+  # Steam Deck: the internal library lives under ~/.local/share/Steam; games moved to a
+  # microSD card are mounted under /run/media. These are the host paths — see the README
+  # "Journal detection under the sandbox" note, since $HOME is redirected inside Flatpak.
+  - --filesystem=~/.local/share/Steam:ro
+  - --filesystem=~/.steam:ro
+  - --filesystem=/run/media:ro
+
+modules:
+  - name: ednexus
+    buildsystem: simple
+    build-commands:
+      - install -d /app/lib/ednexus
+      - cp -a app-payload/. /app/lib/ednexus/
+      - chmod +x /app/lib/ednexus/EDNexus.App
+      - install -Dm755 ednexus /app/bin/ednexus
+      - install -Dm644 io.github.Signal_Thread_LLC.EDNexus.desktop /app/share/applications/io.github.Signal_Thread_LLC.EDNexus.desktop
+      - install -Dm644 io.github.Signal_Thread_LLC.EDNexus.metainfo.xml /app/share/metainfo/io.github.Signal_Thread_LLC.EDNexus.metainfo.xml
+      - install -Dm644 ednexus-256.png /app/share/icons/hicolor/256x256/apps/io.github.Signal_Thread_LLC.EDNexus.png
+    sources:
+      # Pre-built, self-contained linux-x64 publish, tarred with EDNexus.App at the archive
+      # root. Produce it with build-flatpak.sh, upload as a GitHub Release asset, then paste
+      # the printed sha256 below. (For fast LOCAL iteration, swap this whole entry for:
+      #   - type: dir
+      #     path: publish
+      #     dest: app-payload
+      # after running build-flatpak.sh — no upload or checksum needed.)
+      - type: archive
+        url: https://github.com/Signal-Thread-LLC/EDNexus/releases/download/v0.1.0/ednexus-0.1.0-linux-x64.tar.gz
+        sha256: REPLACE_WITH_TARBALL_SHA256
+        dest: app-payload
+      - type: file
+        path: ednexus
+      - type: file
+        path: io.github.Signal_Thread_LLC.EDNexus.desktop
+      - type: file
+        path: io.github.Signal_Thread_LLC.EDNexus.metainfo.xml
+      # For a Flathub submission (separate repo), copy the icon in beside the manifest and
+      # change this to `path: ednexus-256.png`.
+      - type: file
+        path: ../../assets/icons/ednexus-256.png
