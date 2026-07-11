@@ -72,7 +72,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
                 UpdateAvailable = true;
                 System.Diagnostics.Trace.TraceInformation($"UI: UpdateDownloaded event received (AutoUpdateService2) path={path}");
             });
-        };    }
+        };
+    }
 
     /// <summary>The dashboard cards, in display order.</summary>
     public ObservableCollection<CardViewModel> Cards { get; }
@@ -104,6 +105,10 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string _balance = "0 cr";
     [ObservableProperty] private string _lastUpdated = "—";
     [ObservableProperty] private bool _devMode;
+
+    // Update bar: set when a background updater has downloaded a new build.
+    [ObservableProperty] private bool _updateAvailable;
+    [ObservableProperty] private string _updatePath = "";
 
     [RelayCommand]
     private async Task OpenSettings()
