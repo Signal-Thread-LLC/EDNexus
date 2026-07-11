@@ -1,0 +1,3 @@
+#!/bin/sh
+# Flatpak entry point: the self-contained .NET apphost lives in /app/lib/ednexus.
+exec /app/lib/ednexus/EDNexus.App "$@"
