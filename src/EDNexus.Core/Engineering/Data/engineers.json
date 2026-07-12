@@ -21,7 +21,7 @@
     "system": "Wyrd",
     "base": "Black Hide",
     "unlock": "Deal with at least 5 black-market contacts, then pay 500,000 Cr.",
-    "specialities": [ "Power Distributors", "Power Plants", "Pulse Lasers", "Burst Lasers" ]
+    "specialities": [ "Power Distributors", "Pulse Lasers", "Burst Lasers" ]
   },
   {
     "id": "mcquinn",
@@ -51,7 +51,7 @@
     "id": "palin",
     "name": "Professor Palin",
     "system": "Arque",
-    "base": "Abel Laboratories",
+    "base": "Abel Laboratory",
     "unlock": "Travel 5,000 Ly from career start and meet Marco Qwent, then gift 25 units of Sensor Fragments.",
     "specialities": [ "Thrusters", "Frame Shift Drives" ]
   },

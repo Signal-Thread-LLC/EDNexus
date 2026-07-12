@@ -53,5 +53,19 @@
   { "symbol": "shieldsoakanalysis",     "name": "Inconsistent Shield Soak Analysis","category": "Encoded", "grade": 1, "source": "Scan ships with active shields during combat (composition scanner)." },
   { "symbol": "shieldcyclerecordings",  "name": "Distorted Shield Cycle Recordings","category": "Encoded", "grade": 2, "source": "Scan shielded ships in combat; plentiful at RES / Combat Zones." },
   { "symbol": "shielddensityreports",   "name": "Untypical Shield Scans",         "category": "Encoded", "grade": 3, "source": "Scan shielded ships in combat; High-grade Emissions." },
-  { "symbol": "emissiondata",           "name": "Unexpected Emission Data",       "category": "Encoded", "grade": 3, "source": "Scan ship emissions during combat; Encoded Emissions USS." }
+  { "symbol": "emissiondata",           "name": "Unexpected Emission Data",       "category": "Encoded", "grade": 3, "source": "Scan ship emissions during combat; Encoded Emissions USS." },
+
+  { "symbol": "tellurium",              "name": "Tellurium",                      "category": "Raw", "grade": 4, "source": "Very rare raw. Metal-rich body surface deposits; HIP 36601 C 1 is a reliable spot." },
+
+  { "symbol": "heatconductionwiring",   "name": "Heat Conduction Wiring",         "category": "Manufactured", "grade": 1, "source": "Ship and settlement salvage; ship kills at RES; Dav's Hope loop." },
+  { "symbol": "conductivecomponents",   "name": "Conductive Components",          "category": "Manufactured", "grade": 2, "source": "Ship kills at RES; settlement salvage; Dav's Hope." },
+  { "symbol": "conductivepolymers",     "name": "Conductive Polymers",            "category": "Manufactured", "grade": 4, "source": "High-grade Emissions USS; tougher ship kills in Combat Zones." },
+  { "symbol": "polymercapacitors",      "name": "Polymer Capacitors",             "category": "Manufactured", "grade": 4, "source": "High-grade Emissions USS; Combat Zones; tougher ship kills." },
+  { "symbol": "improvisedcomponents",   "name": "Improvised Components",          "category": "Manufactured", "grade": 5, "source": "Very rare. Raid surface settlements at night (steal cargo to raise security); anarchy USS." },
+  { "symbol": "fedproprietarycomposites","name": "Proprietary Composites",        "category": "Manufactured", "grade": 4, "source": "High-grade Emissions and Combat Zones; Federal ship kills and salvage." },
+  { "symbol": "fedcorecomposites",      "name": "Core Dynamics Composites",       "category": "Manufactured", "grade": 5, "source": "Very rare. High-value Federal ship kills in Combat Zones; mission rewards." },
+
+  { "symbol": "bulkscandata",           "name": "Anomalous Bulk Scan Data",       "category": "Encoded", "grade": 1, "source": "Very common. Scan ships and data points; wanted-ship scans at Nav Beacons." },
+  { "symbol": "scanarchives",           "name": "Unidentified Scan Archives",     "category": "Encoded", "grade": 2, "source": "Scan ships and data beacons; ship-log uplink missions." },
+  { "symbol": "scandatabanks",          "name": "Classified Scan Databanks",      "category": "Encoded", "grade": 3, "source": "Scan authority/wanted ships; ship-log uplink and data-retrieval missions." }
 ]
