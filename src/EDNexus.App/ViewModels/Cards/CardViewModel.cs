@@ -5,6 +5,7 @@ using Avalonia.Input.Platform;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using EDNexus.Core;
+using EDNexus.Core.Settings;
 using EDNexus.Core.State;
 
 namespace EDNexus.App.ViewModels;
@@ -19,12 +20,21 @@ public sealed class DashboardContext
 {
     private readonly Func<EngineHost> _host;
     private readonly Func<bool> _devEnabled;
+    private readonly Func<EngineeringSettings> _getEngineeringPin;
+    private readonly Action<string?, int> _saveEngineeringPin;
 
-    public DashboardContext(Func<EngineHost> host, Func<bool> devEnabled, Random rng)
+    public DashboardContext(
+        Func<EngineHost> host,
+        Func<bool> devEnabled,
+        Random rng,
+        Func<EngineeringSettings> getEngineeringPin,
+        Action<string?, int> saveEngineeringPin)
     {
         _host = host;
         _devEnabled = devEnabled;
         Rng = rng;
+        _getEngineeringPin = getEngineeringPin;
+        _saveEngineeringPin = saveEngineeringPin;
     }
 
     /// <summary>The live engine host — always the current one, even after a reset-to-live rebuild.</summary>
@@ -34,6 +44,12 @@ public sealed class DashboardContext
     public bool DevEnabled => _devEnabled();
 
     public Random Rng { get; }
+
+    /// <summary>Read the persisted engineering pin (blueprint id + grade).</summary>
+    public EngineeringSettings GetEngineeringPin() => _getEngineeringPin();
+
+    /// <summary>Persist the engineering pin; a null blueprint id clears it.</summary>
+    public void SaveEngineeringPin(string? blueprintId, int grade) => _saveEngineeringPin(blueprintId, grade);
 }
 
 /// <summary>

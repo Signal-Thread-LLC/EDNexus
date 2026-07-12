@@ -1,0 +1,74 @@
+[
+  {
+    "id": "fsd_increased_range",
+    "name": "Increased FSD Range",
+    "module": "Frame Shift Drive",
+    "grades": [
+      { "grade": 1, "engineerIds": [ "farseer", "martuuk", "dorn" ], "ingredients": [ "disruptedwakeechoes" ] },
+      { "grade": 2, "engineerIds": [ "farseer", "martuuk", "dorn" ], "ingredients": [ "chemicalprocessors", "disruptedwakeechoes" ] },
+      { "grade": 3, "engineerIds": [ "farseer", "martuuk" ], "ingredients": [ "chemicalprocessors", "phosphorus", "wakesolutions" ] },
+      { "grade": 4, "engineerIds": [ "farseer", "martuuk" ], "ingredients": [ "chemicaldistillery", "manganese", "wakesolutions" ] },
+      { "grade": 5, "engineerIds": [ "farseer", "martuuk", "palin" ], "ingredients": [ "chemicalmanipulators", "arsenic", "dataminedwake" ] }
+    ]
+  },
+  {
+    "id": "thrusters_dirty",
+    "name": "Dirty Drive Tuning",
+    "module": "Thrusters",
+    "grades": [
+      { "grade": 1, "engineerIds": [ "farseer", "martuuk", "palin" ], "ingredients": [ "legacyfirmware" ] },
+      { "grade": 2, "engineerIds": [ "farseer", "martuuk", "palin" ], "ingredients": [ "sulphur", "consumerfirmware" ] },
+      { "grade": 3, "engineerIds": [ "farseer", "martuuk", "palin" ], "ingredients": [ "manganese", "industrialfirmware" ] },
+      { "grade": 4, "engineerIds": [ "palin" ], "ingredients": [ "mercury", "industrialfirmware", "chemicalmanipulators" ] },
+      { "grade": 5, "engineerIds": [ "palin" ], "ingredients": [ "cadmium", "industrialfirmware", "pharmaceuticalisolators" ] }
+    ]
+  },
+  {
+    "id": "shieldgen_reinforced",
+    "name": "Reinforced Shield",
+    "module": "Shield Generator",
+    "grades": [
+      { "grade": 1, "engineerIds": [ "martuuk", "cheung" ], "ingredients": [ "wornshieldemitters" ] },
+      { "grade": 2, "engineerIds": [ "martuuk", "cheung" ], "ingredients": [ "shieldemitters", "shieldcyclerecordings" ] },
+      { "grade": 3, "engineerIds": [ "martuuk", "cheung" ], "ingredients": [ "shieldingsensors", "shielddensityreports" ] },
+      { "grade": 4, "engineerIds": [ "cheung" ], "ingredients": [ "compoundshielding", "shielddensityreports" ] },
+      { "grade": 5, "engineerIds": [ "cheung" ], "ingredients": [ "imperialshielding", "shielddensityreports" ] }
+    ]
+  },
+  {
+    "id": "armour_heavyduty",
+    "name": "Heavy Duty",
+    "module": "Armour",
+    "grades": [
+      { "grade": 1, "engineerIds": [ "selene" ], "ingredients": [ "carbon" ] },
+      { "grade": 2, "engineerIds": [ "selene" ], "ingredients": [ "carbon", "nickel" ] },
+      { "grade": 3, "engineerIds": [ "selene" ], "ingredients": [ "carbon", "highdensitycomposites", "nickel" ] },
+      { "grade": 4, "engineerIds": [ "selene" ], "ingredients": [ "highdensitycomposites", "chromium", "zirconium" ] },
+      { "grade": 5, "engineerIds": [ "selene" ], "ingredients": [ "highdensitycomposites", "chromium", "militarygradealloys" ] }
+    ]
+  },
+  {
+    "id": "powerplant_overcharged",
+    "name": "Overcharged Power Plant",
+    "module": "Power Plant",
+    "grades": [
+      { "grade": 1, "engineerIds": [ "dweller" ], "ingredients": [ "sulphur" ] },
+      { "grade": 2, "engineerIds": [ "dweller" ], "ingredients": [ "sulphur", "heatdispersionplate" ] },
+      { "grade": 3, "engineerIds": [ "dweller", "qwent" ], "ingredients": [ "conductiveceramics", "phasealloys" ] },
+      { "grade": 4, "engineerIds": [ "qwent", "tani" ], "ingredients": [ "conductiveceramics", "phasealloys", "industrialfirmware" ] },
+      { "grade": 5, "engineerIds": [ "tani" ], "ingredients": [ "chemicalmanipulators", "militarygradealloys", "industrialfirmware" ] }
+    ]
+  },
+  {
+    "id": "powerdist_engfocused",
+    "name": "Engine Focused Power Distributor",
+    "module": "Power Distributor",
+    "grades": [
+      { "grade": 1, "engineerIds": [ "dweller" ], "ingredients": [ "sulphur" ] },
+      { "grade": 2, "engineerIds": [ "dweller" ], "ingredients": [ "sulphur", "hybridcapacitors" ] },
+      { "grade": 3, "engineerIds": [ "dweller", "dorn" ], "ingredients": [ "electrochemicalarrays", "phasealloys" ] },
+      { "grade": 4, "engineerIds": [ "dorn", "tani" ], "ingredients": [ "electrochemicalarrays", "arsenic", "industrialfirmware" ] },
+      { "grade": 5, "engineerIds": [ "dorn", "tani" ], "ingredients": [ "militarysupercapacitors", "arsenic", "chemicalmanipulators" ] }
+    ]
+  }
+]

@@ -23,6 +23,19 @@ public sealed class AppSettings
 
     /// <summary>Opt-in configuration for the EDDN and Inara data reporters. Both default to off.</summary>
     public ReportingSettings Reporting { get; set; } = new();
+
+    /// <summary>The commander's pinned engineering goal, if any.</summary>
+    public EngineeringSettings Engineering { get; set; } = new();
+}
+
+/// <summary>The single pinned blueprint the Engineering card focuses on. Null id means nothing pinned.</summary>
+public sealed class EngineeringSettings
+{
+    /// <summary>Blueprint id from the engineering catalog (e.g. "fsd_increased_range"), or null.</summary>
+    public string? PinnedBlueprintId { get; set; }
+
+    /// <summary>Target grade for the pinned blueprint, 1–5.</summary>
+    public int PinnedGrade { get; set; } = 5;
 }
 
 /// <summary>Per-service opt-in for outbound data reporting. Nothing is sent unless enabled.</summary>

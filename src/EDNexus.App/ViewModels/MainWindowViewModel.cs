@@ -32,12 +32,18 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     {
         _boot = boot;
         _host = BuildHost();
-        _context = new DashboardContext(() => _host, () => _boot.Dev.Enabled, _rng);
+        _context = new DashboardContext(
+            () => _host,
+            () => _boot.Dev.Enabled,
+            _rng,
+            () => _boot.Settings.Engineering,
+            (id, grade) => _boot.ApplyEngineeringPin(id, grade));
         Cards = new ObservableCollection<CardViewModel>
         {
             new LocationCardViewModel(_context),
             new ShipCardViewModel(_context),
             new MaterialsCardViewModel(_context),
+            new EngineeringCardViewModel(_context),
             new CargoCardViewModel(_context),
             new RouteCardViewModel(_context),
             new TradeCardViewModel(_context),
