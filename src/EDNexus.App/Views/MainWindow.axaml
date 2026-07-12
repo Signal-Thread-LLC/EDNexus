@@ -320,8 +320,22 @@
                           Command="{Binding ToggleCollapseCommand}" />
                 </Grid>
                 <StackPanel IsVisible="{Binding !IsCollapsed}">
-                  <TextBlock Classes="label" Text="Neutron-highway route between two systems for your ship's jump range."
-                             TextWrapping="Wrap" Margin="0,0,0,10" />
+                  <TextBlock Classes="label" Text="Plot a route between two systems." TextWrapping="Wrap" Margin="0,0,0,8" />
+
+                  <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,0,0,4">
+                    <RadioButton GroupName="RouteMode" Content="Neutron" IsChecked="{Binding ModeNeutron}" />
+                    <RadioButton GroupName="RouteMode" Content="No boost" IsChecked="{Binding ModeNoBoost}" />
+                    <RadioButton GroupName="RouteMode" Content="Fleet carrier" IsChecked="{Binding ModeCarrier}" />
+                  </StackPanel>
+                  <TextBlock Classes="label" Text="{Binding ModeHint}" TextWrapping="Wrap" Margin="0,0,0,10"
+                             IsVisible="{Binding ModeHint, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+                  <TextBlock Classes="label" Text="{Binding CarrierFuelText}" TextWrapping="Wrap" Margin="0,0,0,4"
+                             Foreground="{StaticResource AmberBrush}"
+                             IsVisible="{Binding ShowCarrierFuel}" />
+                  <TextBlock Classes="label" Text="{Binding CarrierPendingText}" TextWrapping="Wrap" Margin="0,0,0,10"
+                             Foreground="{StaticResource AmberBrush}"
+                             IsVisible="{Binding ShowCarrierPending}" />
 
                   <TextBlock Classes="label" Text="FROM" />
                   <TextBox Classes="field" Text="{Binding RouteFrom}" PlaceholderText="Current system" Margin="0,2,0,8" />
@@ -329,7 +343,7 @@
                   <TextBox Classes="field" Text="{Binding RouteTo}" PlaceholderText="Destination system" Margin="0,2,0,8" />
 
                   <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,10">
-                    <StackPanel Grid.Column="0" Margin="0,0,10,0">
+                    <StackPanel Grid.Column="0" Margin="0,0,10,0" IsVisible="{Binding ShowJumpRange}">
                       <TextBlock Classes="label" Text="JUMP RANGE (LY)" />
                       <TextBox Classes="field" Text="{Binding RouteJumpRange}" PlaceholderText="e.g. 48.5" Margin="0,2,0,0" />
                     </StackPanel>
@@ -374,6 +388,9 @@
                                 <TextBlock Text="★ neutron" Foreground="{StaticResource Good}" FontSize="11"
                                            IsVisible="{Binding IsNeutron}" />
                               </StackPanel>
+                              <TextBlock Text="{Binding Fuel}" Classes="label" FontSize="11" TextWrapping="Wrap"
+                                         IsVisible="{Binding ShowFuel}"
+                                         Foreground="{StaticResource AmberBrush}" />
                             </StackPanel>
                             <TextBlock Grid.Column="2" Text="{Binding Remaining}" Classes="label" FontSize="11"
                                        VerticalAlignment="Center" />

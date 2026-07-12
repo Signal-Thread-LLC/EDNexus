@@ -84,6 +84,64 @@ public class SpanshRoutePlotterTests
         Assert.Equal("Colonia", second.Hops[^1].System);
     }
 
+    [Fact]
+    public async Task No_boost_mode_uses_the_galaxy_plotter_and_maps_fuel()
+    {
+        const string ready = """
+        { "status": "ok", "result": { "jumps": [
+            { "name": "Sol",     "distance": 0,    "distance_to_destination": 300, "fuel_used": 0,   "fuel_in_tank": 32, "is_scoopable": false },
+            { "name": "Wolf 359","distance": 45.2, "distance_to_destination": 0,   "fuel_used": 4.1, "fuel_in_tank": 28, "is_scoopable": true, "must_refuel": true } ] } }
+        """;
+        var handler = new RecordingHandler(n => (HttpStatusCode.OK, n == 1 ? Submit : ready));
+        var plotter = NewPlotter(handler);
+        var ship = new EDNexus.Core.Ship.ShipFsdProfile(1050, 280, 32, 0.63, 0.012, 2.45, 5, 0, 0);
+
+        var plan = await plotter.PlotAsync(new RoutePlotRequest("Sol", "Wolf 359", 0, Mode: RouteMode.NoBoost, Ship: ship));
+
+        Assert.Contains("/generic/route", handler.Uris[0]!.ToString());
+        Assert.NotNull(plan);
+        Assert.Equal(RouteMode.NoBoost, plan!.Mode);
+        Assert.False(plan.Hops[1].IsNeutron);
+        Assert.Equal(4.1, plan.Hops[1].FuelUsed);
+        Assert.Equal(4.1, plan.TotalFuelUsed);
+    }
+
+    [Fact]
+    public async Task No_boost_mode_without_a_ship_never_touches_the_network()
+    {
+        var handler = new RecordingHandler(body: Ready);
+        var plotter = NewPlotter(handler);
+
+        var plan = await plotter.PlotAsync(new RoutePlotRequest("Sol", "Colonia", 0, Mode: RouteMode.NoBoost, Ship: null));
+
+        Assert.Null(plan);
+        Assert.Equal(0, handler.CallCount);
+    }
+
+    [Fact]
+    public async Task Fleet_carrier_mode_uses_the_carrier_plotter_and_tracks_tritium()
+    {
+        const string ready = """
+        { "status": "ok", "result": { "jumps": [
+            { "name": "Sol",     "distance": 0,   "distance_to_destination": 500, "fuel_used": 0,  "fuel_in_tank": 1000, "must_restock": 0 },
+            { "name": "HR 1183", "distance": 374, "distance_to_destination": 0,   "fuel_used": 90, "fuel_in_tank": 910,  "must_restock": 0, "has_icy_ring": true } ] } }
+        """;
+        var handler = new RecordingHandler(n => (HttpStatusCode.OK, n == 1 ? Submit : ready));
+        var plotter = NewPlotter(handler);
+
+        var plan = await plotter.PlotAsync(new RoutePlotRequest("Sol", "HR 1183", 0, Mode: RouteMode.FleetCarrier));
+
+        Assert.Contains("/fleetcarrier/route", handler.Uris[0]!.ToString());
+        // Fuel must be modelled as draining from a full tank, not topped up each stop, or the tank level
+        // comes back pinned at the maximum and never appears to deduct.
+        Assert.Contains("calculate_starting_fuel=0", handler.Bodies[0]);
+        Assert.NotNull(plan);
+        Assert.Equal(RouteMode.FleetCarrier, plan!.Mode);
+        Assert.Equal(90, plan.Hops[1].FuelUsed);
+        Assert.True(plan.Hops[1].HasIcyRing);
+        Assert.Equal(90, plan.TotalFuelUsed);
+    }
+
     private sealed class InMemoryCache : IResponseCache
     {
         private readonly Dictionary<string, string> _store = new();

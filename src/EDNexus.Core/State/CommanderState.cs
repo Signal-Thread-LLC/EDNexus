@@ -45,6 +45,30 @@ public sealed class CommanderState : ObservableObject
     private double _cargoTons;
     public double CargoTons { get => _cargoTons; set => Set(ref _cargoTons, value); }
 
+    private double _carrierFuel;
+    /// <summary>Tritium in the current fleet carrier's fuel reserve (t), from <c>CarrierStats</c>. 0 when unknown.</summary>
+    public double CarrierFuel { get => _carrierFuel; set => Set(ref _carrierFuel, value); }
+
+    private double _carrierJumpRange;
+    /// <summary>The fleet carrier's current jump range (ly) at its present load, from <c>CarrierStats</c>. 0 when unknown.</summary>
+    public double CarrierJumpRange { get => _carrierJumpRange; set => Set(ref _carrierJumpRange, value); }
+
+    private string? _carrierPendingSystem;
+    /// <summary>
+    /// The system a fleet-carrier jump is scheduled to, from a <c>CarrierJumpRequest</c> that hasn't yet
+    /// completed or been cancelled. Non-null means the carrier is booked to move but the journal has not
+    /// logged the arrival — which is why the live location can lag behind where the commander expects to be.
+    /// </summary>
+    public string? CarrierPendingSystem { get => _carrierPendingSystem; set => Set(ref _carrierPendingSystem, value); }
+
+    private DateTimeOffset? _carrierPendingDeparture;
+    /// <summary>When the pending carrier jump is scheduled to depart, from <c>CarrierJumpRequest</c>. Null when none is pending.</summary>
+    public DateTimeOffset? CarrierPendingDeparture { get => _carrierPendingDeparture; set => Set(ref _carrierPendingDeparture, value); }
+
+    private Ship.ShipFsdProfile? _fsd;
+    /// <summary>The current ship's Frame Shift Drive, derived from the last <c>Loadout</c>. Null until one is seen. Drives no-boost route plots.</summary>
+    public Ship.ShipFsdProfile? Fsd { get => _fsd; set => Set(ref _fsd, value); }
+
     private DateTimeOffset _lastUpdated;
     public DateTimeOffset LastUpdated { get => _lastUpdated; set => Set(ref _lastUpdated, value); }
 
