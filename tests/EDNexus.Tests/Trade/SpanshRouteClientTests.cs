@@ -106,4 +106,81 @@ public class SpanshRouteClientTests
         Assert.False(result.IsOk);
         Assert.Contains("timed out", result.Error);
     }
+
+    // --- Galaxy plotter (no neutron boost) ---
+
+    private const string GalaxyReady = """
+    { "status": "ok", "result": { "jumps": [
+        { "name": "Sol",      "distance": 0,     "distance_to_destination": 374, "has_neutron": false, "is_scoopable": false, "fuel_used": 0,    "fuel_in_tank": 32, "must_refuel": false },
+        { "name": "LHS 1541", "distance": 49.9,  "distance_to_destination": 324, "has_neutron": false, "is_scoopable": true,  "fuel_used": 4.96, "fuel_in_tank": 27, "must_refuel": true  },
+        { "name": "HR 1183",  "distance": 324.1, "distance_to_destination": 0,   "has_neutron": false, "is_scoopable": true,  "fuel_used": 5,    "fuel_in_tank": 22, "must_refuel": false } ] } }
+    """;
+
+    private static SpanshGalaxyRouteQuery GalaxyQuery => new()
+    {
+        From = "Sol", To = "HR 1183",
+        OptimalMass = 1050, BaseMass = 280, TankSize = 32, ReserveSize = 0.77,
+        FuelMultiplier = 0.012, FuelPower = 2.45, MaxFuelPerJump = 5, RangeBoost = 10.5, Cargo = 0,
+    };
+
+    [Fact]
+    public async Task Galaxy_route_submits_ship_physics_with_boost_off_and_parses_fuel()
+    {
+        var handler = new RecordingHandler(n => (HttpStatusCode.OK, n == 1 ? Submit : GalaxyReady));
+        using var client = new SpanshClient(Options(), new HttpClient(handler));
+
+        var result = await client.PlotGalaxyRouteAsync(GalaxyQuery);
+
+        Assert.Contains("/generic/route", handler.Uris[0]!.ToString());
+        var body = handler.Bodies[0];
+        Assert.Contains("source=Sol", body);
+        Assert.Contains("use_supercharge=0", body);         // the whole point: no neutron boosting
+        Assert.Contains("optimal_mass=1050", body);
+        Assert.Contains("max_fuel_per_jump=5", body);
+        Assert.Contains("range_boost=10.5", body);
+
+        Assert.True(result.IsOk);
+        Assert.Equal(3, result.Waypoints.Count);
+        Assert.Equal(0, result.Waypoints[0].Jumps);         // origin
+        Assert.Equal(1, result.Waypoints[1].Jumps);         // every real hop is a single plain jump
+        Assert.False(result.Waypoints[1].IsNeutron);
+        Assert.Equal(4.96, result.Waypoints[1].FuelUsed);
+        Assert.True(result.Waypoints[1].IsScoopable);
+        Assert.True(result.Waypoints[1].MustRestock);       // must_refuel
+    }
+
+    // --- Fleet-carrier plotter ---
+
+    private const string CarrierReady = """
+    { "status": "ok", "result": { "jumps": [
+        { "name": "Sol",     "distance": 0,   "distance_to_destination": 374, "fuel_used": 0,  "fuel_in_tank": 52, "has_icy_ring": false, "must_restock": 1, "restock_amount": 52 },
+        { "name": "HR 1183", "distance": 374, "distance_to_destination": 0,   "fuel_used": 52, "fuel_in_tank": 0,  "has_icy_ring": true,  "must_restock": 0, "restock_amount": 0  } ] } }
+    """;
+
+    [Fact]
+    public async Task Fleet_carrier_route_submits_capacity_and_parses_tritium()
+    {
+        var handler = new RecordingHandler(n => (HttpStatusCode.OK, n == 1 ? Submit : CarrierReady));
+        using var client = new SpanshClient(Options(), new HttpClient(handler));
+
+        var result = await client.PlotFleetCarrierRouteAsync(new SpanshFleetCarrierRouteQuery
+        {
+            From = "Sol", To = "HR 1183", CapacityUsed = 120, CalculateStartingFuel = true,
+        });
+
+        Assert.Contains("/fleetcarrier/route", handler.Uris[0]!.ToString());
+        var body = handler.Bodies[0];
+        Assert.Contains("source=Sol", body);
+        Assert.Contains("capacity_used=120", body);
+        Assert.Contains("calculate_starting_fuel=1", body);
+
+        Assert.True(result.IsOk);
+        Assert.Equal(2, result.Waypoints.Count);
+        var hop = result.Waypoints[1];
+        Assert.Equal(52, hop.FuelUsed);                     // tritium burnt this 374 ly hop
+        Assert.Equal(0, hop.FuelInTank);
+        Assert.True(hop.HasIcyRing);
+        Assert.False(result.Waypoints[1].IsNeutron);
+        Assert.True(result.Waypoints[0].MustRestock);       // must_restock: 1 on the origin
+    }
 }
