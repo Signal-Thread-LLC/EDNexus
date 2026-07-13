@@ -88,12 +88,6 @@
   code { color: var(--accent-bright); }
   pre code { color: inherit; }
 
-  ul.roadmap { list-style: none; padding: 0; margin: 0; }
-  ul.roadmap li { padding: 6px 0; color: var(--muted); }
-  ul.roadmap li.done { color: var(--text); }
-  ul.roadmap li::before { content: "▢ "; }
-  ul.roadmap li.done::before { content: "✓ "; color: var(--accent); }
-
   footer {
     padding: 32px 0 56px;
     text-align: center;
@@ -187,17 +181,15 @@ dotnet run --project src/EDNexus.Cli -- --once</code></pre>
   </div>
 </section>
 
-<section id="roadmap">
+<section id="issues">
   <div class="wrap">
-    <h2>Road<span class="accent">map</span></h2>
-    <ul class="roadmap">
-      <li class="done">Journal engine (watcher, event bus, commander state)</li>
-      <li class="done">Avalonia dashboard shell</li>
-      <li>Colonisation tracker (construction depots, shopping lists, hauling progress)</li>
-      <li>Market / trade search + route plotting (Spansh, EDSM)</li>
-      <li>Materials &amp; exobiology tracking</li>
-      <li>In-game overlay + voice callouts</li>
-    </ul>
+    <h2>What's <span class="accent">next</span></h2>
+    <p style="color:var(--muted)">
+      Planned work, open bugs, and feature requests are tracked on GitHub.
+    </p>
+    <div class="cta" style="justify-content:flex-start">
+      <a class="btn secondary" href="https://github.com/Signal-Thread-LLC/EDNexus/issues">View open issues</a>
+    </div>
   </div>
 </section>
 
