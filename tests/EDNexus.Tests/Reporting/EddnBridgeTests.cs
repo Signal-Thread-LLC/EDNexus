@@ -35,6 +35,15 @@ public class EddnBridgeTests
         return (bridge, handler);
     }
 
+    private static (EddnBridge, RecordingHandler) NewBridge(
+        JournalEventBus bus, AppSettings settings, IReportingLog log, HttpStatusCode status = HttpStatusCode.OK)
+    {
+        var handler = new RecordingHandler(status);
+        var uploader = new EddnUploader(Options, new HttpClient(handler));
+        var bridge = new EddnBridge(bus, settings, uploader, new EddnJournalTransformer(Options), isSuppressed: () => false, log);
+        return (bridge, handler);
+    }
+
     private const string Jump = """
     { "timestamp": "2020-01-01T00:00:00Z", "event": "FSDJump",
       "StarSystem": "Sol", "SystemAddress": 1, "StarPos": [0.0, 0.0, 0.0] }
@@ -65,5 +74,60 @@ public class EddnBridgeTests
         await bridge.DisposeAsync();
 
         Assert.Equal(0, handler.CallCount);
+    }
+
+    [Fact]
+    public async Task Successful_upload_is_recorded()
+    {
+        var bus = new JournalEventBus();
+        var log = new CapturingReportingLog();
+        var (bridge, _) = NewBridge(bus, EnabledSettings(), log);
+
+        bus.Publish(Live(Jump));
+        await bridge.DisposeAsync();   // flushes the uploader, which fires Completed
+
+        var record = Assert.Single(log.Records);
+        Assert.Equal(ReportingTarget.Eddn, record.Target);
+        Assert.True(record.Success);
+        Assert.Contains("journal", record.Summary);      // the $schemaRef of a journal message
+        Assert.Contains("200", record.Status);
+        Assert.Null(record.Payload);                     // payload logging is off by default
+        Assert.Null(record.Error);
+    }
+
+    [Fact]
+    public async Task Rejected_upload_records_the_failure()
+    {
+        var bus = new JournalEventBus();
+        var log = new CapturingReportingLog();
+        // 400 is a permanent EDDN reject (bad schema/version) — exactly what a validation log must show.
+        var (bridge, _) = NewBridge(bus, EnabledSettings(), log, HttpStatusCode.BadRequest);
+
+        bus.Publish(Live(Jump));
+        await bridge.DisposeAsync();
+
+        var record = Assert.Single(log.Records);
+        Assert.False(record.Success);
+        Assert.Contains("400", record.Status);
+    }
+
+    [Fact]
+    public async Task Payload_logging_redacts_the_commander_name()
+    {
+        var bus = new JournalEventBus();
+        var settings = EnabledSettings();
+        settings.Reporting.LogPayloads = true;
+        var log = new CapturingReportingLog();
+        var (bridge, _) = NewBridge(bus, settings, log);
+
+        // The commander name warms EDDN state and becomes the header uploaderID on the next upload.
+        bus.Publish(Live("""{ "timestamp": "2020-01-01T00:00:00Z", "event": "Commander", "Name": "Jameson" }"""));
+        bus.Publish(Live(Jump));
+        await bridge.DisposeAsync();
+
+        var record = Assert.Single(log.Records);
+        Assert.NotNull(record.Payload);
+        Assert.Contains("[redacted]", record.Payload);
+        Assert.DoesNotContain("Jameson", record.Payload);   // the raw name must never reach the log
     }
 }

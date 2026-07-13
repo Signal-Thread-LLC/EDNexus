@@ -28,11 +28,11 @@ public class InaraBridgeTests
     }
 
     // Builds a bridge with zero debounce/throttle so triggers fire immediately in tests.
-    private static (InaraBridge, RecordingHandler) NewBridge(JournalEventBus bus, AppSettings settings, Func<bool>? isSuppressed = null)
+    private static (InaraBridge, RecordingHandler) NewBridge(JournalEventBus bus, AppSettings settings, Func<bool>? isSuppressed = null, IReportingLog? log = null)
     {
         var handler = new RecordingHandler(body: """{ "header": { "eventStatus": 200 } }""");
         var client = new InaraClient(ClientOptions, new HttpClient(handler));
-        var bridge = new InaraBridge(bus, settings, client, TimeSpan.Zero, TimeSpan.Zero, isSuppressed);
+        var bridge = new InaraBridge(bus, settings, client, TimeSpan.Zero, TimeSpan.Zero, isSuppressed, log);
         return (bridge, handler);
     }
 
@@ -127,5 +127,54 @@ public class InaraBridgeTests
 
         await Task.Delay(150);
         Assert.Equal(0, handler.CallCount);
+    }
+
+    [Fact]
+    public async Task Upload_is_recorded_on_docking()
+    {
+        var bus = new JournalEventBus();
+        var log = new CapturingReportingLog();
+        var (bridge, _) = NewBridge(bus, EnabledSettings(), log: log);
+        await using var _2 = bridge;
+
+        bus.Publish(Live("""{ "timestamp": "2020-01-01T00:00:00Z", "event": "Commander", "Name": "Jameson" }"""));
+        bus.Publish(Live("""
+        { "timestamp": "2020-01-01T00:10:00Z", "event": "Docked",
+          "StarSystem": "Sol", "StationName": "Abraham Lincoln", "MarketID": 128666762 }
+        """));
+
+        await WaitForAsync(() => log.Records.Count >= 1);
+
+        var record = log.Records[0];
+        Assert.Equal(ReportingTarget.Inara, record.Target);
+        Assert.True(record.Success);
+        Assert.Contains("addCommanderTravelDock", record.Summary);
+        Assert.Contains("200", record.Status);
+        Assert.Null(record.Payload);   // payload logging off by default
+    }
+
+    [Fact]
+    public async Task Payload_logging_excludes_the_api_key()
+    {
+        var bus = new JournalEventBus();
+        var settings = EnabledSettings();   // ApiKey = "key"
+        settings.Reporting.LogPayloads = true;
+        var log = new CapturingReportingLog();
+        var (bridge, _) = NewBridge(bus, settings, log: log);
+        await using var _2 = bridge;
+
+        bus.Publish(Live("""{ "timestamp": "2020-01-01T00:00:00Z", "event": "Commander", "Name": "Jameson" }"""));
+        bus.Publish(Live("""
+        { "timestamp": "2020-01-01T00:10:00Z", "event": "Docked",
+          "StarSystem": "Sol", "StationName": "Abraham Lincoln", "MarketID": 128666762 }
+        """));
+
+        await WaitForAsync(() => log.Records.Count >= 1);
+
+        var record = log.Records[0];
+        Assert.NotNull(record.Payload);
+        Assert.Contains("addCommanderTravelDock", record.Payload);
+        Assert.DoesNotContain("\"key\"", record.Payload);      // the API key must never reach the log
+        Assert.DoesNotContain("APIkey", record.Payload);       // nor the header that carries it
     }
 }
