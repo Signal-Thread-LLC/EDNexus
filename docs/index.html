@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EDNexus — Commander console for Elite Dangerous</title>
+<meta name="description" content="EDNexus is a single, does-it-all commander console for Elite Dangerous — market, routes, exobiology, colonisation, and materials in one cross-platform app.">
+<link rel="icon" type="image/svg+xml" href="assets/logo/ednexus-icon.svg">
+<style>
+  :root {
+    --bg: #0E1013;
+    --panel: #16181D;
+    --border: #242830;
+    --text: #E7E9EE;
+    --muted: #8A909C;
+    --accent: #F07100;
+    --accent-bright: #FF8C2E;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Segoe UI", Inter, Arial, sans-serif;
+    line-height: 1.6;
+  }
+  a { color: var(--accent-bright); }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 0 24px; }
+
+  header.hero {
+    padding: 72px 0 48px;
+    text-align: center;
+    border-bottom: 1px solid var(--border);
+  }
+  header.hero img.lockup { max-width: 440px; width: 100%; height: auto; }
+  header.hero p.tagline {
+    color: var(--muted);
+    font-size: 1.15rem;
+    max-width: 620px;
+    margin: 20px auto 0;
+  }
+  .cta { margin-top: 32px; display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+  .btn {
+    display: inline-block;
+    padding: 12px 24px;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+    border: 1px solid var(--border);
+  }
+  .btn.primary { background: var(--accent); color: #0E1013; border-color: var(--accent); }
+  .btn.primary:hover { background: var(--accent-bright); }
+  .btn.secondary { color: var(--text); }
+  .btn.secondary:hover { border-color: var(--accent); color: var(--accent-bright); }
+
+  section { padding: 56px 0; border-bottom: 1px solid var(--border); }
+  section:last-of-type { border-bottom: none; }
+  h2 { font-size: 1.6rem; margin-bottom: 24px; }
+  h2 .accent { color: var(--accent); }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 20px;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 22px;
+  }
+  .card h3 { margin: 0 0 8px; font-size: 1.05rem; }
+  .card p { margin: 0; color: var(--muted); font-size: 0.95rem; }
+
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; font-size: 0.9rem; }
+
+  pre {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    overflow-x: auto;
+    font-size: 0.9rem;
+  }
+  code { color: var(--accent-bright); }
+  pre code { color: inherit; }
+
+  ul.roadmap { list-style: none; padding: 0; margin: 0; }
+  ul.roadmap li { padding: 6px 0; color: var(--muted); }
+  ul.roadmap li.done { color: var(--text); }
+  ul.roadmap li::before { content: "▢ "; }
+  ul.roadmap li.done::before { content: "✓ "; color: var(--accent); }
+
+  footer {
+    padding: 32px 0 56px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <img class="lockup" src="assets/logo/ednexus-lockup.svg" alt="EDNexus — commander console for Elite Dangerous">
+    <p class="tagline">
+      A single, does-it-all commander console for <strong>Elite Dangerous</strong> — built to replace
+      the sprawl of separate market, route, exobiology, colonisation, and materials tools with one
+      cross-platform app.
+    </p>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/Signal-Thread-LLC/EDNexus/releases">Download</a>
+      <a class="btn secondary" href="https://github.com/Signal-Thread-LLC/EDNexus">View on GitHub</a>
+    </div>
+  </div>
+</header>
+
+<section id="how-it-works">
+  <div class="wrap">
+    <h2>How it <span class="accent">works</span></h2>
+    <p style="color:var(--muted)">
+      EDNexus works off the game's own data. A watcher tails the journal (<code>Journal.*.log</code>)
+      and the sidecar status files (<code>Status.json</code>, <code>Cargo.json</code>, <code>Market.json</code>, …),
+      turns them into a typed event stream, and folds that into a single live commander state that
+      every feature reads from.
+    </p>
+  </div>
+</section>
+
+<section id="stack">
+  <div class="wrap">
+    <h2>Built <span class="accent">for</span> the desktop</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>.NET 10</h3>
+        <p>Cross-platform — Windows, Linux, and macOS.</p>
+      </div>
+      <div class="card">
+        <h3>Avalonia 12</h3>
+        <p>Native-feeling desktop UI across every supported OS.</p>
+      </div>
+      <div class="card">
+        <h3>CommunityToolkit.Mvvm</h3>
+        <p>Clean, testable view models behind the dashboard.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="reporting">
+  <div class="wrap">
+    <h2>Community <span class="accent">data</span>, on your terms</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>EDDN</h3>
+        <p>Opt-in, anonymized market, scan, and travel data contributed to the Elite Dangerous Data Network as you play.</p>
+      </div>
+      <div class="card">
+        <h3>Inara</h3>
+        <p>Opt-in sync of your commander's identity, credits, ranks, and travel to your own Inara profile.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="install">
+  <div class="wrap">
+    <h2>Get <span class="accent">started</span></h2>
+    <p style="color:var(--muted)">Installers are self-contained — no separate .NET install needed.</p>
+    <table>
+      <thead><tr><th>Platform</th><th>How</th></tr></thead>
+      <tbody>
+        <tr><td>Windows</td><td>Run the <code>EDNexus-&lt;version&gt;-setup.exe</code> installer (Inno Setup)</td></tr>
+        <tr><td>Linux &amp; Steam Deck</td><td>Install the <a href="https://github.com/Signal-Thread-LLC/EDNexus/tree/main/packaging/flatpak">Flatpak</a></td></tr>
+      </tbody>
+    </table>
+    <p style="margin-top:20px; color:var(--muted)">Building from source:</p>
+    <pre><code># Live dashboard
+dotnet run --project src/EDNexus.App
+
+# Headless: replay the latest journal and print current state
+dotnet run --project src/EDNexus.Cli -- --once</code></pre>
+  </div>
+</section>
+
+<section id="roadmap">
+  <div class="wrap">
+    <h2>Road<span class="accent">map</span></h2>
+    <ul class="roadmap">
+      <li class="done">Journal engine (watcher, event bus, commander state)</li>
+      <li class="done">Avalonia dashboard shell</li>
+      <li>Colonisation tracker (construction depots, shopping lists, hauling progress)</li>
+      <li>Market / trade search + route plotting (Spansh, EDSM)</li>
+      <li>Materials &amp; exobiology tracking</li>
+      <li>In-game overlay + voice callouts</li>
+    </ul>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    EDNexus is an independent, fan-made tool and is not affiliated with Frontier Developments.
+    <br>
+    <a href="https://github.com/Signal-Thread-LLC/EDNexus">github.com/Signal-Thread-LLC/EDNexus</a>
+  </div>
+</footer>
+
+</body>
+</html>
