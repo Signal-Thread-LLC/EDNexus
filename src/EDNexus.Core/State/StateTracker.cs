@@ -35,6 +35,9 @@ public sealed class StateTracker
         bus.Subscribe("BackpackChange", OnBackpackChange);
         bus.Subscribe("SuitLoadout", OnSuitLoadout);
         bus.Subscribe("SwitchSuitLoadout", OnSuitLoadout);
+        bus.Subscribe("CarrierStats", OnCarrierStats);
+        bus.Subscribe("CarrierJumpRequest", OnCarrierJumpRequest);
+        bus.Subscribe("CarrierJumpCancelled", OnCarrierJumpCancelled);
 
         bus.SubscribeAny(e =>
         {
@@ -61,6 +64,37 @@ public sealed class StateTracker
         if (e.Raw.TryGetProperty("FuelCapacity", out var fc)
             && fc.TryGetProperty("Main", out var main) && main.TryGetDouble(out var cap))
             _state.FuelCapacity = cap;
+
+        // Derive the FSD profile so the no-boost route plot can model this ship's jumps.
+        if (Ship.ShipFsdProfile.FromLoadout(e) is { } fsd) _state.Fsd = fsd;
+    }
+
+    /// <summary>
+    /// CarrierStats reports the carrier's tritium reserve and current jump range — updated on login and
+    /// after carrier actions, so it tracks fuel as it is burned by jumps and topped up by deposits.
+    /// </summary>
+    private void OnCarrierStats(JournalEntry e)
+    {
+        if (e.GetDouble("FuelLevel") is double fuel) _state.CarrierFuel = fuel;
+        if (e.GetDouble("JumpRangeCurr") is double range) _state.CarrierJumpRange = range;
+    }
+
+    /// <summary>
+    /// A carrier jump has been scheduled: record the destination and departure time so the UI can show
+    /// where the carrier is heading before the (much later) arrival lands in the journal. If the game is
+    /// closed before departure, no arrival is ever logged — the pending destination is the only clue.
+    /// </summary>
+    private void OnCarrierJumpRequest(JournalEntry e)
+    {
+        _state.CarrierPendingSystem = e.GetString("SystemName");
+        _state.CarrierPendingDeparture =
+            e.Raw.TryGetProperty("DepartureTime", out var d) && d.TryGetDateTimeOffset(out var t) ? t : null;
+    }
+
+    private void OnCarrierJumpCancelled(JournalEntry e)
+    {
+        _state.CarrierPendingSystem = null;
+        _state.CarrierPendingDeparture = null;
     }
 
     private void OnLocation(JournalEntry e)
@@ -77,6 +111,13 @@ public sealed class StateTracker
         _state.Body = e.GetString("Body") ?? e.GetString("StarSystem");
         _state.Docked = false;
         _state.StationName = null;
+
+        // A completed carrier jump fulfils any pending request — clear it so the UI stops advertising it.
+        if (e.Event == "CarrierJump")
+        {
+            _state.CarrierPendingSystem = null;
+            _state.CarrierPendingDeparture = null;
+        }
     }
 
     private void OnDocked(JournalEntry e)

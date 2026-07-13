@@ -57,25 +57,85 @@ public sealed class SpanshClient : IDisposable
     }
 
     /// <summary>
-    /// Plot a neutron-highway route. Spansh runs this as a background job: this submits the job, then
-    /// polls for the result (spacing polls by <see cref="SpanshClientOptions.RoutePollInterval"/>) until
-    /// it is ready, the attempt budget runs out, or the job errors. Never throws — every failure comes
-    /// back as <see cref="SpanshRouteResult.Failure"/>.
+    /// Plot a neutron-highway route (boosting off neutron stars). Spansh runs this as a background job:
+    /// this submits the job, then polls for the result (spacing polls by
+    /// <see cref="SpanshClientOptions.RoutePollInterval"/>) until it is ready, the attempt budget runs
+    /// out, or the job errors. Never throws — every failure comes back as
+    /// <see cref="SpanshRouteResult.Failure"/>.
     /// </summary>
-    public async Task<SpanshRouteResult> PlotRouteAsync(SpanshRouteQuery query, CancellationToken ct = default)
+    public Task<SpanshRouteResult> PlotRouteAsync(SpanshRouteQuery query, CancellationToken ct = default)
+    {
+        var submitUrl =
+            $"{_options.BaseUrl.TrimEnd('/')}/route?efficiency={query.Efficiency}" +
+            $"&range={Num(query.RangeLy)}" +
+            $"&from={Uri.EscapeDataString(query.From)}&to={Uri.EscapeDataString(query.To)}";
+        return RunRouteJobAsync(c => _http.PostAsync(submitUrl, content: null, c), ParseNeutronPoll, ct);
+    }
+
+    /// <summary>
+    /// Plot a plain jump route with neutron boosting turned off, modelling the ship's real FSD so the
+    /// per-jump fuel burn is accurate. Backed by Spansh's "galaxy plotter". Same job/poll lifecycle and
+    /// no-throw contract as <see cref="PlotRouteAsync"/>.
+    /// </summary>
+    public Task<SpanshRouteResult> PlotGalaxyRouteAsync(SpanshGalaxyRouteQuery query, CancellationToken ct = default)
+    {
+        var form = new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["source"] = query.From,
+            ["destination"] = query.To,
+            ["algorithm"] = query.Algorithm,
+            ["use_supercharge"] = query.UseSupercharge ? "1" : "0",
+            ["use_injections"] = "0",
+            ["exclude_secondary"] = "0",
+            ["optimal_mass"] = Num(query.OptimalMass),
+            ["base_mass"] = Num(query.BaseMass),
+            ["tank_size"] = Num(query.TankSize),
+            ["internal_tank_size"] = Num(query.ReserveSize),
+            ["fuel_power"] = Num(query.FuelPower),
+            ["fuel_multiplier"] = Num(query.FuelMultiplier),
+            ["max_fuel_per_jump"] = Num(query.MaxFuelPerJump),
+            ["range_boost"] = Num(query.RangeBoost),
+            ["cargo"] = Num(query.Cargo),
+        });
+        return RunRouteJobAsync(c => _http.PostAsync($"{_options.BaseUrl.TrimEnd('/')}/generic/route", form, c), ParseShipPoll, ct);
+    }
+
+    /// <summary>
+    /// Plot a fleet-carrier route (fixed 500 ly hops, tritium-fuelled, never boosting). Backed by
+    /// Spansh's fleet-carrier plotter. Same job/poll lifecycle and no-throw contract as
+    /// <see cref="PlotRouteAsync"/>; the returned waypoints carry the tritium burn/restock fields.
+    /// </summary>
+    public Task<SpanshRouteResult> PlotFleetCarrierRouteAsync(SpanshFleetCarrierRouteQuery query, CancellationToken ct = default)
+    {
+        var form = new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["source"] = query.From,
+            ["destination"] = query.To,
+            ["capacity_used"] = Num(query.CapacityUsed),
+            ["calculate_starting_fuel"] = query.CalculateStartingFuel ? "1" : "0",
+        });
+        return RunRouteJobAsync(c => _http.PostAsync($"{_options.BaseUrl.TrimEnd('/')}/fleetcarrier/route", form, c), ParseFleetCarrierPoll, ct);
+    }
+
+    /// <summary>
+    /// The shared submit-then-poll lifecycle every Spansh route endpoint uses: POST to start the job,
+    /// then GET <c>results/{job}</c> until the supplied <paramref name="parsePoll"/> reports the job is
+    /// done. Endpoint-specific bits — the submit request and the result shape — are the two delegates.
+    /// Never throws (cancellation excepted); failures come back as <see cref="SpanshRouteResult.Failure"/>.
+    /// </summary>
+    private async Task<SpanshRouteResult> RunRouteJobAsync(
+        Func<CancellationToken, Task<HttpResponseMessage>> submit,
+        Func<string, (bool Done, SpanshRouteResult Result)> parsePoll,
+        CancellationToken ct)
     {
         string jobId;
         try
         {
-            var submitUrl =
-                $"{_options.BaseUrl.TrimEnd('/')}/route?efficiency={query.Efficiency}" +
-                $"&range={query.RangeLy.ToString(System.Globalization.CultureInfo.InvariantCulture)}" +
-                $"&from={Uri.EscapeDataString(query.From)}&to={Uri.EscapeDataString(query.To)}";
-            using var submit = await _http.PostAsync(submitUrl, content: null, ct).ConfigureAwait(false);
-            if (!submit.IsSuccessStatusCode)
-                return SpanshRouteResult.Failure($"HTTP {(int)submit.StatusCode}");
+            using var response = await submit(ct).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode)
+                return SpanshRouteResult.Failure($"HTTP {(int)response.StatusCode}");
 
-            var submitBody = await submit.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+            var submitBody = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
             using var submitDoc = JsonDocument.Parse(submitBody);
             if (ReadString(submitDoc.RootElement, "job") is not { Length: > 0 } id)
                 return SpanshRouteResult.Failure(ReadString(submitDoc.RootElement, "error") ?? "no job id returned");
@@ -99,7 +159,7 @@ public sealed class SpanshClient : IDisposable
                     return SpanshRouteResult.Failure($"HTTP {(int)poll.StatusCode}");
 
                 var pollBody = await poll.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
-                var (done, result) = ParseRoutePoll(pollBody);
+                var (done, result) = parsePoll(pollBody);
                 if (done) return result;
             }
             catch (JsonException ex) { return SpanshRouteResult.Failure("unparseable poll response: " + ex.Message); }
@@ -111,22 +171,40 @@ public sealed class SpanshClient : IDisposable
     }
 
     /// <summary>
-    /// Inspect one poll reply. Returns <c>(done: false, …)</c> while the job is still queued/running,
-    /// and <c>(done: true, result)</c> once it has finished — successfully or with an error status.
-    /// Missing or reshaped fields degrade to failures rather than throwing.
+    /// Classify a poll reply's job status. <c>Running</c> while queued/running, <c>Failed</c> on an
+    /// error status (with <paramref name="error"/> set), <c>Ready</c> once the result is available.
     /// </summary>
-    private static (bool Done, SpanshRouteResult Result) ParseRoutePoll(string body)
+    private static JobPhase ReadPhase(JsonElement root, out string? error)
+    {
+        error = null;
+        var status = ReadString(root, "status");
+        if (string.Equals(status, "queued", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(status, "running", StringComparison.OrdinalIgnoreCase))
+            return JobPhase.Running;
+        if (!string.Equals(status, "ok", StringComparison.OrdinalIgnoreCase))
+        {
+            error = ReadString(root, "error") ?? $"job status '{status}'";
+            return JobPhase.Failed;
+        }
+        return JobPhase.Ready;
+    }
+
+    private enum JobPhase { Running, Ready, Failed }
+
+    /// <summary>
+    /// Parse a neutron-plotter poll. Returns <c>(done: false, …)</c> while queued/running and
+    /// <c>(done: true, result)</c> once finished. Missing or reshaped fields degrade to a failure or
+    /// an empty route rather than throwing.
+    /// </summary>
+    private static (bool Done, SpanshRouteResult Result) ParseNeutronPoll(string body)
     {
         using var doc = JsonDocument.Parse(body);
         var root = doc.RootElement;
-        var status = ReadString(root, "status");
-
-        if (string.Equals(status, "queued", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(status, "running", StringComparison.OrdinalIgnoreCase))
-            return (false, SpanshRouteResult.Failure("still running"));
-
-        if (!string.Equals(status, "ok", StringComparison.OrdinalIgnoreCase))
-            return (true, SpanshRouteResult.Failure(ReadString(root, "error") ?? $"job status '{status}'"));
+        switch (ReadPhase(root, out var error))
+        {
+            case JobPhase.Running: return (false, SpanshRouteResult.Failure("still running"));
+            case JobPhase.Failed: return (true, SpanshRouteResult.Failure(error!));
+        }
 
         if (!root.TryGetProperty("result", out var result) ||
             !result.TryGetProperty("system_jumps", out var jumps) || jumps.ValueKind != JsonValueKind.Array)
@@ -140,6 +218,83 @@ public sealed class SpanshClient : IDisposable
                 IsNeutron: hop.TryGetProperty("neutron_star", out var n) && n.ValueKind is JsonValueKind.True,
                 DistanceJumpedLy: ReadDouble(hop, "distance_jumped"),
                 DistanceRemainingLy: ReadDouble(hop, "distance_left")));
+
+        return (true, SpanshRouteResult.Ok(waypoints));
+    }
+
+    /// <summary>
+    /// Parse a galaxy-plotter poll. Each waypoint is a single plain jump, carrying the ship-fuel figures
+    /// Spansh reports. Same running/ready/failed handling as the neutron parser.
+    /// </summary>
+    private static (bool Done, SpanshRouteResult Result) ParseShipPoll(string body)
+    {
+        using var doc = JsonDocument.Parse(body);
+        var root = doc.RootElement;
+        switch (ReadPhase(root, out var error))
+        {
+            case JobPhase.Running: return (false, SpanshRouteResult.Failure("still running"));
+            case JobPhase.Failed: return (true, SpanshRouteResult.Failure(error!));
+        }
+
+        if (!root.TryGetProperty("result", out var result) ||
+            !result.TryGetProperty("jumps", out var jumps) || jumps.ValueKind != JsonValueKind.Array)
+            return (true, SpanshRouteResult.Ok(Array.Empty<SpanshRouteWaypoint>()));
+
+        var waypoints = new List<SpanshRouteWaypoint>();
+        var index = 0;
+        foreach (var hop in jumps.EnumerateArray())
+        {
+            waypoints.Add(new SpanshRouteWaypoint(
+                System: ReadString(hop, "name") ?? "Unknown",
+                Jumps: index == 0 ? 0 : 1,
+                IsNeutron: false,   // a no-boost route never scoop-boosts, even past a neutron star
+                DistanceJumpedLy: ReadDouble(hop, "distance"),
+                DistanceRemainingLy: ReadDouble(hop, "distance_to_destination"),
+                FuelUsed: ReadNullableDouble(hop, "fuel_used"),
+                FuelInTank: ReadNullableDouble(hop, "fuel_in_tank"),
+                IsScoopable: ReadBool(hop, "is_scoopable"),
+                MustRestock: ReadBool(hop, "must_refuel")));
+            index++;
+        }
+
+        return (true, SpanshRouteResult.Ok(waypoints));
+    }
+
+    /// <summary>
+    /// Parse a fleet-carrier-plotter poll. Each waypoint is one 500 ly hop, carrying the tritium burn,
+    /// tank level and restock hints Spansh reports. Same running/ready/failed handling as the others.
+    /// </summary>
+    private static (bool Done, SpanshRouteResult Result) ParseFleetCarrierPoll(string body)
+    {
+        using var doc = JsonDocument.Parse(body);
+        var root = doc.RootElement;
+        switch (ReadPhase(root, out var error))
+        {
+            case JobPhase.Running: return (false, SpanshRouteResult.Failure("still running"));
+            case JobPhase.Failed: return (true, SpanshRouteResult.Failure(error!));
+        }
+
+        if (!root.TryGetProperty("result", out var result) ||
+            !result.TryGetProperty("jumps", out var jumps) || jumps.ValueKind != JsonValueKind.Array)
+            return (true, SpanshRouteResult.Ok(Array.Empty<SpanshRouteWaypoint>()));
+
+        var waypoints = new List<SpanshRouteWaypoint>();
+        var index = 0;
+        foreach (var hop in jumps.EnumerateArray())
+        {
+            waypoints.Add(new SpanshRouteWaypoint(
+                System: ReadString(hop, "name") ?? "Unknown",
+                Jumps: index == 0 ? 0 : 1,
+                IsNeutron: false,
+                DistanceJumpedLy: ReadDouble(hop, "distance"),
+                DistanceRemainingLy: ReadDouble(hop, "distance_to_destination"),
+                FuelUsed: ReadNullableDouble(hop, "fuel_used"),
+                FuelInTank: ReadNullableDouble(hop, "fuel_in_tank"),
+                MustRestock: ReadInt(hop, "must_restock") != 0,
+                RestockAmount: ReadNullableDouble(hop, "restock_amount"),
+                HasIcyRing: ReadBool(hop, "has_icy_ring")));
+            index++;
+        }
 
         return (true, SpanshRouteResult.Ok(waypoints));
     }
@@ -217,6 +372,16 @@ public sealed class SpanshClient : IDisposable
 
     private static double ReadDouble(JsonElement e, string prop)
         => e.TryGetProperty(prop, out var v) && v.ValueKind == JsonValueKind.Number && v.TryGetDouble(out var d) ? d : 0;
+
+    private static double? ReadNullableDouble(JsonElement e, string prop)
+        => e.TryGetProperty(prop, out var v) && v.ValueKind == JsonValueKind.Number && v.TryGetDouble(out var d) ? d : null;
+
+    private static bool ReadBool(JsonElement e, string prop)
+        => e.TryGetProperty(prop, out var v) && (v.ValueKind is JsonValueKind.True
+            || (v.ValueKind is JsonValueKind.Number && v.TryGetInt32(out var n) && n != 0));
+
+    /// <summary>Format a number for a Spansh request body — invariant culture, so '.' is always the decimal point.</summary>
+    private static string Num(double value) => value.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
     private static DateTimeOffset? ReadDate(JsonElement e, string prop)
         => e.TryGetProperty(prop, out var v) && v.ValueKind == JsonValueKind.String && v.TryGetDateTimeOffset(out var d) ? d : null;
