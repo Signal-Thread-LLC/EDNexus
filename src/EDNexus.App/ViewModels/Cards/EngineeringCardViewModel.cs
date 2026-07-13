@@ -9,10 +9,11 @@ using EDNexus.Core.State;
 namespace EDNexus.App.ViewModels;
 
 /// <summary>
-/// Engineering focus card. The commander pins one blueprint+grade and the card collapses the whole
-/// engineering catalogue down to that single goal: which engineer to visit (and whether it's unlocked)
-/// and the material checklist, each row tooltip-annotated with where to farm it. This is the antidote
-/// to being overwhelmed by every blueprint at once.
+/// Engineering focus card. The commander pins one blueprint+grade (ship side) or one suit/weapon
+/// grade-upgrade (Odyssey on-foot side, via the <see cref="OnFootMode"/> toggle) and the card collapses
+/// the whole relevant catalogue down to that single goal: which engineer to visit (and whether it's
+/// unlocked) and the material checklist, each row tooltip-annotated with where to farm it. This is the
+/// antidote to being overwhelmed by every blueprint/upgrade at once.
 /// </summary>
 public sealed partial class EngineeringCardViewModel : CardViewModel
 {
@@ -29,13 +30,25 @@ public sealed partial class EngineeringCardViewModel : CardViewModel
         var pin = context.GetEngineeringPin();
         _pinnedId = pin.PinnedBlueprintId;
         _pinnedGrade = pin.PinnedGrade is >= 1 and <= 5 ? pin.PinnedGrade : 5;
+        _onFootMode = pin.OnFootMode;
 
         SelectedBlueprint = Blueprints.FirstOrDefault(o => o.Id == _pinnedId) ?? Blueprints.FirstOrDefault();
         SelectedGrade = _pinnedGrade;
+
+        InitializeOnFoot(pin);
     }
 
     /// <summary>No dev-mode sample source of its own; held counts come from the Materials sampler.</summary>
     public override bool CanRandomize => false;
+
+    [ObservableProperty] private bool _onFootMode;
+
+    [RelayCommand]
+    private void ToggleOnFootMode()
+    {
+        OnFootMode = !OnFootMode;
+        Context.SaveEngineeringOnFootMode(OnFootMode);
+    }
 
     // --- Picker (shown when nothing is pinned) ---
     public ObservableCollection<BlueprintOption> Blueprints { get; } = new();
@@ -73,6 +86,8 @@ public sealed partial class EngineeringCardViewModel : CardViewModel
 
     public override void Update(CommanderState s)
     {
+        UpdateOnFoot(s);
+
         if (_pinnedId is null)
         {
             if (HasPin) { HasPin = false; Materials.Clear(); _signature = ""; }
@@ -160,6 +175,7 @@ public sealed partial class EngineeringCardViewModel : CardViewModel
     {
         _signature = "";
         Materials.Clear();
+        ResetOnFoot();
     }
 
     private static string CategoryTag(string category) => category.ToLowerInvariant() switch

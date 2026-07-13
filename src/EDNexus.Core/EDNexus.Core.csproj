@@ -15,6 +15,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Engineering\Data\*.json" />
+    <EmbeddedResource Include="Odyssey\Data\*.json" />
   </ItemGroup>
 
   <ItemGroup>

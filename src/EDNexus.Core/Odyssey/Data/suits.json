@@ -1,0 +1,45 @@
+[
+  {
+    "id": "dominator",
+    "name": "Dominator Suit",
+    "suitSymbol": "tacticalsuit",
+    "modSlotsByGrade": [0, 1, 2, 3, 4],
+    "gradeSteps": [
+      { "grade": 2, "credits": 600000,   "materials": [ { "symbol": "suitschematic", "count": 1 }, { "symbol": "healthmonitor", "count": 1 }, { "symbol": "manufacturinginstructions", "count": 1 }, { "symbol": "titaniumplating", "count": 2 }, { "symbol": "graphene", "count": 2 } ] },
+      { "grade": 3, "credits": 2250000,  "materials": [ { "symbol": "suitschematic", "count": 2 }, { "symbol": "healthmonitor", "count": 2 }, { "symbol": "manufacturinginstructions", "count": 2 }, { "symbol": "titaniumplating", "count": 5 }, { "symbol": "graphene", "count": 5 } ] },
+      { "grade": 4, "credits": 4500000,  "materials": [ { "symbol": "suitschematic", "count": 4 }, { "symbol": "healthmonitor", "count": 4 }, { "symbol": "manufacturinginstructions", "count": 4 }, { "symbol": "titaniumplating", "count": 9 }, { "symbol": "graphene", "count": 9 } ] },
+      { "grade": 5, "credits": 7500000,  "materials": [ { "symbol": "suitschematic", "count": 5 }, { "symbol": "healthmonitor", "count": 5 }, { "symbol": "manufacturinginstructions", "count": 5 }, { "symbol": "titaniumplating", "count": 12 }, { "symbol": "graphene", "count": 12 } ] }
+    ]
+  },
+  {
+    "id": "maverick",
+    "name": "Maverick Suit",
+    "suitSymbol": "utilitysuit",
+    "modSlotsByGrade": [0, 1, 2, 3, 4],
+    "gradeSteps": [
+      { "grade": 2, "credits": 600000,   "materials": [ { "symbol": "suitschematic", "count": 1 }, { "symbol": "healthmonitor", "count": 1 }, { "symbol": "manufacturinginstructions", "count": 1 }, { "symbol": "carbonfibreplating", "count": 2 }, { "symbol": "graphene", "count": 2 } ] },
+      { "grade": 3, "credits": 2250000,  "materials": [ { "symbol": "suitschematic", "count": 2 }, { "symbol": "healthmonitor", "count": 2 }, { "symbol": "manufacturinginstructions", "count": 2 }, { "symbol": "carbonfibreplating", "count": 5 }, { "symbol": "graphene", "count": 5 } ] },
+      { "grade": 4, "credits": 4500000,  "materials": [ { "symbol": "suitschematic", "count": 4 }, { "symbol": "healthmonitor", "count": 4 }, { "symbol": "manufacturinginstructions", "count": 4 }, { "symbol": "carbonfibreplating", "count": 9 }, { "symbol": "graphene", "count": 9 } ] },
+      { "grade": 5, "credits": 7500000,  "materials": [ { "symbol": "suitschematic", "count": 5 }, { "symbol": "healthmonitor", "count": 5 }, { "symbol": "manufacturinginstructions", "count": 5 }, { "symbol": "carbonfibreplating", "count": 12 }, { "symbol": "graphene", "count": 12 } ] }
+    ]
+  },
+  {
+    "id": "artemis",
+    "name": "Artemis Suit",
+    "suitSymbol": "explorationsuit",
+    "modSlotsByGrade": [0, 1, 2, 3, 4],
+    "gradeSteps": [
+      { "grade": 2, "credits": 600000,   "materials": [ { "symbol": "suitschematic", "count": 1 }, { "symbol": "healthmonitor", "count": 1 }, { "symbol": "manufacturinginstructions", "count": 1 }, { "symbol": "aerogel", "count": 2 }, { "symbol": "graphene", "count": 2 } ] },
+      { "grade": 3, "credits": 2250000,  "materials": [ { "symbol": "suitschematic", "count": 2 }, { "symbol": "healthmonitor", "count": 2 }, { "symbol": "manufacturinginstructions", "count": 2 }, { "symbol": "aerogel", "count": 5 }, { "symbol": "graphene", "count": 5 } ] },
+      { "grade": 4, "credits": 4500000,  "materials": [ { "symbol": "suitschematic", "count": 4 }, { "symbol": "healthmonitor", "count": 4 }, { "symbol": "manufacturinginstructions", "count": 4 }, { "symbol": "aerogel", "count": 9 }, { "symbol": "graphene", "count": 9 } ] },
+      { "grade": 5, "credits": 7500000,  "materials": [ { "symbol": "suitschematic", "count": 5 }, { "symbol": "healthmonitor", "count": 5 }, { "symbol": "manufacturinginstructions", "count": 5 }, { "symbol": "aerogel", "count": 12 }, { "symbol": "graphene", "count": 12 } ] }
+    ]
+  },
+  {
+    "id": "flightsuit",
+    "name": "Flight Suit",
+    "suitSymbol": "flightsuit",
+    "modSlotsByGrade": [0],
+    "gradeSteps": []
+  }
+]

@@ -1,0 +1,32 @@
+[
+  {
+    "id": "improved_battery_capacity",
+    "name": "Improved Battery Capacity",
+    "appliesTo": "Suit",
+    "effect": "Increases the suit's battery capacity by 50%.",
+    "engineerIds": [ "oden_geiger", "rosa_dayette", "wellington_beck" ],
+    "credits": 750000,
+    "materials": [
+      { "symbol": "reactoroutputreview", "count": 5 },
+      { "symbol": "maintenancelogs", "count": 8 },
+      { "symbol": "ionbattery", "count": 3 },
+      { "symbol": "microsupercapacitor", "count": 5 },
+      { "symbol": "electricalwiring", "count": 5 }
+    ]
+  },
+  {
+    "id": "extra_backpack_capacity",
+    "name": "Extra Backpack Capacity",
+    "appliesTo": "Suit",
+    "effect": "Increases backpack Data, Component and Item capacity (amount varies by suit).",
+    "engineerIds": [ "domino_green", "rosa_dayette", "wellington_beck" ],
+    "credits": 750000,
+    "materials": [
+      { "symbol": "epoxyadhesive", "count": 5 },
+      { "symbol": "memorychip", "count": 3 },
+      { "symbol": "weaponinventory", "count": 5 },
+      { "symbol": "chemicalinventory", "count": 5 },
+      { "symbol": "digitaldesigns", "count": 5 }
+    ]
+  }
+]

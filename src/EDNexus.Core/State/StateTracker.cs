@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using EDNexus.Core.Journal;
 
 namespace EDNexus.Core.State;
@@ -30,6 +31,10 @@ public sealed class StateTracker
         bus.Subscribe("Cargo", OnCargo);
         bus.Subscribe("Materials", OnMaterials);
         bus.Subscribe("MaterialCollected", OnMaterialCollected);
+        bus.Subscribe("ShipLocker", OnShipLocker);
+        bus.Subscribe("BackpackChange", OnBackpackChange);
+        bus.Subscribe("SuitLoadout", OnSuitLoadout);
+        bus.Subscribe("SwitchSuitLoadout", OnSuitLoadout);
 
         bus.SubscribeAny(e =>
         {
@@ -157,5 +162,84 @@ public sealed class StateTracker
         if (item.TryGetProperty("Name_Localised", out var loc) && loc.ValueKind == JsonValueKind.String)
             return loc.GetString();
         return item.TryGetProperty("Name", out var n) ? n.GetString() : null;
+    }
+
+    // --- Odyssey: on-foot inventory + current suit. ---
+
+    private void OnShipLocker(JournalEntry e)
+    {
+        // Like Cargo, ShipLocker sometimes omits the arrays and defers to ShipLocker.json;
+        // only rebuild a category when its array is actually present.
+        LoadOnFootCategory(e, "Items", _state.OnFoot.Items);
+        LoadOnFootCategory(e, "Components", _state.OnFoot.Components);
+        LoadOnFootCategory(e, "Consumables", _state.OnFoot.Consumables);
+        LoadOnFootCategory(e, "Data", _state.OnFoot.Data);
+        _state.RaiseOnFootChanged();
+    }
+
+    private void OnBackpackChange(JournalEntry e)
+    {
+        var changed = false;
+        if (e.Raw.TryGetProperty("Added", out var added) && added.ValueKind == JsonValueKind.Array)
+            changed |= ApplyBackpackDeltas(added, +1);
+        if (e.Raw.TryGetProperty("Removed", out var removed) && removed.ValueKind == JsonValueKind.Array)
+            changed |= ApplyBackpackDeltas(removed, -1);
+        if (changed) _state.RaiseOnFootChanged();
+    }
+
+    private bool ApplyBackpackDeltas(JsonElement arr, int sign)
+    {
+        var changed = false;
+        foreach (var item in arr.EnumerateArray())
+        {
+            // Raw (not localised) symbol, matching the Odyssey catalog's material keys — same convention
+            // as ship Materials (LoadCategory), which is deliberately not localised like Cargo/BuildShoppingList.
+            var name = item.TryGetProperty("Name", out var nameEl) ? nameEl.GetString() : null;
+            var type = item.TryGetProperty("Type", out var t) && t.ValueKind == JsonValueKind.String ? t.GetString() : null;
+            var count = item.TryGetProperty("Count", out var c) && c.TryGetInt32(out var n) ? n : 0;
+            if (name is null || type is null || count == 0) continue;
+
+            var target = OnFootTargetFor(type);
+            if (target is null) continue;
+
+            target.AddOrUpdate(name, Math.Max(0, sign * count), (_, v) => Math.Max(0, v + sign * count));
+            changed = true;
+        }
+        return changed;
+    }
+
+    private ConcurrentDictionary<string, int>? OnFootTargetFor(string type) => type.ToLowerInvariant() switch
+    {
+        "item" => _state.OnFoot.Items,
+        "component" => _state.OnFoot.Components,
+        "consumable" => _state.OnFoot.Consumables,
+        "data" => _state.OnFoot.Data,
+        _ => null,
+    };
+
+    private static void LoadOnFootCategory(JournalEntry e, string prop, ConcurrentDictionary<string, int> target)
+    {
+        if (!e.Raw.TryGetProperty(prop, out var arr) || arr.ValueKind != JsonValueKind.Array) return;
+        target.Clear();
+        foreach (var item in arr.EnumerateArray())
+        {
+            // Raw symbol (see ApplyBackpackDeltas) so held counts join the Odyssey catalog by the same key.
+            var name = item.TryGetProperty("Name", out var n) ? n.GetString() : null;
+            var count = item.TryGetProperty("Count", out var c) && c.TryGetInt32(out var v) ? v : 0;
+            if (name is not null) target[name] = count;
+        }
+    }
+
+    private static readonly Regex SuitGradeSuffix = new(@"_class(\d+)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    private void OnSuitLoadout(JournalEntry e)
+    {
+        var symbol = e.GetString("SuitName");
+        if (symbol is null) return;
+
+        _state.SuitSymbol = symbol;
+        _state.SuitName = e.GetLocalised("SuitName") ?? symbol;
+        _state.SuitClass = SuitGradeSuffix.Match(symbol) is { Success: true } m && int.TryParse(m.Groups[1].Value, out var grade)
+            ? grade : 1;
     }
 }

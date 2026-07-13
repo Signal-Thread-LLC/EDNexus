@@ -36,6 +36,18 @@ public sealed class EngineeringSettings
 
     /// <summary>Target grade for the pinned blueprint, 1–5.</summary>
     public int PinnedGrade { get; set; } = 5;
+
+    /// <summary>When true, the Engineering card shows the on-foot (Odyssey) panel instead of the ship panel.</summary>
+    public bool OnFootMode { get; set; }
+
+    /// <summary>"suit" or "weapon" — which Odyssey catalog <see cref="PinnedOnFootId"/> refers to.</summary>
+    public string? PinnedOnFootKind { get; set; }
+
+    /// <summary>Suit or weapon id from the Odyssey catalog, or null if nothing pinned.</summary>
+    public string? PinnedOnFootId { get; set; }
+
+    /// <summary>Target grade for the pinned suit/weapon, 1–5.</summary>
+    public int PinnedOnFootGrade { get; set; } = 5;
 }
 
 /// <summary>Per-service opt-in for outbound data reporting. Nothing is sent unless enabled.</summary>

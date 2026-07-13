@@ -22,19 +22,25 @@ public sealed class DashboardContext
     private readonly Func<bool> _devEnabled;
     private readonly Func<EngineeringSettings> _getEngineeringPin;
     private readonly Action<string?, int> _saveEngineeringPin;
+    private readonly Action<bool> _saveEngineeringOnFootMode;
+    private readonly Action<string?, string?, int> _saveOnFootPin;
 
     public DashboardContext(
         Func<EngineHost> host,
         Func<bool> devEnabled,
         Random rng,
         Func<EngineeringSettings> getEngineeringPin,
-        Action<string?, int> saveEngineeringPin)
+        Action<string?, int> saveEngineeringPin,
+        Action<bool> saveEngineeringOnFootMode,
+        Action<string?, string?, int> saveOnFootPin)
     {
         _host = host;
         _devEnabled = devEnabled;
         Rng = rng;
         _getEngineeringPin = getEngineeringPin;
         _saveEngineeringPin = saveEngineeringPin;
+        _saveEngineeringOnFootMode = saveEngineeringOnFootMode;
+        _saveOnFootPin = saveOnFootPin;
     }
 
     /// <summary>The live engine host — always the current one, even after a reset-to-live rebuild.</summary>
@@ -45,11 +51,17 @@ public sealed class DashboardContext
 
     public Random Rng { get; }
 
-    /// <summary>Read the persisted engineering pin (blueprint id + grade).</summary>
+    /// <summary>Read the persisted engineering pin (blueprint id + grade, and the on-foot pin/mode).</summary>
     public EngineeringSettings GetEngineeringPin() => _getEngineeringPin();
 
     /// <summary>Persist the engineering pin; a null blueprint id clears it.</summary>
     public void SaveEngineeringPin(string? blueprintId, int grade) => _saveEngineeringPin(blueprintId, grade);
+
+    /// <summary>Persist the Engineering card's Ship / On-foot toggle.</summary>
+    public void SaveEngineeringOnFootMode(bool onFootMode) => _saveEngineeringOnFootMode(onFootMode);
+
+    /// <summary>Persist the pinned on-foot suit/weapon; a null id clears it.</summary>
+    public void SaveOnFootPin(string? kind, string? id, int grade) => _saveOnFootPin(kind, id, grade);
 }
 
 /// <summary>

@@ -1,0 +1,51 @@
+[
+  {
+    "id": "oden_geiger",
+    "name": "Oden Geiger",
+    "system": "Candiaei",
+    "base": "Ankh's Promise",
+    "unlock": "Unlock requirement not independently confirmed — check the in-game right-hand Engineers panel for the current 'Establish first contact' requirement."
+  },
+  {
+    "id": "rosa_dayette",
+    "name": "Rosa Dayette",
+    "system": "Kojeara",
+    "base": "Rosa's Shop",
+    "unlock": "Unlock requirement not independently confirmed — check the in-game right-hand Engineers panel for the current 'Establish first contact' requirement."
+  },
+  {
+    "id": "wellington_beck",
+    "name": "Wellington Beck",
+    "system": "Jolapa",
+    "base": "Beck Facility",
+    "unlock": "Unlock requirement not independently confirmed — check the in-game right-hand Engineers panel for the current 'Establish first contact' requirement."
+  },
+  {
+    "id": "domino_green",
+    "name": "Domino Green",
+    "system": "Orishis",
+    "base": "The Jackrabbit",
+    "unlock": "Unlock requirement not independently confirmed — check the in-game right-hand Engineers panel for the current 'Establish first contact' requirement."
+  },
+  {
+    "id": "kit_fowler",
+    "name": "Kit Fowler",
+    "system": "Capoya",
+    "base": "The Last Call",
+    "unlock": "Sell 40 Opinion Polls to bartenders."
+  },
+  {
+    "id": "jude_navarro",
+    "name": "Jude Navarro",
+    "system": "Aurai",
+    "base": "Marshall's Drift",
+    "unlock": "Unlock requirement not independently confirmed — check the in-game right-hand Engineers panel for the current 'Establish first contact' requirement."
+  },
+  {
+    "id": "eleanor_bresa",
+    "name": "Eleanor Bresa",
+    "system": "Desy",
+    "base": "Bresa Modifications",
+    "unlock": "Unlock requirement not independently confirmed — check the in-game right-hand Engineers panel for the current 'Establish first contact' requirement."
+  }
+]

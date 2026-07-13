@@ -1,0 +1,57 @@
+[
+  {
+    "id": "karma_ar50",
+    "name": "Karma AR-50",
+    "modSlotsByGrade": [0, 1, 2, 3, 4],
+    "gradeSteps": [
+      { "grade": 2, "credits": 500000,   "materials": [ { "symbol": "weaponschematic", "count": 1 }, { "symbol": "compressionliquidgas", "count": 1 }, { "symbol": "manufacturinginstructions", "count": 1 }, { "symbol": "tungstencarbide", "count": 2 }, { "symbol": "weaponcomponent", "count": 2 } ] },
+      { "grade": 3, "credits": 1875000,  "materials": [ { "symbol": "weaponschematic", "count": 2 }, { "symbol": "compressionliquidgas", "count": 2 }, { "symbol": "manufacturinginstructions", "count": 2 }, { "symbol": "tungstencarbide", "count": 5 }, { "symbol": "weaponcomponent", "count": 5 } ] },
+      { "grade": 4, "credits": 3750000,  "materials": [ { "symbol": "weaponschematic", "count": 4 }, { "symbol": "compressionliquidgas", "count": 4 }, { "symbol": "manufacturinginstructions", "count": 4 }, { "symbol": "tungstencarbide", "count": 9 }, { "symbol": "weaponcomponent", "count": 9 } ] },
+      { "grade": 5, "credits": 6250000,  "materials": [ { "symbol": "weaponschematic", "count": 5 }, { "symbol": "compressionliquidgas", "count": 5 }, { "symbol": "manufacturinginstructions", "count": 5 }, { "symbol": "tungstencarbide", "count": 12 }, { "symbol": "weaponcomponent", "count": 12 } ] }
+    ]
+  },
+  {
+    "id": "manticore_executioner",
+    "name": "Manticore Executioner",
+    "modSlotsByGrade": [0, 1, 2, 3, 4],
+    "gradeSteps": [
+      { "grade": 2, "credits": 700000,   "materials": [ { "symbol": "weaponschematic", "count": 1 }, { "symbol": "ionisedgas", "count": 1 }, { "symbol": "manufacturinginstructions", "count": 1 }, { "symbol": "chemicalsuperbase", "count": 2 }, { "symbol": "microelectrode", "count": 2 } ] },
+      { "grade": 3, "credits": 2625000,  "materials": [ { "symbol": "weaponschematic", "count": 2 }, { "symbol": "ionisedgas", "count": 2 }, { "symbol": "manufacturinginstructions", "count": 2 }, { "symbol": "chemicalsuperbase", "count": 5 }, { "symbol": "microelectrode", "count": 5 } ] },
+      { "grade": 4, "credits": 5250000,  "materials": [ { "symbol": "weaponschematic", "count": 4 }, { "symbol": "ionisedgas", "count": 4 }, { "symbol": "manufacturinginstructions", "count": 4 }, { "symbol": "chemicalsuperbase", "count": 9 }, { "symbol": "microelectrode", "count": 9 } ] },
+      { "grade": 5, "credits": 8750000,  "materials": [ { "symbol": "weaponschematic", "count": 5 }, { "symbol": "ionisedgas", "count": 5 }, { "symbol": "manufacturinginstructions", "count": 5 }, { "symbol": "chemicalsuperbase", "count": 12 }, { "symbol": "microelectrode", "count": 12 } ] }
+    ]
+  },
+  {
+    "id": "tk_eclipse",
+    "name": "TK Eclipse",
+    "modSlotsByGrade": [0, 1, 2, 3, 4],
+    "gradeSteps": [
+      { "grade": 2, "credits": 300000,   "materials": [ { "symbol": "weaponschematic", "count": 1 }, { "symbol": "ionisedgas", "count": 1 }, { "symbol": "manufacturinginstructions", "count": 1 }, { "symbol": "microelectrode", "count": 2 }, { "symbol": "opticalfibre", "count": 2 } ] },
+      { "grade": 3, "credits": 1125000,  "materials": [ { "symbol": "weaponschematic", "count": 2 }, { "symbol": "ionisedgas", "count": 2 }, { "symbol": "manufacturinginstructions", "count": 2 }, { "symbol": "microelectrode", "count": 5 }, { "symbol": "opticalfibre", "count": 5 } ] },
+      { "grade": 4, "credits": 2250000,  "materials": [ { "symbol": "weaponschematic", "count": 4 }, { "symbol": "ionisedgas", "count": 4 }, { "symbol": "manufacturinginstructions", "count": 4 }, { "symbol": "microelectrode", "count": 9 }, { "symbol": "opticalfibre", "count": 9 } ] },
+      { "grade": 5, "credits": 3750000,  "materials": [ { "symbol": "weaponschematic", "count": 5 }, { "symbol": "ionisedgas", "count": 5 }, { "symbol": "manufacturinginstructions", "count": 5 }, { "symbol": "microelectrode", "count": 12 }, { "symbol": "opticalfibre", "count": 12 } ], "creditsEstimated": true }
+    ]
+  },
+  {
+    "id": "karma_p15",
+    "name": "Karma P-15",
+    "modSlotsByGrade": [0, 1, 2, 3, 4],
+    "gradeSteps": [
+      { "grade": 2, "credits": 200000,   "materials": [ { "symbol": "weaponschematic", "count": 1 }, { "symbol": "compressionliquidgas", "count": 1 }, { "symbol": "manufacturinginstructions", "count": 1 }, { "symbol": "tungstencarbide", "count": 2 }, { "symbol": "weaponcomponent", "count": 2 } ] },
+      { "grade": 3, "credits": 750000,   "materials": [ { "symbol": "weaponschematic", "count": 2 }, { "symbol": "compressionliquidgas", "count": 2 }, { "symbol": "manufacturinginstructions", "count": 2 }, { "symbol": "tungstencarbide", "count": 5 }, { "symbol": "weaponcomponent", "count": 5 } ] },
+      { "grade": 4, "credits": 1500000,  "materials": [ { "symbol": "weaponschematic", "count": 4 }, { "symbol": "compressionliquidgas", "count": 4 }, { "symbol": "manufacturinginstructions", "count": 4 }, { "symbol": "tungstencarbide", "count": 9 }, { "symbol": "weaponcomponent", "count": 9 } ] },
+      { "grade": 5, "credits": 2500000,  "materials": [ { "symbol": "weaponschematic", "count": 5 }, { "symbol": "compressionliquidgas", "count": 5 }, { "symbol": "manufacturinginstructions", "count": 5 }, { "symbol": "tungstencarbide", "count": 12 }, { "symbol": "weaponcomponent", "count": 12 } ], "creditsEstimated": true }
+    ]
+  },
+  {
+    "id": "manticore_tormentor",
+    "name": "Manticore Tormentor",
+    "modSlotsByGrade": [0, 1, 2, 3, 4],
+    "gradeSteps": [
+      { "grade": 2, "credits": 500000,   "materials": [ { "symbol": "weaponschematic", "count": 1 }, { "symbol": "ionisedgas", "count": 1 }, { "symbol": "manufacturinginstructions", "count": 1 }, { "symbol": "chemicalsuperbase", "count": 2 }, { "symbol": "microelectrode", "count": 2 } ] },
+      { "grade": 3, "credits": 750000,   "materials": [ { "symbol": "weaponschematic", "count": 2 }, { "symbol": "ionisedgas", "count": 2 }, { "symbol": "manufacturinginstructions", "count": 2 }, { "symbol": "chemicalsuperbase", "count": 5 }, { "symbol": "microelectrode", "count": 5 } ] },
+      { "grade": 4, "credits": 1500000,  "materials": [ { "symbol": "weaponschematic", "count": 4 }, { "symbol": "ionisedgas", "count": 4 }, { "symbol": "manufacturinginstructions", "count": 4 }, { "symbol": "chemicalsuperbase", "count": 9 }, { "symbol": "microelectrode", "count": 9 } ] },
+      { "grade": 5, "credits": 2500000,  "materials": [ { "symbol": "weaponschematic", "count": 5 }, { "symbol": "ionisedgas", "count": 5 }, { "symbol": "manufacturinginstructions", "count": 5 }, { "symbol": "chemicalsuperbase", "count": 12 }, { "symbol": "microelectrode", "count": 12 } ] }
+    ]
+  }
+]

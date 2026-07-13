@@ -1,0 +1,31 @@
+[
+  {
+    "id": "stability",
+    "name": "Stability",
+    "appliesTo": "Weapon",
+    "effect": "Considerably reduces the weapon's recoil.",
+    "engineerIds": [ "domino_green", "oden_geiger", "rosa_dayette" ],
+    "credits": 500000,
+    "materials": [
+      { "symbol": "viscoelasticpolymer", "count": 5 },
+      { "symbol": "microhydraulics", "count": 5 },
+      { "symbol": "mininganalytics", "count": 5 },
+      { "symbol": "riskassessments", "count": 8 }
+    ]
+  },
+  {
+    "id": "magazine_size",
+    "name": "Magazine Size",
+    "appliesTo": "Weapon",
+    "effect": "Increases the weapon's magazine size by 50%.",
+    "engineerIds": [ "eleanor_bresa", "jude_navarro", "kit_fowler" ],
+    "credits": 750000,
+    "materials": [
+      { "symbol": "weaponcomponent", "count": 3 },
+      { "symbol": "tungstencarbide", "count": 3 },
+      { "symbol": "metalcoil", "count": 5 },
+      { "symbol": "weapontestdata", "count": 5 },
+      { "symbol": "securityexpenses", "count": 3 }
+    ]
+  }
+]

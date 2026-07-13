@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
 using EDNexus.Core.Journal;
+using EDNexus.Core.Odyssey;
 using EDNexus.Core.State;
 
 namespace EDNexus.Core.Engineering;
@@ -14,24 +15,30 @@ namespace EDNexus.Core.Engineering;
 public sealed class EngineeringTracker
 {
     private readonly EngineeringCatalog _catalog;
+    private readonly OdysseyCatalog _odyssey;
     // engineer in-game name → unlocked rank (1–5). Only unlocked engineers appear here.
+    // Odyssey engineers report through the same EngineerProgress event as ship engineers, so one
+    // dictionary covers both.
     private readonly ConcurrentDictionary<string, int> _unlockedRanks = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Raised after an <c>EngineerProgress</c> event changes the unlocked picture.</summary>
     public event Action? Changed;
 
-    public EngineeringTracker(JournalEventBus bus, EngineeringCatalog? catalog = null)
+    public EngineeringTracker(JournalEventBus bus, EngineeringCatalog? catalog = null, OdysseyCatalog? odyssey = null)
     {
         _catalog = catalog ?? EngineeringCatalog.Default;
+        _odyssey = odyssey ?? OdysseyCatalog.Default;
         bus.Subscribe("EngineerProgress", OnEngineerProgress);
     }
 
     public EngineeringCatalog Catalog => _catalog;
+    public OdysseyCatalog Odyssey => _odyssey;
 
     /// <summary>Unlocked engineers by in-game name → highest rank reached (1–5).</summary>
     public IReadOnlyDictionary<string, int> UnlockedRanks => _unlockedRanks;
 
     public bool IsUnlocked(Engineer engineer) => _unlockedRanks.ContainsKey(engineer.Name);
+    public bool IsUnlocked(OdysseyEngineer engineer) => _unlockedRanks.ContainsKey(engineer.Name);
 
     private void OnEngineerProgress(JournalEntry e)
     {
@@ -111,6 +118,108 @@ public sealed class EngineeringTracker
             "raw" => state.Materials.Raw,
             "manufactured" => state.Materials.Manufactured,
             "encoded" => state.Materials.Encoded,
+            _ => null,
+        };
+        return dict is not null && dict.TryGetValue(symbol, out var v) ? v : 0;
+    }
+
+    // --- Odyssey: on-foot suit/weapon grade upgrades. ---
+
+    /// <summary>
+    /// Build the plan for a pinned suit upgrade: the cumulative material checklist and credit cost from
+    /// the currently-equipped grade (or 1, if this isn't the equipped suit) up to the target grade, plus
+    /// the modifications the suit can take at that grade. Returns null for an unknown suit/grade, or a
+    /// suit with no upgrade path (the Flight Suit).
+    /// </summary>
+    public SuitUpgradePlan? BuildSuitUpgradePlan(string suitId, int targetGrade, CommanderState state)
+    {
+        var suit = _odyssey.Suit(suitId);
+        if (suit is null || !suit.IsUpgradeable || targetGrade is < 1 or > 5) return null;
+
+        // SuitSymbol carries the "_classN" suffix (e.g. "tacticalsuit_class3"); the catalog's SuitSymbol
+        // is just the prefix, so this must be a prefix match, not an exact one.
+        var fromGrade = state.SuitSymbol is not null && state.SuitSymbol.StartsWith(suit.SuitSymbol, StringComparison.OrdinalIgnoreCase)
+            ? Math.Max(1, state.SuitClass) : 1;
+
+        var (credits, estimated, materials) = SumSteps(suit.GradeSteps, fromGrade, targetGrade, state);
+        var slotIndex = Math.Clamp(targetGrade - 1, 0, suit.ModSlotsByGrade.Count - 1);
+        var slots = suit.ModSlotsByGrade.Count > 0 ? suit.ModSlotsByGrade[slotIndex] : 0;
+        var mods = ResolveMods(_odyssey.SuitMods, slots);
+
+        return new SuitUpgradePlan(suit, fromGrade, targetGrade, credits, estimated, materials, mods);
+    }
+
+    /// <summary>
+    /// Build the plan for a pinned weapon upgrade. Weapons have no live "current grade" detection (no
+    /// per-weapon loadout event is tracked), so this always plans from grade 1.
+    /// </summary>
+    public WeaponUpgradePlan? BuildWeaponUpgradePlan(string weaponId, int targetGrade, CommanderState state)
+    {
+        var weapon = _odyssey.Weapon(weaponId);
+        if (weapon is null || targetGrade is < 1 or > 5) return null;
+
+        const int fromGrade = 1;
+        var (credits, estimated, materials) = SumSteps(weapon.GradeSteps, fromGrade, targetGrade, state);
+        var slotIndex = Math.Clamp(targetGrade - 1, 0, weapon.ModSlotsByGrade.Count - 1);
+        var slots = weapon.ModSlotsByGrade.Count > 0 ? weapon.ModSlotsByGrade[slotIndex] : 0;
+        var mods = ResolveMods(_odyssey.WeaponMods, slots);
+
+        return new WeaponUpgradePlan(weapon, fromGrade, targetGrade, credits, estimated, materials, mods);
+    }
+
+    /// <summary>Sum the grade steps strictly after <paramref name="fromGrade"/> up to and including <paramref name="toGrade"/>.</summary>
+    private (long Credits, bool Estimated, IReadOnlyList<UpgradeRequirement> Materials) SumSteps(
+        IReadOnlyList<GradeStep> allSteps, int fromGrade, int toGrade, CommanderState state)
+    {
+        var steps = allSteps.Where(s => s.Grade > fromGrade && s.Grade <= toGrade).ToList();
+
+        long credits = 0;
+        var estimated = false;
+        var totals = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach (var step in steps)
+        {
+            credits += step.Credits;
+            estimated |= step.CreditsEstimated;
+            foreach (var m in step.Materials)
+                totals[m.Symbol] = totals.TryGetValue(m.Symbol, out var v) ? v + m.Count : m.Count;
+        }
+
+        var materials = totals.Select(kv =>
+        {
+            var info = _odyssey.Material(kv.Key);
+            var category = info?.Category ?? "Unknown";
+            return new UpgradeRequirement(
+                Symbol: kv.Key,
+                Name: info?.Name ?? kv.Key,
+                Category: category,
+                Needed: kv.Value,
+                Held: OnFootHeldCount(state, category, kv.Key),
+                Source: info?.Source ?? "Source unknown — reference data pending.");
+        }).OrderBy(m => m.Category).ThenBy(m => m.Name).ToList();
+
+        return (credits, estimated, materials);
+    }
+
+    private IReadOnlyList<ModOption> ResolveMods(IReadOnlyList<Modification> mods, int slots)
+    {
+        if (slots <= 0) return Array.Empty<ModOption>();
+
+        return mods.Select(mod =>
+        {
+            var offering = mod.EngineerIds.Select(_odyssey.Engineer).Where(e => e is not null).Cast<OdysseyEngineer>().ToList();
+            var chosen = offering.FirstOrDefault(IsUnlocked) ?? offering.FirstOrDefault();
+            return new ModOption(mod, chosen, chosen is not null && IsUnlocked(chosen));
+        }).ToList();
+    }
+
+    private static int OnFootHeldCount(CommanderState state, string category, string symbol)
+    {
+        var dict = category.ToLowerInvariant() switch
+        {
+            "item" => state.OnFoot.Items,
+            "component" => state.OnFoot.Components,
+            "data" => state.OnFoot.Data,
+            "consumable" => state.OnFoot.Consumables,
             _ => null,
         };
         return dict is not null && dict.TryGetValue(symbol, out var v) ? v : 0;

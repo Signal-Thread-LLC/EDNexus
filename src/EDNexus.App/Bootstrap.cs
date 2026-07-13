@@ -57,4 +57,20 @@ public sealed class Bootstrap
         Store.Save(Settings);
     }
 
+    /// <summary>Persist the Ship / On-foot toggle for the Engineering card.</summary>
+    public void ApplyEngineeringOnFootMode(bool onFootMode)
+    {
+        Settings.Engineering.OnFootMode = onFootMode;
+        Store.Save(Settings);
+    }
+
+    /// <summary>Persist the pinned Odyssey suit/weapon upgrade (null id clears the pin).</summary>
+    public void ApplyOnFootPin(string? kind, string? id, int grade)
+    {
+        Settings.Engineering.PinnedOnFootKind = kind;
+        Settings.Engineering.PinnedOnFootId = id;
+        Settings.Engineering.PinnedOnFootGrade = grade;
+        Store.Save(Settings);
+    }
+
 }

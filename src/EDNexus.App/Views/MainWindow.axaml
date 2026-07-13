@@ -286,6 +286,19 @@
                 </Grid>
                 <StackPanel IsVisible="{Binding !IsCollapsed}">
 
+                  <!-- Ship / On-foot toggle -->
+                  <Grid ColumnDefinitions="*,*" Margin="0,0,0,10">
+                    <Button Grid.Column="0" Classes.action="{Binding !OnFootMode}" Classes.mini="{Binding OnFootMode}"
+                            Content="SHIP" HorizontalContentAlignment="Center" HorizontalAlignment="Stretch"
+                            IsEnabled="{Binding OnFootMode}" Command="{Binding ToggleOnFootModeCommand}" />
+                    <Button Grid.Column="1" Classes.action="{Binding OnFootMode}" Classes.mini="{Binding !OnFootMode}"
+                            Content="ON-FOOT" HorizontalContentAlignment="Center" HorizontalAlignment="Stretch"
+                            Margin="6,0,0,0" IsEnabled="{Binding !OnFootMode}" Command="{Binding ToggleOnFootModeCommand}" />
+                  </Grid>
+
+                  <!-- SHIP SIDE -->
+                  <StackPanel IsVisible="{Binding !OnFootMode}">
+
                   <!-- Picker: shown until a blueprint is pinned -->
                   <StackPanel IsVisible="{Binding NoPin}">
                     <TextBlock Classes="label" TextWrapping="Wrap" Margin="0,0,0,10"
@@ -375,6 +388,109 @@
                     <TextBlock Classes="label" Text="{Binding OtherEngineers}" TextWrapping="Wrap" Margin="0,8,0,0"
                                IsVisible="{Binding OtherEngineers, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                   </StackPanel>
+                  </StackPanel>
+                  <!-- end SHIP SIDE -->
+
+                  <!-- ON-FOOT SIDE -->
+                  <StackPanel IsVisible="{Binding OnFootMode}">
+
+                    <!-- Picker: shown until a suit/weapon is pinned -->
+                    <StackPanel IsVisible="{Binding OnFootNoPin}">
+                      <TextBlock Classes="label" TextWrapping="Wrap" Margin="0,0,0,10"
+                                 Text="Pin one suit or weapon grade upgrade. The card shows the cumulative material checklist, credit cost, and any modifications it can then take." />
+                      <TextBlock Classes="label" Text="SUIT / WEAPON" />
+                      <ComboBox ItemsSource="{Binding OnFootOptions}" SelectedItem="{Binding SelectedOnFootOption}"
+                                HorizontalAlignment="Stretch" Margin="0,2,0,8">
+                        <ComboBox.ItemTemplate>
+                          <DataTemplate x:DataType="vm:OnFootOption">
+                            <TextBlock Text="{Binding Label}" />
+                          </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                      </ComboBox>
+                      <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,4">
+                        <StackPanel Grid.Column="0" Margin="0,0,10,0">
+                          <TextBlock Classes="label" Text="TARGET GRADE" />
+                          <ComboBox ItemsSource="{Binding OnFootGradeChoices}" SelectedItem="{Binding SelectedOnFootGrade}"
+                                    HorizontalAlignment="Stretch" Margin="0,2,0,0">
+                            <ComboBox.ItemTemplate>
+                              <DataTemplate x:DataType="x:Int32">
+                                <TextBlock Text="{Binding StringFormat='Grade {0}'}" />
+                              </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                          </ComboBox>
+                        </StackPanel>
+                        <Button Grid.Column="1" Classes="action" Content="Pin goal" VerticalAlignment="Bottom"
+                                Command="{Binding PinOnFootCommand}" />
+                      </Grid>
+                    </StackPanel>
+
+                    <!-- Pinned goal -->
+                    <StackPanel IsVisible="{Binding OnFootHasPin}">
+                      <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel Grid.Column="0">
+                          <TextBlock Classes="value" Text="{Binding OnFootPinnedTitle}" FontSize="15" />
+                          <TextBlock Classes="label" Text="{Binding OnFootPinnedGradeLabel}"
+                                     Foreground="{StaticResource AmberBrush}" />
+                        </StackPanel>
+                        <Button Grid.Column="1" Classes="mini" Content="Change" VerticalAlignment="Top"
+                                Command="{Binding UnpinOnFootCommand}" ToolTip.Tip="Unpin and choose a different suit/weapon" />
+                      </Grid>
+
+                      <TextBlock Classes="label" Text="{Binding OnFootCreditsTotal}" Margin="0,8,0,10"
+                                 Foreground="{StaticResource AmberBrush}" FontSize="14" FontWeight="SemiBold" />
+
+                      <!-- Materials -->
+                      <TextBlock Classes="label" Text="{Binding OnFootMaterialsSummary}" Margin="0,0,0,6" />
+                      <ItemsControl ItemsSource="{Binding OnFootMaterials}" MaxHeight="240">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:OnFootMaterialRow">
+                            <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,4" ToolTip.Tip="{Binding Source}">
+                              <Border Grid.Column="0" Background="#22262E" CornerRadius="4" Padding="6,2" MinWidth="44">
+                                <TextBlock Text="{Binding CategoryTag}" Foreground="{StaticResource InkDim}"
+                                           FontSize="10" HorizontalAlignment="Center" />
+                              </Border>
+                              <TextBlock Grid.Column="1" Text="{Binding Name}" Classes="value" FontSize="13"
+                                         Margin="10,0,8,0" VerticalAlignment="Center" TextWrapping="Wrap" />
+                              <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                <TextBlock Text="✓" Foreground="{StaticResource Good}" FontSize="13"
+                                           IsVisible="{Binding Satisfied}" />
+                                <TextBlock Text="{Binding NeededVsHeld}" FontSize="13" MinWidth="60" TextAlignment="Right"
+                                           Foreground="{StaticResource Ink}" IsVisible="{Binding Satisfied}" />
+                                <TextBlock Text="{Binding NeededVsHeld}" FontSize="13" MinWidth="60" TextAlignment="Right"
+                                           Foreground="{StaticResource Bad}" IsVisible="{Binding !Satisfied}" />
+                              </StackPanel>
+                            </Grid>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+
+                      <!-- Modifications -->
+                      <TextBlock Classes="label" Text="MODIFICATIONS" Margin="0,10,0,6" />
+                      <ItemsControl ItemsSource="{Binding OnFootMods}" MaxHeight="260">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:ModRow">
+                            <Border Background="#0E1013" BorderBrush="{StaticResource CardBorder}" BorderThickness="1"
+                                    CornerRadius="6" Padding="10,8" Margin="0,4" ToolTip.Tip="{Binding EngineerUnlock}">
+                              <StackPanel>
+                                <TextBlock Text="{Binding Name}" Classes="value" FontSize="13" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding Effect}" Classes="label" FontSize="11" TextWrapping="Wrap" Margin="0,2,0,4" />
+                                <Grid ColumnDefinitions="*,Auto">
+                                  <TextBlock Grid.Column="0" Text="{Binding EngineerName}" Classes="label" FontSize="11" />
+                                  <TextBlock Grid.Column="1" Text="Unlocked" FontSize="11" Foreground="{StaticResource Good}"
+                                             IsVisible="{Binding EngineerUnlocked}" />
+                                  <TextBlock Grid.Column="1" Text="Locked" FontSize="11" Foreground="{StaticResource Bad}"
+                                             IsVisible="{Binding !EngineerUnlocked}" />
+                                </Grid>
+                                <TextBlock Text="{Binding EngineerLocation}" Classes="label" FontSize="11" />
+                              </StackPanel>
+                            </Border>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </StackPanel>
+                  </StackPanel>
+                  <!-- end ON-FOOT SIDE -->
+
                 </StackPanel>
               </StackPanel>
             </Border>
