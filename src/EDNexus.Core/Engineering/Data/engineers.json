@@ -1,0 +1,98 @@
+[
+  {
+    "id": "farseer",
+    "name": "Felicity Farseer",
+    "system": "Deciat",
+    "base": "Farseer Inc",
+    "unlock": "Gain exploration rank Scout or higher, then gift 1 unit of Meta Alloys.",
+    "specialities": [ "Frame Shift Drives", "Thrusters", "Sensors", "Detailed Surface Scanner" ]
+  },
+  {
+    "id": "martuuk",
+    "name": "Elvira Martuuk",
+    "system": "Khun",
+    "base": "Long Sight Base",
+    "unlock": "Travel 300 Ly or more from your career start system, then gift 3 units of Soontill Relics.",
+    "specialities": [ "Frame Shift Drives", "Shield Generators", "Thrusters", "Shield Boosters" ]
+  },
+  {
+    "id": "dweller",
+    "name": "The Dweller",
+    "system": "Wyrd",
+    "base": "Black Hide",
+    "unlock": "Deal with at least 5 black-market contacts, then pay 500,000 Cr.",
+    "specialities": [ "Power Distributors", "Pulse Lasers", "Burst Lasers" ]
+  },
+  {
+    "id": "mcquinn",
+    "name": "Tod \"The Blaster\" McQuinn",
+    "system": "Wolf 397",
+    "base": "Trophy Camp",
+    "unlock": "Earn 15+ Combat Bonds, then gift 25 units of Modular Terminals.",
+    "specialities": [ "Multi-cannons", "Cannons", "Rail Guns", "Fragment Cannons" ]
+  },
+  {
+    "id": "ryder",
+    "name": "Liz Ryder",
+    "system": "Eurybia",
+    "base": "Demolition Unlimited",
+    "unlock": "Reach Cordial status with Eurybia Blue Mafia, then gift 200 units of Landmines.",
+    "specialities": [ "Missile Racks", "Torpedo Pylons", "Mine Launchers", "Hull Reinforcement" ]
+  },
+  {
+    "id": "selene",
+    "name": "Selene Jean",
+    "system": "Kuk",
+    "base": "Prospector's Rest",
+    "unlock": "Mine at least 500 tons of ore, then gift 10 units of Painite.",
+    "specialities": [ "Hull Reinforcement", "Armour", "Bulkheads" ]
+  },
+  {
+    "id": "palin",
+    "name": "Professor Palin",
+    "system": "Arque",
+    "base": "Abel Laboratory",
+    "unlock": "Travel 5,000 Ly from career start and meet Marco Qwent, then gift 25 units of Sensor Fragments.",
+    "specialities": [ "Thrusters", "Frame Shift Drives" ]
+  },
+  {
+    "id": "qwent",
+    "name": "Marco Qwent",
+    "system": "Sirius",
+    "base": "Qwent Research Base",
+    "unlock": "Obtain a Sirius Corp permit (invite) and gift 25 units of Modular Terminals.",
+    "specialities": [ "Power Plants", "Power Distributors" ]
+  },
+  {
+    "id": "tani",
+    "name": "Hera Tani",
+    "system": "Kuwemaki",
+    "base": "The Jet's Hole",
+    "unlock": "Reach at least Outsider rank with the Empire and meet Liz Ryder, then gift 50 units of Kamitra Cigars.",
+    "specialities": [ "Power Plants", "Power Distributors", "Detailed Surface Scanner", "Sensors" ]
+  },
+  {
+    "id": "dorn",
+    "name": "Etienne Dorn",
+    "system": "Los",
+    "base": "Kraken's Retreat",
+    "unlock": "Reach at least Master rank with the Empire and meet Liz Ryder, then gift 25 units of Occupied Escape Pods.",
+    "specialities": [ "Power Distributors", "Power Plants", "Life Support", "Sensors", "Frame Shift Drives" ]
+  },
+  {
+    "id": "bris_dekker",
+    "name": "Colonel Bris Dekker",
+    "system": "Sol",
+    "base": "Dekker's Yard",
+    "unlock": "Obtain a Sol permit (Federation Midshipman) and meet Juri Ishmaak, then gift 1,000,000 Cr.",
+    "specialities": [ "Frame Shift Drive Interdictor", "Frame Shift Drives" ]
+  },
+  {
+    "id": "cheung",
+    "name": "Lei Cheung",
+    "system": "Laksak",
+    "base": "Trader's Rest",
+    "unlock": "Trade with 50+ different markets and meet The Dweller, then gift 200 units of Gold.",
+    "specialities": [ "Shield Generators", "Shield Boosters", "Detailed Surface Scanner", "Sensors" ]
+  }
+]

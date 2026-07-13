@@ -275,6 +275,111 @@
             </Border>
           </DataTemplate>
 
+          <!-- Engineering -->
+          <DataTemplate DataType="vm:EngineeringCardViewModel">
+            <Border Classes="card" Width="{Binding Width}" IsVisible="{Binding IsVisible}">
+              <StackPanel>
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBlock Grid.Column="0" Classes="cardHeader" Text="{Binding Title}" />
+                  <Button Grid.Column="1" Classes="collapse" Content="{Binding CollapseGlyph}"
+                          Command="{Binding ToggleCollapseCommand}" />
+                </Grid>
+                <StackPanel IsVisible="{Binding !IsCollapsed}">
+
+                  <!-- Picker: shown until a blueprint is pinned -->
+                  <StackPanel IsVisible="{Binding NoPin}">
+                    <TextBlock Classes="label" TextWrapping="Wrap" Margin="0,0,0,10"
+                               Text="Pin one blueprint to focus on. The card then shows where to unlock its engineer and where to farm each material." />
+                    <TextBlock Classes="label" Text="BLUEPRINT" />
+                    <ComboBox ItemsSource="{Binding Blueprints}" SelectedItem="{Binding SelectedBlueprint}"
+                              HorizontalAlignment="Stretch" Margin="0,2,0,8">
+                      <ComboBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:BlueprintOption">
+                          <TextBlock Text="{Binding Label}" />
+                        </DataTemplate>
+                      </ComboBox.ItemTemplate>
+                    </ComboBox>
+                    <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,4">
+                      <StackPanel Grid.Column="0" Margin="0,0,10,0">
+                        <TextBlock Classes="label" Text="GRADE" />
+                        <ComboBox ItemsSource="{Binding GradeChoices}" SelectedItem="{Binding SelectedGrade}"
+                                  HorizontalAlignment="Stretch" Margin="0,2,0,0">
+                          <ComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="x:Int32">
+                              <TextBlock Text="{Binding StringFormat='Grade {0}'}" />
+                            </DataTemplate>
+                          </ComboBox.ItemTemplate>
+                        </ComboBox>
+                      </StackPanel>
+                      <Button Grid.Column="1" Classes="action" Content="Pin goal" VerticalAlignment="Bottom"
+                              Command="{Binding PinCommand}" />
+                    </Grid>
+                  </StackPanel>
+
+                  <!-- Pinned goal -->
+                  <StackPanel IsVisible="{Binding HasPin}">
+                    <Grid ColumnDefinitions="*,Auto">
+                      <StackPanel Grid.Column="0">
+                        <TextBlock Classes="value" Text="{Binding PinnedTitle}" FontSize="15" />
+                        <TextBlock Classes="label" Text="{Binding PinnedGradeLabel}"
+                                   Foreground="{StaticResource AmberBrush}" />
+                      </StackPanel>
+                      <Button Grid.Column="1" Classes="mini" Content="Change" VerticalAlignment="Top"
+                              Command="{Binding UnpinCommand}" ToolTip.Tip="Unpin and choose a different blueprint" />
+                    </Grid>
+
+                    <!-- Engineer -->
+                    <Border Background="#0E1013" BorderBrush="{StaticResource CardBorder}" BorderThickness="1"
+                            CornerRadius="6" Padding="12,10" Margin="0,10,0,10"
+                            ToolTip.Tip="{Binding EngineerUnlock}">
+                      <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                          <TextBlock Classes="label" Text="ENGINEER" />
+                          <TextBlock Text="{Binding EngineerName}" Foreground="{StaticResource Ink}"
+                                     FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap" />
+                          <TextBlock Text="{Binding EngineerLocation}" Classes="label" FontSize="12" />
+                          <TextBlock Text="{Binding EngineerStatus}" FontSize="12" Margin="0,2,0,0"
+                                     Foreground="{StaticResource Good}" IsVisible="{Binding EngineerUnlocked}" />
+                          <TextBlock Text="{Binding EngineerStatus}" FontSize="12" Margin="0,2,0,0"
+                                     Foreground="{StaticResource Bad}" IsVisible="{Binding !EngineerUnlocked}" />
+                        </StackPanel>
+                        <Button Grid.Column="1" Classes="mini" Content="Copy system" VerticalAlignment="Center"
+                                Command="{Binding CopyEngineerSystemCommand}"
+                                ToolTip.Tip="Copy the engineer's system to the clipboard" />
+                      </Grid>
+                    </Border>
+
+                    <!-- Materials -->
+                    <TextBlock Classes="label" Text="{Binding MaterialsSummary}" Margin="0,0,0,6" />
+                    <ItemsControl ItemsSource="{Binding Materials}" MaxHeight="320">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:MaterialRow">
+                          <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,4" ToolTip.Tip="{Binding Source}">
+                            <Border Grid.Column="0" Background="#22262E" CornerRadius="4" Padding="6,2" MinWidth="44">
+                              <TextBlock Text="{Binding CategoryTag}" Foreground="{StaticResource InkDim}"
+                                         FontSize="10" HorizontalAlignment="Center" />
+                            </Border>
+                            <TextBlock Grid.Column="1" Text="{Binding Name}" Classes="value" FontSize="13"
+                                       Margin="10,0,8,0" VerticalAlignment="Center" TextWrapping="Wrap" />
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                              <TextBlock Text="✓" Foreground="{StaticResource Good}" FontSize="13"
+                                         IsVisible="{Binding HasAny}" />
+                              <TextBlock Text="{Binding Held}" Classes="value" FontSize="13" MinWidth="34"
+                                         TextAlignment="Right" />
+                            </StackPanel>
+                          </Grid>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <TextBlock Classes="label" Text="{Binding OtherEngineers}" TextWrapping="Wrap" Margin="0,8,0,0"
+                               IsVisible="{Binding OtherEngineers, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                  </StackPanel>
+                </StackPanel>
+              </StackPanel>
+            </Border>
+          </DataTemplate>
+
           <!-- Cargo -->
           <DataTemplate DataType="vm:CargoCardViewModel">
             <Border Classes="card" Width="{Binding Width}" IsVisible="{Binding IsVisible}">

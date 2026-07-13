@@ -49,4 +49,12 @@ public sealed class Bootstrap
         System.Diagnostics.Trace.TraceInformation($"Settings: AutoDownloadUpdates set to {enabled}");
     }
 
+    /// <summary>Persist the pinned engineering blueprint (null id clears the pin).</summary>
+    public void ApplyEngineeringPin(string? blueprintId, int grade)
+    {
+        Settings.Engineering.PinnedBlueprintId = blueprintId;
+        Settings.Engineering.PinnedGrade = grade;
+        Store.Save(Settings);
+    }
+
 }
