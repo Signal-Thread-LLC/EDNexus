@@ -84,7 +84,12 @@ public sealed class EngineHost : IDisposable
             new DiskResponseCache(Path.Combine(cacheRoot, "systems"), TimeSpan.FromDays(30)));
 
         if (settings is not null)
-            _reporters = new ReporterHost(Bus, settings, ResolveVersion(), IsDevelopmentBuild, reportingSuppressed);
+        {
+            // Every EDDN/Inara upload attempt is recorded here for troubleshooting and validation.
+            var log = new FileReportingLog(Path.Combine(
+                Path.GetDirectoryName(SettingsStore.DefaultPath())!, "logs", "reporting.log"));
+            _reporters = new ReporterHost(Bus, settings, ResolveVersion(), IsDevelopmentBuild, reportingSuppressed, log);
+        }
         if (JournalDirectory is not null)
             _watcher = new JournalWatcher(JournalDirectory, Bus);
     }

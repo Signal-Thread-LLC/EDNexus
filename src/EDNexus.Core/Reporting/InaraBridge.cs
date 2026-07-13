@@ -1,3 +1,4 @@
+using System.Text.Json;
 using EDNexus.Core.Journal;
 using EDNexus.Core.Settings;
 using EliteDangerous.Inara;
@@ -21,6 +22,7 @@ public sealed class InaraBridge : IAsyncDisposable
     private readonly Func<bool> _isSuppressed;
     private readonly TimeSpan _debounceDelay;
     private readonly TimeSpan _minInterval;
+    private readonly IReportingLog? _log;
     private readonly object _gate = new();
 
     // Captured identity (from any event, incl. historical) so we can attribute live sends.
@@ -44,17 +46,18 @@ public sealed class InaraBridge : IAsyncDisposable
     private DateTimeOffset _lastFlush = DateTimeOffset.MinValue;
     private bool _stopped;   // set on a hard error (e.g. bad API key); cleared when disabled again
 
-    public InaraBridge(JournalEventBus bus, AppSettings settings, InaraClient client, Func<bool>? isSuppressed = null)
-        : this(bus, settings, client, SessionStartDebounce, MinInterval, isSuppressed) { }
+    public InaraBridge(JournalEventBus bus, AppSettings settings, InaraClient client, Func<bool>? isSuppressed = null, IReportingLog? log = null)
+        : this(bus, settings, client, SessionStartDebounce, MinInterval, isSuppressed, log) { }
 
     /// <summary>Test-only constructor allowing the debounce/throttle windows to be shortened.</summary>
-    internal InaraBridge(JournalEventBus bus, AppSettings settings, InaraClient client, TimeSpan debounceDelay, TimeSpan minInterval, Func<bool>? isSuppressed = null)
+    internal InaraBridge(JournalEventBus bus, AppSettings settings, InaraClient client, TimeSpan debounceDelay, TimeSpan minInterval, Func<bool>? isSuppressed = null, IReportingLog? log = null)
     {
         _settings = settings;
         _client = client;
         _isSuppressed = isSuppressed ?? (static () => false);
         _debounceDelay = debounceDelay;
         _minInterval = minInterval;
+        _log = log;
 
         bus.Subscribe("Commander", e => Capture(() => _commander = e.GetString("Name") ?? _commander));
         bus.Subscribe("LoadGame", OnLoadGame);
@@ -230,8 +233,47 @@ public sealed class InaraBridge : IAsyncDisposable
         var response = await _client.SendAsync(identity, batch).ConfigureAwait(false);
         _lastFlush = DateTimeOffset.UtcNow;
 
+        LogUpload(batch, response);
+
         if (response.IsHardError)
             lock (_gate) _stopped = true;   // e.g. invalid API key — stop until re-enabled
+    }
+
+    /// <summary>Record the batch we just sent (and Inara's verdict) to the reporting log, if attached.</summary>
+    private void LogUpload(List<InaraEvent> batch, InaraResponse response)
+    {
+        if (_log is null) return;
+
+        var summary = $"{batch.Count} event(s): {string.Join(", ", batch.Select(e => e.EventName))}";
+        var status = response.Status == 0
+            ? $"transport error: {response.StatusText}"
+            : $"{response.Status} {response.StatusText}".TrimEnd();
+
+        // Payload logging serialises only the events (eventName/eventData) — never the request header,
+        // which carries the commander's Inara API key.
+        var payload = _settings.Reporting.LogPayloads ? SerializeEvents(batch) : null;
+
+        _log.Record(new ReportingUpload(
+            DateTimeOffset.UtcNow, ReportingTarget.Inara, summary, response.IsOk, status,
+            Error: response.IsOk ? null : (response.StatusText ?? "error"),
+            Payload: payload));
+    }
+
+    private static string? SerializeEvents(List<InaraEvent> batch)
+    {
+        try
+        {
+            return JsonSerializer.Serialize(batch.Select(e => new
+            {
+                eventName = e.EventName,
+                eventTimestamp = e.EventTimestamp.UtcDateTime,
+                eventData = e.EventData,
+            }));
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     public async ValueTask DisposeAsync()

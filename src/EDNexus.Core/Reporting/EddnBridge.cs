@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+using System.Text.Json.Nodes;
 using EDNexus.Core.Journal;
 using EDNexus.Core.Settings;
 using EliteDangerous.Eddn;
@@ -8,6 +10,7 @@ namespace EDNexus.Core.Reporting;
 /// Connects the journal event bus to the reusable <see cref="EliteDangerous.Eddn"/> client. It warms
 /// the EDDN context from every event (including historical replay) so location augmentation is ready,
 /// but only uploads <b>live</b> events, and only while the EDDN reporter is enabled in settings.
+/// When a <see cref="IReportingLog"/> is supplied, every upload attempt is recorded for validation.
 /// </summary>
 public sealed class EddnBridge : IAsyncDisposable
 {
@@ -16,15 +19,23 @@ public sealed class EddnBridge : IAsyncDisposable
     private readonly EddnState _state = new();
     private readonly EddnJournalTransformer _transformer;
     private readonly EddnUploader _uploader;
+    private readonly IReportingLog? _log;
+
+    // The (redacted) payload of each queued upload, oldest first, so an upload result can be paired
+    // back with what was sent. The uploader completes uploads in submission order, so this stays in
+    // step; each entry is null when payload logging is off. Only used when a log is attached.
+    private readonly ConcurrentQueue<string?> _outbound = new();
 
     public EddnBridge(JournalEventBus bus, AppSettings settings, EddnUploader uploader,
-        EddnJournalTransformer transformer, Func<bool>? isSuppressed = null)
+        EddnJournalTransformer transformer, Func<bool>? isSuppressed = null, IReportingLog? log = null)
     {
         _settings = settings;
         _uploader = uploader;
         _transformer = transformer;
         _isSuppressed = isSuppressed ?? (static () => false);
+        _log = log;
 
+        if (_log is not null) _uploader.Completed += OnUploadCompleted;
         bus.SubscribeAny(OnEvent);
     }
 
@@ -43,7 +54,45 @@ public sealed class EddnBridge : IAsyncDisposable
         if (!_settings.Reporting.Eddn.Enabled) return;    // opt-in, read live so toggles take effect
 
         var message = _transformer.Transform(e.Raw, _state);
-        if (message is not null) _uploader.Enqueue(message);
+        if (message is null) return;
+
+        // Capture the payload (redacted) before handing the message to the uploader, so it can be
+        // paired with the result when it completes. Enqueue in lock-step with the uploader.
+        if (_log is not null)
+            _outbound.Enqueue(_settings.Reporting.LogPayloads ? RedactPayload(message) : null);
+        _uploader.Enqueue(message);
+    }
+
+    private void OnUploadCompleted(EddnUploadResult result)
+    {
+        if (_log is null) return;
+        _outbound.TryDequeue(out var payload);
+
+        var status = result.Status is { } code ? $"{(int)code} {code}" : "no response";
+        _log.Record(new ReportingUpload(
+            DateTimeOffset.UtcNow, ReportingTarget.Eddn, result.SchemaRef, result.Success, status,
+            Error: result.Success ? null : result.Error,
+            Payload: payload));
+    }
+
+    /// <summary>
+    /// The EDDN envelope's <c>header.uploaderID</c> is the raw commander name (the relay obfuscates it
+    /// on receipt, but the bytes we send do not). Strip it before writing the payload to a local log
+    /// so a commander's name never lands on disk. Returns null if the envelope can't be reparsed.
+    /// </summary>
+    private static string? RedactPayload(EddnMessage message)
+    {
+        try
+        {
+            var node = JsonNode.Parse(message.ToString());
+            if (node?["header"] is JsonObject header && header.ContainsKey("uploaderID"))
+                header["uploaderID"] = "[redacted]";
+            return node?.ToJsonString();
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     public ValueTask DisposeAsync() => _uploader.DisposeAsync();

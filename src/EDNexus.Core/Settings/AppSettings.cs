@@ -55,6 +55,13 @@ public sealed class ReportingSettings
 {
     public EddnSettings Eddn { get; set; } = new();
     public InaraSettings Inara { get; set; } = new();
+
+    /// <summary>
+    /// When true, the reporting log additionally records the (redacted) JSON payload of every EDDN
+    /// and Inara upload — verbose, for validating exactly what was sent. The per-attempt summary
+    /// (schema/status/result) is always logged regardless. Default off to keep the log compact.
+    /// </summary>
+    public bool LogPayloads { get; set; }
 }
 
 /// <summary>EDDN reporter settings. Uploads are anonymized by the relay.</summary>
