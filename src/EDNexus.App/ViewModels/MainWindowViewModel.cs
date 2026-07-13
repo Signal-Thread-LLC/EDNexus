@@ -37,7 +37,9 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             () => _boot.Dev.Enabled,
             _rng,
             () => _boot.Settings.Engineering,
-            (id, grade) => _boot.ApplyEngineeringPin(id, grade));
+            (id, grade) => _boot.ApplyEngineeringPin(id, grade),
+            onFootMode => _boot.ApplyEngineeringOnFootMode(onFootMode),
+            (kind, id, grade) => _boot.ApplyOnFootPin(kind, id, grade));
         Cards = new ObservableCollection<CardViewModel>
         {
             new LocationCardViewModel(_context),

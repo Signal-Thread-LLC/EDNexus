@@ -77,11 +77,28 @@ public sealed class CommanderState : ObservableObject
 
     public MaterialsInventory Materials { get; } = new();
 
+    /// <summary>On-foot (Odyssey) inventory: components, data, goods and consumables in the ship locker/backpack.</summary>
+    public OnFootInventory OnFoot { get; } = new();
+
+    private string? _suitName;
+    /// <summary>Localised name of the currently equipped suit (e.g. "Dominator Suit"), or null if unknown.</summary>
+    public string? SuitName { get => _suitName; set => Set(ref _suitName, value); }
+
+    private string? _suitSymbol;
+    /// <summary>Raw journal suit symbol (e.g. "tacticalsuit_class3"), used to resolve the suit + grade.</summary>
+    public string? SuitSymbol { get => _suitSymbol; set => Set(ref _suitSymbol, value); }
+
+    private int _suitClass;
+    /// <summary>Current suit grade (1-5), parsed from the suit symbol's "_classN" suffix.</summary>
+    public int SuitClass { get => _suitClass; set => Set(ref _suitClass, value); }
+
     public event Action? CargoChanged;
     public event Action? MaterialsChanged;
+    public event Action? OnFootChanged;
 
     public void RaiseCargoChanged() => CargoChanged?.Invoke();
     public void RaiseMaterialsChanged() => MaterialsChanged?.Invoke();
+    public void RaiseOnFootChanged() => OnFootChanged?.Invoke();
 }
 
 /// <summary>Engineering materials split into the game's three categories.</summary>
@@ -92,4 +109,15 @@ public sealed class MaterialsInventory
     public ConcurrentDictionary<string, int> Encoded { get; } = new(StringComparer.OrdinalIgnoreCase);
 
     public int TotalCount => Raw.Values.Sum() + Manufactured.Values.Sum() + Encoded.Values.Sum();
+}
+
+/// <summary>On-foot goods split into the game's four ship-locker categories.</summary>
+public sealed class OnFootInventory
+{
+    public ConcurrentDictionary<string, int> Components { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public ConcurrentDictionary<string, int> Data { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public ConcurrentDictionary<string, int> Items { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public ConcurrentDictionary<string, int> Consumables { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+    public int TotalCount => Components.Values.Sum() + Data.Values.Sum() + Items.Values.Sum() + Consumables.Values.Sum();
 }
