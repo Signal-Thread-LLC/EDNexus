@@ -33,7 +33,7 @@ public sealed class CrashReporting : IDisposable
         if (string.IsNullOrWhiteSpace(dsn)) return false;
 
         _installId = settings.InstallId;
-        _scrubber = BuildScrubber(extraSensitive);
+        _scrubber = BuildScrubber(settings, extraSensitive);
 
         _sentry = SentrySdk.Init(o =>
         {
@@ -97,13 +97,15 @@ public sealed class CrashReporting : IDisposable
 
     public void Dispose() => Stop();
 
-    private static PiiScrubber BuildScrubber(IEnumerable<string>? extra)
+    private static PiiScrubber BuildScrubber(AppSettings settings, IEnumerable<string>? extra)
     {
         var sensitive = new List<string>
         {
             Environment.UserName,
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
             JournalPaths.Resolve() ?? "",
+            // The Inara key could ride out inside an HTTP-failure message; never let it.
+            settings.Reporting.Inara.ApiKey,
         };
         if (extra is not null) sensitive.AddRange(extra);
         return new PiiScrubber(sensitive);
