@@ -36,8 +36,13 @@
                   Foreground="#E7E9EE" />
         <TextBlock Foreground="#8A909C" FontSize="12" TextWrapping="Wrap"
                    Text="Sends your identity, credits, ranks, and travel to your Inara profile on session start, docking, and FSD jumps. Requires your personal Inara API key (Inara → Profile → API keys)." />
-        <TextBox x:Name="InaraApiKey" PlaceholderText="Inara API key"
-                 Foreground="#E7E9EE" Background="#14161A" />
+        <!-- Masked by default: keys get leaked through streams and screenshots, not local attackers. -->
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBox x:Name="InaraApiKey" PlaceholderText="Inara API key" PasswordChar="●"
+                   Foreground="#E7E9EE" Background="#14161A" />
+          <CheckBox x:Name="RevealApiKey" Grid.Column="1" Content="Show" Margin="10,0,0,0"
+                    Foreground="#8A909C" IsCheckedChanged="OnRevealApiKeyChanged" />
+        </Grid>
       </StackPanel>
     </Border>
 

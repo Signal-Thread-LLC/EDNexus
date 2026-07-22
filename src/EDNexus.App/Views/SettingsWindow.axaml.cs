@@ -95,6 +95,9 @@ public partial class SettingsWindow : Window
 
     private void OnClose(object? sender, RoutedEventArgs e) => Close();
 
+    private void OnRevealApiKeyChanged(object? sender, RoutedEventArgs e)
+        => InaraApiKey.RevealPassword = RevealApiKey.IsChecked == true;
+
     private void OnOpenLogs(object? sender, RoutedEventArgs e)
     {
         try
