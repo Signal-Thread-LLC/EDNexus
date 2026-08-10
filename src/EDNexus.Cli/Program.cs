@@ -1,6 +1,8 @@
 using EDNexus.Core.Colonisation;
+using EDNexus.Core.Exobio;
 using EDNexus.Core.Journal;
 using EDNexus.Core.Market;
+using EDNexus.Core.Materials;
 using EDNexus.Core.State;
 
 // EDNexus.Cli — a headless harness for the journal engine.
@@ -27,6 +29,7 @@ var state = new CommanderState();
 _ = new StateTracker(bus, state);
 var colonisation = new ColonisationTracker(bus, state);
 var market = new MarketTracker(bus, state);
+var exobio = new ExobiologyTracker(bus, state);
 
 var liveCounts = new SortedDictionary<string, int>();
 bus.SubscribeAny(e =>
@@ -43,6 +46,8 @@ watcher.Replay();
 PrintState(state);
 PrintColonisation(colonisation, state);
 PrintMarket(market, state);
+PrintMaterials(state);
+PrintExobiology(exobio);
 
 if (args.Contains("--once"))
     return 0;
@@ -61,6 +66,8 @@ Console.WriteLine();
 PrintState(state);
 PrintColonisation(colonisation, state);
 PrintMarket(market, state);
+PrintMaterials(state);
+PrintExobiology(exobio);
 if (liveCounts.Count > 0)
 {
     Console.WriteLine("\nLive events this session:");
@@ -155,5 +162,70 @@ static void PrintMarket(MarketTracker tracker, CommanderState s)
     {
         var vsMean = c.SellVsMean >= 0 ? $"+{c.SellVsMean:N0}" : c.SellVsMean.ToString("N0");
         Console.WriteLine($"      {c.SellPrice,9:N0}  {vsMean,8}  {c.Demand,8:N0}  {c.Name}");
+    }
+}
+
+static void PrintMaterials(CommanderState s)
+{
+    var views = MaterialInventory.All(s);
+    if (views.All(v => v.TotalHeld == 0)) return;
+
+    Console.WriteLine("\n======== Materials ========");
+    foreach (var view in views)
+        Console.WriteLine($"  {view.Category,-13}: {view.TotalHeld,6:N0} held across {view.Held.Count,3} materials"
+                          + (view.FullCount > 0 ? $"  ({view.FullCount} at cap)" : ""));
+
+    var capped = MaterialInventory.AtCap(s);
+    if (capped.Count == 0) return;
+
+    // At the cap the game bins further pickups, so this is the actionable list.
+    Console.WriteLine("  --- at cap (trade these down) ---");
+    Console.WriteLine($"      {"grade",5}  {"held",6}  material");
+    foreach (var stock in capped)
+        Console.WriteLine($"      {"G" + stock.Grade,5}  {stock.Held,6:N0}  {stock.Name}");
+}
+
+static void PrintExobiology(ExobiologyTracker tracker)
+{
+    var session = tracker.Session;
+    var bodies = tracker.Bodies;
+    if (bodies.Count == 0 && session.Pending.Count == 0 && session.SoldValue == 0) return;
+
+    Console.WriteLine("\n======== Exobiology ========");
+
+    if (tracker.CurrentBody is { } here)
+    {
+        var genera = here.Genera.Count > 0 ? string.Join(", ", here.Genera.Select(g => g.Name)) : "(not mapped)";
+        Console.WriteLine($"  Here      : {here.BodyName} — {here.SignalCount} bio signal(s): {genera}");
+        if (here.ValueRange is { } r)
+            Console.WriteLine($"  Estimate  : {r.Min:N0} – {r.Max:N0} cr");
+    }
+
+    if (tracker.ActiveScan is { } scan)
+        Console.WriteLine($"  Sampling  : {scan.SpeciesName} {scan.Progress} on {scan.BodyName}");
+
+    Console.WriteLine($"  Pending   : {session.PendingValue:N0} cr across {session.Pending.Count} sample(s)");
+    Console.WriteLine($"  Sold      : {session.SoldValue:N0} cr from {session.SoldCount} sample(s)"
+                      + (session.SoldBonus > 0 ? $"  (incl. {session.SoldBonus:N0} cr first-logged bonus)" : ""));
+    if (tracker.NewDiscoveries > 0)
+        Console.WriteLine($"  New codex : {tracker.NewDiscoveries} first "
+                          + (tracker.NewDiscoveries == 1 ? "discovery" : "discoveries") + " this session");
+
+    if (session.Pending.Count > 0)
+    {
+        Console.WriteLine("  --- analysed, waiting on Vista Genomics ---");
+        Console.WriteLine($"      {"value cr",12}  {"if first",12}  species");
+        foreach (var p in session.Pending)
+            Console.WriteLine($"      {p.Value,12:N0}  {p.Value * 5,12:N0}  {p.SpeciesName} ({p.BodyName})");
+    }
+
+    if (bodies.Count > 0)
+    {
+        Console.WriteLine("  --- bodies with bio signals ---");
+        foreach (var b in bodies.Take(10))
+        {
+            var range = b.ValueRange is { } r2 ? $"{r2.Min,12:N0} – {r2.Max,12:N0} cr" : "  (FSS only — map it)";
+            Console.WriteLine($"      {b.SignalCount,2}  {range}  {b.BodyName}");
+        }
     }
 }

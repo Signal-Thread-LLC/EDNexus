@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Reflection;
 using EDNexus.Core.Colonisation;
 using EDNexus.Core.Engineering;
+using EDNexus.Core.Exobio;
 using EDNexus.Core.Journal;
 using EDNexus.Core.Market;
 using EDNexus.Core.Navigation;
@@ -38,6 +39,9 @@ public sealed class EngineHost : IDisposable
     /// <summary>Engineering planner: pinned-blueprint material/engineer guidance. Reads static reference data.</summary>
     public EngineeringTracker Engineering { get; }
 
+    /// <summary>Exobiology: body bio signals, three-sample scan progress, and the session's Vista Genomics tally.</summary>
+    public ExobiologyTracker Exobiology { get; }
+
     /// <summary>Cross-station "best price nearby" lookups. Backed by Spansh; swappable via <see cref="ITradeSearch"/>.</summary>
     public ITradeSearch Trade { get; }
 
@@ -66,6 +70,7 @@ public sealed class EngineHost : IDisposable
         Colonisation = new ColonisationTracker(Bus, State);
         Market = new MarketTracker(Bus, State);
         Engineering = new EngineeringTracker(Bus);
+        Exobiology = new ExobiologyTracker(Bus, State);
 
         // Shared client for outbound trade lookups. The EDDN/Inara reporters own their own client
         // inside ReporterHost, so this one is dedicated to the read-side (Spansh) queries.

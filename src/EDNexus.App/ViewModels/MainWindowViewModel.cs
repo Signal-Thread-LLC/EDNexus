@@ -51,6 +51,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             new TradeCardViewModel(_context),
             new ColonisationCardViewModel(_context),
             new MarketCardViewModel(_context),
+            new ExobiologyCardViewModel(_context),
         };
 
         DevMode = _boot.Dev.Enabled;
