@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using EDNexus.Core.Colonisation;
 using EDNexus.Core.Dev;
 using EDNexus.Core.State;
 using EDNexus.Core.Trade;
@@ -36,13 +37,18 @@ public sealed partial class TradeCardViewModel : CardViewModel
 
     /// <summary>
     /// Pre-fill the reference system and commodity from live state, but only while a field is still
-    /// empty — never clobber what the commander has typed.
+    /// empty — never clobber what the commander has typed. Limpets are skipped when guessing the
+    /// commodity: a full rack outweighs the actual haul, and nobody flies out to trade them.
     /// </summary>
     public override void Update(CommanderState s)
     {
         if (TradeReferenceSystem.Length == 0 && s.StarSystem is { Length: > 0 } sys) TradeReferenceSystem = sys;
         if (TradeCommodity.Length == 0 && !s.Cargo.IsEmpty)
-            TradeCommodity = s.Cargo.OrderByDescending(k => k.Value).First().Key;
+            TradeCommodity = s.Cargo
+                .Where(k => !CommodityName.IsLimpet(k.Key))
+                .OrderByDescending(k => k.Value)
+                .Select(k => k.Key)
+                .FirstOrDefault() ?? "";
     }
 
     [RelayCommand]

@@ -78,7 +78,7 @@ static void PrintState(CommanderState s)
     Console.WriteLine($"  Balance   : {cr(s.Balance)}");
     Console.WriteLine($"  System    : {s.StarSystem ?? "(unknown)"}");
     Console.WriteLine($"  Body      : {s.Body}");
-    Console.WriteLine($"  Location  : {(s.Docked ? $"docked at {s.StationName}" : "in flight")}");
+    Console.WriteLine($"  Location  : {(s.Docked ? $"docked at {s.StationDisplayName}" : "in flight")}");
     Console.WriteLine($"  Fuel      : {s.FuelMain:0.0}{(s.FuelCapacity > 0 ? $" / {s.FuelCapacity:0.0}" : "")} t");
     Console.WriteLine($"  Cargo     : {s.CargoTons:0} t ({s.Cargo.Count} commodities)");
 

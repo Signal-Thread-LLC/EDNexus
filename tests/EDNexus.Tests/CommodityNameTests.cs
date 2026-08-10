@@ -22,4 +22,20 @@ public class CommodityNameTests
     [InlineData("   ")]
     public void Canonicalize_returns_empty_for_blank(string? input)
         => Assert.Equal(string.Empty, CommodityName.Canonicalize(input));
+
+    [Theory]
+    [InlineData("drones")]          // journal symbol
+    [InlineData("$drones_name;")]   // wrapped symbol
+    [InlineData("Limpet")]          // localised cargo label
+    [InlineData("Limpets")]
+    public void IsLimpet_recognises_every_form_limpets_arrive_in(string input)
+        => Assert.True(CommodityName.IsLimpet(input));
+
+    [Theory]
+    [InlineData("Painite")]
+    [InlineData("$lowtemperaturediamond_name;")]
+    [InlineData(null)]
+    [InlineData("")]
+    public void IsLimpet_is_false_for_real_cargo(string? input)
+        => Assert.False(CommodityName.IsLimpet(input));
 }

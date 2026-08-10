@@ -42,4 +42,12 @@ public static class CommodityName
 
         return sb.ToString();
     }
+
+    /// <summary>
+    /// Limpets — the journal's <c>drones</c>, localised "Limpet". They occupy cargo like a commodity
+    /// but are consumable equipment: bought a hundred at a time, never hauled for profit. Anything
+    /// picking a commodity <em>for</em> the commander should skip them, because sheer tonnage would
+    /// otherwise make them the obvious pick.
+    /// </summary>
+    public static bool IsLimpet(string? raw) => Canonicalize(raw) is "drones" or "limpet" or "limpets";
 }

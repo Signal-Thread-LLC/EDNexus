@@ -77,6 +77,12 @@ public sealed class StateTracker
     {
         if (e.GetDouble("FuelLevel") is double fuel) _state.CarrierFuel = fuel;
         if (e.GetDouble("JumpRangeCurr") is double range) _state.CarrierJumpRange = range;
+
+        // The only place the carrier's chosen name is ever reported — Docked/Location carry the
+        // callsign alone. Pairing the two here is what lets the UI show "Nomad's Reach" instead
+        // of "K7Q-B3L", and only for the commander's own carrier.
+        if (e.GetString("Name") is { Length: > 0 } name) _state.CarrierName = name;
+        if (e.GetString("Callsign") is { Length: > 0 } callsign) _state.CarrierCallsign = callsign;
     }
 
     /// <summary>
@@ -103,6 +109,7 @@ public sealed class StateTracker
         _state.Body = e.GetString("Body") ?? _state.Body;
         _state.Docked = e.GetBool("Docked") ?? _state.Docked;
         _state.StationName = e.GetString("StationName");
+        _state.StationType = e.GetString("StationType");
     }
 
     private void OnJump(JournalEntry e)
@@ -111,6 +118,7 @@ public sealed class StateTracker
         _state.Body = e.GetString("Body") ?? e.GetString("StarSystem");
         _state.Docked = false;
         _state.StationName = null;
+        _state.StationType = null;
 
         // A completed carrier jump fulfils any pending request — clear it so the UI stops advertising it.
         if (e.Event == "CarrierJump")
@@ -124,12 +132,14 @@ public sealed class StateTracker
     {
         _state.Docked = true;
         _state.StationName = e.GetString("StationName");
+        _state.StationType = e.GetString("StationType");
     }
 
     private void OnUndocked(JournalEntry e)
     {
         _state.Docked = false;
         _state.StationName = null;
+        _state.StationType = null;
     }
 
     private void OnSupercruiseExit(JournalEntry e) => _state.Body = e.GetString("Body") ?? _state.Body;
