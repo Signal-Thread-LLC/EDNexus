@@ -34,7 +34,41 @@ public sealed class CommanderState : ObservableObject
     public bool Docked { get => _docked; set => Set(ref _docked, value); }
 
     private string? _stationName;
-    public string? StationName { get => _stationName; set => Set(ref _stationName, value); }
+    /// <summary>
+    /// The docked station exactly as the journal names it. For a fleet carrier that is the callsign,
+    /// not the carrier's name — read <see cref="StationDisplayName"/> when showing it to a commander.
+    /// </summary>
+    public string? StationName
+    {
+        get => _stationName;
+        set { if (Set(ref _stationName, value)) Raise(nameof(StationDisplayName)); }
+    }
+
+    private string? _stationType;
+    /// <summary>The docked station's kind, from <c>Docked</c>/<c>Location</c> (e.g. "Coriolis", "FleetCarrier"). Null when not docked.</summary>
+    public string? StationType { get => _stationType; set => Set(ref _stationType, value); }
+
+    private string? _carrierName;
+    /// <summary>The name the commander gave their own fleet carrier, from <c>CarrierStats</c>. Null until one is seen.</summary>
+    public string? CarrierName
+    {
+        get => _carrierName;
+        set { if (Set(ref _carrierName, value)) Raise(nameof(StationDisplayName)); }
+    }
+
+    private string? _carrierCallsign;
+    /// <summary>The commander's own fleet carrier callsign (e.g. "K7Q-B3L"), from <c>CarrierStats</c>. Null until one is seen.</summary>
+    public string? CarrierCallsign
+    {
+        get => _carrierCallsign;
+        set { if (Set(ref _carrierCallsign, value)) Raise(nameof(StationDisplayName)); }
+    }
+
+    /// <summary>
+    /// The docked station as a commander would name it: their own carrier's name in place of its
+    /// callsign, and <see cref="StationName"/> unchanged for everywhere else.
+    /// </summary>
+    public string? StationDisplayName => StationDisplay.Resolve(StationName, CarrierName, CarrierCallsign);
 
     private double _fuelMain;
     public double FuelMain { get => _fuelMain; set => Set(ref _fuelMain, value); }

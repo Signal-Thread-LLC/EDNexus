@@ -16,6 +16,8 @@ public sealed partial class LocationCardViewModel : CardViewModel
     {
         SystemName = s.StarSystem ?? "—";
         Body = s.Body ?? "—";
-        LocationStatus = s.Docked ? $"Docked · {s.StationName}" : "In flight";
+        // StationDisplayName, not StationName: on the commander's own carrier the journal reports
+        // only the callsign, and "Docked · K7Q-B3L" tells them nothing they don't already know.
+        LocationStatus = s.Docked ? $"Docked · {s.StationDisplayName}" : "In flight";
     }
 }

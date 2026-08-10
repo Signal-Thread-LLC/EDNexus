@@ -364,26 +364,29 @@
 
                     <!-- Materials -->
                     <TextBlock Classes="label" Text="{Binding MaterialsSummary}" Margin="0,0,0,6" />
-                    <ItemsControl ItemsSource="{Binding Materials}" MaxHeight="320">
-                      <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="vm:MaterialRow">
-                          <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,4" ToolTip.Tip="{Binding Source}">
-                            <Border Grid.Column="0" Background="#22262E" CornerRadius="4" Padding="6,2" MinWidth="44">
-                              <TextBlock Text="{Binding CategoryTag}" Foreground="{StaticResource InkDim}"
-                                         FontSize="10" HorizontalAlignment="Center" />
-                            </Border>
-                            <TextBlock Grid.Column="1" Text="{Binding Name}" Classes="value" FontSize="13"
-                                       Margin="10,0,8,0" VerticalAlignment="Center" TextWrapping="Wrap" />
-                            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                              <TextBlock Text="✓" Foreground="{StaticResource Good}" FontSize="13"
-                                         IsVisible="{Binding HasAny}" />
-                              <TextBlock Text="{Binding Held}" Classes="value" FontSize="13" MinWidth="34"
-                                         TextAlignment="Right" />
-                            </StackPanel>
-                          </Grid>
-                        </DataTemplate>
-                      </ItemsControl.ItemTemplate>
-                    </ItemsControl>
+                    <ScrollViewer MaxHeight="320" VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled">
+                      <ItemsControl ItemsSource="{Binding Materials}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:MaterialRow">
+                            <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,4" ToolTip.Tip="{Binding Source}">
+                              <Border Grid.Column="0" Background="#22262E" CornerRadius="4" Padding="6,2" MinWidth="44">
+                                <TextBlock Text="{Binding CategoryTag}" Foreground="{StaticResource InkDim}"
+                                           FontSize="10" HorizontalAlignment="Center" />
+                              </Border>
+                              <TextBlock Grid.Column="1" Text="{Binding Name}" Classes="value" FontSize="13"
+                                         Margin="10,0,8,0" VerticalAlignment="Center" TextWrapping="Wrap" />
+                              <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                <TextBlock Text="✓" Foreground="{StaticResource Good}" FontSize="13"
+                                           IsVisible="{Binding HasAny}" />
+                                <TextBlock Text="{Binding Held}" Classes="value" FontSize="13" MinWidth="34"
+                                           TextAlignment="Right" />
+                              </StackPanel>
+                            </Grid>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </ScrollViewer>
 
                     <TextBlock Classes="label" Text="{Binding OtherEngineers}" TextWrapping="Wrap" Margin="0,8,0,0"
                                IsVisible="{Binding OtherEngineers, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
@@ -441,52 +444,58 @@
 
                       <!-- Materials -->
                       <TextBlock Classes="label" Text="{Binding OnFootMaterialsSummary}" Margin="0,0,0,6" />
-                      <ItemsControl ItemsSource="{Binding OnFootMaterials}" MaxHeight="240">
-                        <ItemsControl.ItemTemplate>
-                          <DataTemplate x:DataType="vm:OnFootMaterialRow">
-                            <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,4" ToolTip.Tip="{Binding Source}">
-                              <Border Grid.Column="0" Background="#22262E" CornerRadius="4" Padding="6,2" MinWidth="44">
-                                <TextBlock Text="{Binding CategoryTag}" Foreground="{StaticResource InkDim}"
-                                           FontSize="10" HorizontalAlignment="Center" />
-                              </Border>
-                              <TextBlock Grid.Column="1" Text="{Binding Name}" Classes="value" FontSize="13"
-                                         Margin="10,0,8,0" VerticalAlignment="Center" TextWrapping="Wrap" />
-                              <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                                <TextBlock Text="✓" Foreground="{StaticResource Good}" FontSize="13"
-                                           IsVisible="{Binding Satisfied}" />
-                                <TextBlock Text="{Binding NeededVsHeld}" FontSize="13" MinWidth="60" TextAlignment="Right"
-                                           Foreground="{StaticResource Ink}" IsVisible="{Binding Satisfied}" />
-                                <TextBlock Text="{Binding NeededVsHeld}" FontSize="13" MinWidth="60" TextAlignment="Right"
-                                           Foreground="{StaticResource Bad}" IsVisible="{Binding !Satisfied}" />
-                              </StackPanel>
-                            </Grid>
-                          </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                      </ItemsControl>
+                      <ScrollViewer MaxHeight="240" VerticalScrollBarVisibility="Auto"
+                                    HorizontalScrollBarVisibility="Disabled">
+                        <ItemsControl ItemsSource="{Binding OnFootMaterials}">
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:OnFootMaterialRow">
+                              <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,4" ToolTip.Tip="{Binding Source}">
+                                <Border Grid.Column="0" Background="#22262E" CornerRadius="4" Padding="6,2" MinWidth="44">
+                                  <TextBlock Text="{Binding CategoryTag}" Foreground="{StaticResource InkDim}"
+                                             FontSize="10" HorizontalAlignment="Center" />
+                                </Border>
+                                <TextBlock Grid.Column="1" Text="{Binding Name}" Classes="value" FontSize="13"
+                                           Margin="10,0,8,0" VerticalAlignment="Center" TextWrapping="Wrap" />
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                  <TextBlock Text="✓" Foreground="{StaticResource Good}" FontSize="13"
+                                             IsVisible="{Binding Satisfied}" />
+                                  <TextBlock Text="{Binding NeededVsHeld}" FontSize="13" MinWidth="60" TextAlignment="Right"
+                                             Foreground="{StaticResource Ink}" IsVisible="{Binding Satisfied}" />
+                                  <TextBlock Text="{Binding NeededVsHeld}" FontSize="13" MinWidth="60" TextAlignment="Right"
+                                             Foreground="{StaticResource Bad}" IsVisible="{Binding !Satisfied}" />
+                                </StackPanel>
+                              </Grid>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                      </ScrollViewer>
 
                       <!-- Modifications -->
                       <TextBlock Classes="label" Text="MODIFICATIONS" Margin="0,10,0,6" />
-                      <ItemsControl ItemsSource="{Binding OnFootMods}" MaxHeight="260">
-                        <ItemsControl.ItemTemplate>
-                          <DataTemplate x:DataType="vm:ModRow">
-                            <Border Background="#0E1013" BorderBrush="{StaticResource CardBorder}" BorderThickness="1"
-                                    CornerRadius="6" Padding="10,8" Margin="0,4" ToolTip.Tip="{Binding EngineerUnlock}">
-                              <StackPanel>
-                                <TextBlock Text="{Binding Name}" Classes="value" FontSize="13" FontWeight="SemiBold" />
-                                <TextBlock Text="{Binding Effect}" Classes="label" FontSize="11" TextWrapping="Wrap" Margin="0,2,0,4" />
-                                <Grid ColumnDefinitions="*,Auto">
-                                  <TextBlock Grid.Column="0" Text="{Binding EngineerName}" Classes="label" FontSize="11" />
-                                  <TextBlock Grid.Column="1" Text="Unlocked" FontSize="11" Foreground="{StaticResource Good}"
-                                             IsVisible="{Binding EngineerUnlocked}" />
-                                  <TextBlock Grid.Column="1" Text="Locked" FontSize="11" Foreground="{StaticResource Bad}"
-                                             IsVisible="{Binding !EngineerUnlocked}" />
-                                </Grid>
-                                <TextBlock Text="{Binding EngineerLocation}" Classes="label" FontSize="11" />
-                              </StackPanel>
-                            </Border>
-                          </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                      </ItemsControl>
+                      <ScrollViewer MaxHeight="260" VerticalScrollBarVisibility="Auto"
+                                    HorizontalScrollBarVisibility="Disabled">
+                        <ItemsControl ItemsSource="{Binding OnFootMods}">
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ModRow">
+                              <Border Background="#0E1013" BorderBrush="{StaticResource CardBorder}" BorderThickness="1"
+                                      CornerRadius="6" Padding="10,8" Margin="0,4" ToolTip.Tip="{Binding EngineerUnlock}">
+                                <StackPanel>
+                                  <TextBlock Text="{Binding Name}" Classes="value" FontSize="13" FontWeight="SemiBold" />
+                                  <TextBlock Text="{Binding Effect}" Classes="label" FontSize="11" TextWrapping="Wrap" Margin="0,2,0,4" />
+                                  <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Grid.Column="0" Text="{Binding EngineerName}" Classes="label" FontSize="11" />
+                                    <TextBlock Grid.Column="1" Text="Unlocked" FontSize="11" Foreground="{StaticResource Good}"
+                                               IsVisible="{Binding EngineerUnlocked}" />
+                                    <TextBlock Grid.Column="1" Text="Locked" FontSize="11" Foreground="{StaticResource Bad}"
+                                               IsVisible="{Binding !EngineerUnlocked}" />
+                                  </Grid>
+                                  <TextBlock Text="{Binding EngineerLocation}" Classes="label" FontSize="11" />
+                                </StackPanel>
+                              </Border>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                      </ScrollViewer>
                     </StackPanel>
                   </StackPanel>
                   <!-- end ON-FOOT SIDE -->
@@ -511,21 +520,24 @@
                 </Grid>
                 <StackPanel IsVisible="{Binding !IsCollapsed}">
                   <TextBlock Classes="value" Text="{Binding CargoSummary}" Margin="0,0,0,10" />
-                  <ItemsControl ItemsSource="{Binding Cargo}" MaxHeight="220">
-                    <ItemsControl.ItemTemplate>
-                      <DataTemplate x:DataType="vm:CargoLine">
-                        <Grid ColumnDefinitions="Auto,*" Margin="0,3">
-                          <Border Grid.Column="0" Background="#22262E" CornerRadius="4"
-                                  Padding="8,2" MinWidth="44">
-                            <TextBlock Text="{Binding Count}" Foreground="{StaticResource AmberBrush}"
-                                       FontWeight="SemiBold" FontSize="13" HorizontalAlignment="Center" />
-                          </Border>
-                          <TextBlock Grid.Column="1" Text="{Binding Name}" Classes="value" FontSize="13"
-                                     Margin="10,0,0,0" VerticalAlignment="Center" />
-                        </Grid>
-                      </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                  </ItemsControl>
+                  <ScrollViewer MaxHeight="220" VerticalScrollBarVisibility="Auto"
+                                HorizontalScrollBarVisibility="Disabled">
+                    <ItemsControl ItemsSource="{Binding Cargo}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:CargoLine">
+                          <Grid ColumnDefinitions="Auto,*" Margin="0,3">
+                            <Border Grid.Column="0" Background="#22262E" CornerRadius="4"
+                                    Padding="8,2" MinWidth="44">
+                              <TextBlock Text="{Binding Count}" Foreground="{StaticResource AmberBrush}"
+                                         FontWeight="SemiBold" FontSize="13" HorizontalAlignment="Center" />
+                            </Border>
+                            <TextBlock Grid.Column="1" Text="{Binding Name}" Classes="value" FontSize="13"
+                                       Margin="10,0,0,0" VerticalAlignment="Center" />
+                          </Grid>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </ScrollViewer>
                 </StackPanel>
               </StackPanel>
             </Border>
@@ -596,29 +608,32 @@
                       </Grid>
                     </Border>
 
-                    <ItemsControl ItemsSource="{Binding RouteHops}" MaxHeight="300">
-                      <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="vm:RouteHopLine">
-                          <Grid ColumnDefinitions="18,*,Auto" Margin="0,4">
-                            <TextBlock Grid.Column="0" Text="▸" Foreground="{StaticResource AmberBrush}"
-                                       FontWeight="Bold" IsVisible="{Binding IsCurrent}" VerticalAlignment="Center" />
-                            <StackPanel Grid.Column="1" Margin="2,0,8,0" VerticalAlignment="Center">
-                              <TextBlock Text="{Binding System}" Classes="value" FontSize="13" TextWrapping="Wrap" />
-                              <StackPanel Orientation="Horizontal" Spacing="6">
-                                <TextBlock Text="{Binding Jumps}" Classes="label" FontSize="11" />
-                                <TextBlock Text="★ neutron" Foreground="{StaticResource Good}" FontSize="11"
-                                           IsVisible="{Binding IsNeutron}" />
+                    <ScrollViewer MaxHeight="300" VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled">
+                      <ItemsControl ItemsSource="{Binding RouteHops}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:RouteHopLine">
+                            <Grid ColumnDefinitions="18,*,Auto" Margin="0,4">
+                              <TextBlock Grid.Column="0" Text="▸" Foreground="{StaticResource AmberBrush}"
+                                         FontWeight="Bold" IsVisible="{Binding IsCurrent}" VerticalAlignment="Center" />
+                              <StackPanel Grid.Column="1" Margin="2,0,8,0" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding System}" Classes="value" FontSize="13" TextWrapping="Wrap" />
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                  <TextBlock Text="{Binding Jumps}" Classes="label" FontSize="11" />
+                                  <TextBlock Text="★ neutron" Foreground="{StaticResource Good}" FontSize="11"
+                                             IsVisible="{Binding IsNeutron}" />
+                                </StackPanel>
+                                <TextBlock Text="{Binding Fuel}" Classes="label" FontSize="11" TextWrapping="Wrap"
+                                           IsVisible="{Binding ShowFuel}"
+                                           Foreground="{StaticResource AmberBrush}" />
                               </StackPanel>
-                              <TextBlock Text="{Binding Fuel}" Classes="label" FontSize="11" TextWrapping="Wrap"
-                                         IsVisible="{Binding ShowFuel}"
-                                         Foreground="{StaticResource AmberBrush}" />
-                            </StackPanel>
-                            <TextBlock Grid.Column="2" Text="{Binding Remaining}" Classes="label" FontSize="11"
-                                       VerticalAlignment="Center" />
-                          </Grid>
-                        </DataTemplate>
-                      </ItemsControl.ItemTemplate>
-                    </ItemsControl>
+                              <TextBlock Grid.Column="2" Text="{Binding Remaining}" Classes="label" FontSize="11"
+                                         VerticalAlignment="Center" />
+                            </Grid>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </ScrollViewer>
                   </StackPanel>
                 </StackPanel>
               </StackPanel>
@@ -661,32 +676,35 @@
                       <TextBlock Grid.Column="2" Classes="label" Text="DIST" HorizontalAlignment="Right" />
                       <TextBlock Grid.Column="3" Classes="label" Text="" />
                     </Grid>
-                    <ItemsControl ItemsSource="{Binding TradeResults}" MaxHeight="320">
-                      <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="vm:TradeResultLine">
-                          <Grid ColumnDefinitions="*,90,70,Auto" Margin="0,5">
-                            <StackPanel Grid.Column="0" Margin="0,0,8,0" VerticalAlignment="Center">
-                              <TextBlock Text="{Binding Station}" Classes="value" FontSize="13" TextWrapping="Wrap" />
-                              <StackPanel Orientation="Horizontal" Spacing="6">
-                                <TextBlock Text="{Binding System}" Classes="label" FontSize="11" />
-                                <TextBlock Text="{Binding Age}" Classes="label" FontSize="11"
-                                           Foreground="{StaticResource InkDim}" />
+                    <ScrollViewer MaxHeight="320" VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled">
+                      <ItemsControl ItemsSource="{Binding TradeResults}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:TradeResultLine">
+                            <Grid ColumnDefinitions="*,90,70,Auto" Margin="0,5">
+                              <StackPanel Grid.Column="0" Margin="0,0,8,0" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding Station}" Classes="value" FontSize="13" TextWrapping="Wrap" />
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                  <TextBlock Text="{Binding System}" Classes="label" FontSize="11" />
+                                  <TextBlock Text="{Binding Age}" Classes="label" FontSize="11"
+                                             Foreground="{StaticResource InkDim}" />
+                                </StackPanel>
                               </StackPanel>
-                            </StackPanel>
-                            <StackPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right">
-                              <TextBlock Text="{Binding Price}" Foreground="{StaticResource AmberBrush}" FontSize="13"
-                                         FontWeight="Medium" HorizontalAlignment="Right" />
-                              <TextBlock Text="{Binding Quantity}" Classes="label" FontSize="11" HorizontalAlignment="Right" />
-                            </StackPanel>
-                            <TextBlock Grid.Column="2" Text="{Binding Distance}" Classes="value" FontSize="12"
-                                       HorizontalAlignment="Right" VerticalAlignment="Center" />
-                            <Button Grid.Column="3" Classes="mini" Content="Copy" Margin="8,0,0,0"
-                                    VerticalAlignment="Center" Command="{Binding $parent[ItemsControl].((vm:TradeCardViewModel)DataContext).CopySystemCommand}"
-                                    CommandParameter="{Binding System}" ToolTip.Tip="Copy this system" />
-                          </Grid>
-                        </DataTemplate>
-                      </ItemsControl.ItemTemplate>
-                    </ItemsControl>
+                              <StackPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right">
+                                <TextBlock Text="{Binding Price}" Foreground="{StaticResource AmberBrush}" FontSize="13"
+                                           FontWeight="Medium" HorizontalAlignment="Right" />
+                                <TextBlock Text="{Binding Quantity}" Classes="label" FontSize="11" HorizontalAlignment="Right" />
+                              </StackPanel>
+                              <TextBlock Grid.Column="2" Text="{Binding Distance}" Classes="value" FontSize="12"
+                                         HorizontalAlignment="Right" VerticalAlignment="Center" />
+                              <Button Grid.Column="3" Classes="mini" Content="Copy" Margin="8,0,0,0"
+                                      VerticalAlignment="Center" Command="{Binding $parent[ItemsControl].((vm:TradeCardViewModel)DataContext).CopySystemCommand}"
+                                      CommandParameter="{Binding System}" ToolTip.Tip="Copy this system" />
+                            </Grid>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </ScrollViewer>
                   </StackPanel>
                 </StackPanel>
               </StackPanel>
@@ -729,28 +747,31 @@
                       <TextBlock Grid.Column="3" Classes="label" Text="IN HOLD" HorizontalAlignment="Right" />
                     </Grid>
 
-                    <ItemsControl ItemsSource="{Binding ShoppingList}" MaxHeight="360">
-                      <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="vm:ShoppingLine">
-                          <Grid ColumnDefinitions="*,110,100,150" Margin="0,5">
-                            <StackPanel Grid.Column="0" Margin="0,0,12,0" VerticalAlignment="Center">
-                              <TextBlock Text="{Binding Name}" Classes="value" FontSize="13" />
-                              <ProgressBar Minimum="0" Maximum="1" Value="{Binding Fraction}" Height="4"
-                                           Foreground="{StaticResource AmberDim}" Background="#1B1E24"
-                                           Margin="0,4,0,0" />
-                            </StackPanel>
-                            <TextBlock Grid.Column="1" Text="{Binding Remaining}" Classes="value" FontSize="13"
-                                       HorizontalAlignment="Right" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="2" Text="{Binding ToBuy}" Classes="value" FontSize="13"
-                                       Foreground="{StaticResource AmberBrush}"
-                                       HorizontalAlignment="Right" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="3" Text="{Binding HoldNote}" FontSize="12"
-                                       Foreground="{StaticResource Good}" IsVisible="{Binding Carrying}"
-                                       HorizontalAlignment="Right" VerticalAlignment="Center" />
-                          </Grid>
-                        </DataTemplate>
-                      </ItemsControl.ItemTemplate>
-                    </ItemsControl>
+                    <ScrollViewer MaxHeight="360" VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled">
+                      <ItemsControl ItemsSource="{Binding ShoppingList}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:ShoppingLine">
+                            <Grid ColumnDefinitions="*,110,100,150" Margin="0,5">
+                              <StackPanel Grid.Column="0" Margin="0,0,12,0" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding Name}" Classes="value" FontSize="13" />
+                                <ProgressBar Minimum="0" Maximum="1" Value="{Binding Fraction}" Height="4"
+                                             Foreground="{StaticResource AmberDim}" Background="#1B1E24"
+                                             Margin="0,4,0,0" />
+                              </StackPanel>
+                              <TextBlock Grid.Column="1" Text="{Binding Remaining}" Classes="value" FontSize="13"
+                                         HorizontalAlignment="Right" VerticalAlignment="Center" />
+                              <TextBlock Grid.Column="2" Text="{Binding ToBuy}" Classes="value" FontSize="13"
+                                         Foreground="{StaticResource AmberBrush}"
+                                         HorizontalAlignment="Right" VerticalAlignment="Center" />
+                              <TextBlock Grid.Column="3" Text="{Binding HoldNote}" FontSize="12"
+                                         Foreground="{StaticResource Good}" IsVisible="{Binding Carrying}"
+                                         HorizontalAlignment="Right" VerticalAlignment="Center" />
+                            </Grid>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </ScrollViewer>
                   </StackPanel>
                 </StackPanel>
               </StackPanel>
@@ -777,7 +798,8 @@
                   <StackPanel IsVisible="{Binding HasMarket}">
                     <Grid ColumnDefinitions="*,Auto">
                       <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                        <TextBlock Classes="big" Text="{Binding MarketTitle}" TextWrapping="Wrap" />
+                        <TextBlock Classes="big" Text="{Binding MarketTitle}" TextWrapping="Wrap"
+                                   ToolTip.Tip="{Binding MarketTitleTip}" />
                         <TextBlock Classes="label" Text="{Binding MarketSummary}" Margin="0,4,0,0" />
                       </StackPanel>
                       <StackPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center">
@@ -796,30 +818,33 @@
                       <TextBlock Grid.Column="4" Classes="label" Text="VS MEAN" HorizontalAlignment="Right" />
                     </Grid>
 
-                    <ItemsControl ItemsSource="{Binding MarketRows}" MaxHeight="360">
-                      <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="vm:MarketLine">
-                          <Grid ColumnDefinitions="*,110,130,150,110" Margin="0,5">
-                            <TextBlock Grid.Column="0" Text="{Binding Name}" Classes="value" FontSize="13"
-                                       Margin="0,0,12,0" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="1" Text="{Binding Qty}" Classes="value" FontSize="13"
-                                       Foreground="{StaticResource InkDim}"
-                                       HorizontalAlignment="Right" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="2" Text="{Binding Unit}" Classes="value" FontSize="13"
-                                       HorizontalAlignment="Right" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="3" Text="{Binding Total}" Classes="value" FontSize="13"
-                                       Foreground="{StaticResource AmberBrush}"
-                                       HorizontalAlignment="Right" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="4" Text="{Binding VsMean}" FontSize="12"
-                                       Foreground="{StaticResource Good}" IsVisible="{Binding Good}"
-                                       HorizontalAlignment="Right" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="4" Text="{Binding VsMean}" FontSize="12"
-                                       Foreground="{StaticResource Bad}" IsVisible="{Binding Bad}"
-                                       HorizontalAlignment="Right" VerticalAlignment="Center" />
-                          </Grid>
-                        </DataTemplate>
-                      </ItemsControl.ItemTemplate>
-                    </ItemsControl>
+                    <ScrollViewer MaxHeight="360" VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled">
+                      <ItemsControl ItemsSource="{Binding MarketRows}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:MarketLine">
+                            <Grid ColumnDefinitions="*,110,130,150,110" Margin="0,5">
+                              <TextBlock Grid.Column="0" Text="{Binding Name}" Classes="value" FontSize="13"
+                                         Margin="0,0,12,0" VerticalAlignment="Center" />
+                              <TextBlock Grid.Column="1" Text="{Binding Qty}" Classes="value" FontSize="13"
+                                         Foreground="{StaticResource InkDim}"
+                                         HorizontalAlignment="Right" VerticalAlignment="Center" />
+                              <TextBlock Grid.Column="2" Text="{Binding Unit}" Classes="value" FontSize="13"
+                                         HorizontalAlignment="Right" VerticalAlignment="Center" />
+                              <TextBlock Grid.Column="3" Text="{Binding Total}" Classes="value" FontSize="13"
+                                         Foreground="{StaticResource AmberBrush}"
+                                         HorizontalAlignment="Right" VerticalAlignment="Center" />
+                              <TextBlock Grid.Column="4" Text="{Binding VsMean}" FontSize="12"
+                                         Foreground="{StaticResource Good}" IsVisible="{Binding Good}"
+                                         HorizontalAlignment="Right" VerticalAlignment="Center" />
+                              <TextBlock Grid.Column="4" Text="{Binding VsMean}" FontSize="12"
+                                         Foreground="{StaticResource Bad}" IsVisible="{Binding Bad}"
+                                         HorizontalAlignment="Right" VerticalAlignment="Center" />
+                            </Grid>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </ScrollViewer>
                   </StackPanel>
                 </StackPanel>
               </StackPanel>

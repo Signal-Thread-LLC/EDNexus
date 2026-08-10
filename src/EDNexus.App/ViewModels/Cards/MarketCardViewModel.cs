@@ -14,6 +14,8 @@ public sealed partial class MarketCardViewModel : CardViewModel
 
     [ObservableProperty] private bool _hasMarket;
     [ObservableProperty] private string _marketTitle = "—";
+    /// <summary>Callsign hint for a carrier title; null everywhere else so no empty tooltip pops up.</summary>
+    [ObservableProperty] private string? _marketTitleTip;
     [ObservableProperty] private string _marketSummary = "";
     [ObservableProperty] private string _marketHoldValue = "—";
     [ObservableProperty] private string _marketListHeader = "";
@@ -35,7 +37,7 @@ public sealed partial class MarketCardViewModel : CardViewModel
         }
 
         HasMarket = true;
-        MarketTitle = snap.StationName ?? snap.StarSystem ?? "Station market";
+        SetTitle(snap.StationName, snap.StarSystem, s);
         var sellable = snap.Commodities.Count(c => c.Sellable);
         MarketSummary = $"{snap.Commodities.Count} commodities · {sellable} the station buys";
 
@@ -64,6 +66,26 @@ public sealed partial class MarketCardViewModel : CardViewModel
                 MarketRows.Add(new MarketLine(
                     c.Name, $"{c.Demand:N0} dmd", $"{c.SellPrice:N0} cr", "", FormatVsMean(c.SellVsMean), c.SellVsMean >= 0));
         }
+    }
+
+    /// <summary>
+    /// Name the market's station the way the commander does. A fleet carrier reports only its
+    /// callsign, so substitute the carrier's name when it is theirs — and pair it with the system,
+    /// since unlike a station a carrier moves and "which one is this" means "where is it now".
+    /// The callsign stays reachable in the tooltip.
+    /// </summary>
+    private void SetTitle(string? stationName, string? starSystem, CommanderState s)
+    {
+        if (StationDisplay.IsOwnCarrier(stationName, s.CarrierCallsign))
+        {
+            var name = StationDisplay.Resolve(stationName, s.CarrierName, s.CarrierCallsign);
+            MarketTitle = starSystem is { Length: > 0 } sys ? $"{name} ({sys})" : name ?? "Station market";
+            MarketTitleTip = $"Fleet carrier {stationName}";
+            return;
+        }
+
+        MarketTitle = stationName ?? starSystem ?? "Station market";
+        MarketTitleTip = null;
     }
 
     public override void Reset()

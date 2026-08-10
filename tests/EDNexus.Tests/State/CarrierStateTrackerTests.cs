@@ -78,4 +78,93 @@ public class CarrierStateTrackerTests
         Assert.Equal("Merope", state.StarSystem);
         Assert.Equal("Ga Gu", state.CarrierPendingSystem);   // the carrier is still booked to move
     }
+
+    // --- Carrier name vs. callsign (#90). ---
+
+    private const string OwnCarrierStats = """
+    { "timestamp":"2026-07-12T02:55:06Z", "event":"CarrierStats", "CarrierID":3700005632,
+      "Callsign":"K7Q-B3L", "Name":"Nomad's Reach", "FuelLevel":638, "JumpRangeCurr":500.0 }
+    """;
+
+    private const string DockedAtOwnCarrier = """
+    { "timestamp":"2026-07-12T03:20:00Z", "event":"Docked", "StarSystem":"HIP 23759",
+      "StationName":"K7Q-B3L", "StationType":"FleetCarrier", "MarketID":3700005632 }
+    """;
+
+    [Fact]
+    public void CarrierStats_records_the_carrier_name_and_callsign()
+    {
+        var (bus, state) = NewTracker();
+        Publish(bus, OwnCarrierStats);
+
+        Assert.Equal("Nomad's Reach", state.CarrierName);
+        Assert.Equal("K7Q-B3L", state.CarrierCallsign);
+    }
+
+    [Fact]
+    public void Docking_at_your_own_carrier_displays_its_name_not_its_callsign()
+    {
+        var (bus, state) = NewTracker();
+        Publish(bus, OwnCarrierStats);
+        Publish(bus, DockedAtOwnCarrier);
+
+        Assert.Equal("K7Q-B3L", state.StationName);              // raw journal value is preserved
+        Assert.Equal("FleetCarrier", state.StationType);
+        Assert.Equal("Nomad's Reach", state.StationDisplayName); // what a commander is shown
+    }
+
+    [Fact]
+    public void Another_commanders_carrier_keeps_its_callsign()
+    {
+        var (bus, state) = NewTracker();
+        Publish(bus, OwnCarrierStats);
+        Publish(bus, """
+        { "timestamp":"2026-07-12T04:00:00Z", "event":"Docked", "StarSystem":"Deciat",
+          "StationName":"V9T-B0X", "StationType":"FleetCarrier", "MarketID":3700009999 }
+        """);
+
+        // Only the callsign is guaranteed for someone else's carrier — labelling it with our
+        // carrier's name would be worse than showing the callsign.
+        Assert.Equal("V9T-B0X", state.StationDisplayName);
+    }
+
+    [Fact]
+    public void The_callsign_stands_in_until_CarrierStats_supplies_the_name()
+    {
+        var (bus, state) = NewTracker();
+        Publish(bus, DockedAtOwnCarrier);   // docked before any CarrierStats this session
+
+        Assert.Equal("K7Q-B3L", state.StationDisplayName);
+
+        Publish(bus, OwnCarrierStats);
+        Assert.Equal("Nomad's Reach", state.StationDisplayName);
+    }
+
+    [Fact]
+    public void A_normal_station_is_unaffected_by_carrier_naming()
+    {
+        var (bus, state) = NewTracker();
+        Publish(bus, OwnCarrierStats);
+        Publish(bus, """
+        { "timestamp":"2026-07-12T05:00:00Z", "event":"Docked", "StarSystem":"Diaguandri",
+          "StationName":"Ray Gateway", "StationType":"Coriolis", "MarketID":3228024320 }
+        """);
+
+        Assert.Equal("Coriolis", state.StationType);
+        Assert.Equal("Ray Gateway", state.StationDisplayName);
+    }
+
+    [Fact]
+    public void Undocking_clears_the_station_but_keeps_the_carrier_identity()
+    {
+        var (bus, state) = NewTracker();
+        Publish(bus, OwnCarrierStats);
+        Publish(bus, DockedAtOwnCarrier);
+        Publish(bus, """{ "timestamp":"2026-07-12T03:40:00Z", "event":"Undocked", "StationName":"K7Q-B3L" }""");
+
+        Assert.False(state.Docked);
+        Assert.Null(state.StationName);
+        Assert.Null(state.StationType);
+        Assert.Equal("Nomad's Reach", state.CarrierName);   // the carrier still exists
+    }
 }

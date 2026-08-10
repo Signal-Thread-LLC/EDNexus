@@ -122,11 +122,17 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     private async Task OpenSettings()
     {
         var owner = (Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.MainWindow;
+        var wasDev = _boot.Dev.Enabled;
         var dialog = new SettingsWindow(_boot);
         if (owner is not null) await dialog.ShowDialog(owner);
         else dialog.Show();
         RefreshPrivacyStatus();
         DevMode = _boot.Dev.Enabled; // reflect a dev-mode toggle made in the settings dialog
+
+        // Leaving developer mode has to discard the fabricated state as well as the banner: those
+        // events went through the real bus into the real CommanderState, so without a rebuild the
+        // cards keep showing invented systems and cargo that no longer have a dev-mode label on them.
+        if (wasDev && !_boot.Dev.Enabled) ResetToLive();
     }
 
     [RelayCommand]
