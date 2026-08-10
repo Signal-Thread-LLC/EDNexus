@@ -255,20 +255,122 @@ public sealed class MaterialsSampleSource : JournalSampleSource
         {
             Event("Materials", o =>
             {
-                o["Raw"] = Category(rng, SamplePools.RawMaterials, 300);
-                o["Manufactured"] = Category(rng, SamplePools.ManufacturedMaterials, 250);
-                o["Encoded"] = Category(rng, SamplePools.EncodedMaterials, 200);
+                o["Raw"] = Category(rng, "Raw");
+                o["Manufactured"] = Category(rng, "Manufactured");
+                o["Encoded"] = Category(rng, "Encoded");
             }),
         };
     }
 
-    private static JsonArray Category(Random rng, IReadOnlyList<string> names, int cap)
+    /// <summary>
+    /// Draw from the real catalog and respect each material's own cap, so the inventory view's
+    /// grades, fill bars and at-cap warnings are exercised rather than approximated. Roughly one
+    /// material in six is filled right to its cap, which is what the trader hints key off.
+    /// </summary>
+    private static JsonArray Category(Random rng, string category)
     {
+        var pool = Engineering.EngineeringCatalog.Default.Materials
+            .Where(m => string.Equals(m.Category, category, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
         var arr = new JsonArray();
-        var count = rng.Next(names.Count / 2, names.Count + 1);
-        foreach (var name in SamplePools.PickDistinct(rng, names, count))
-            arr.Add(new JsonObject { ["Name"] = name, ["Count"] = rng.Next(1, cap) });
+        foreach (var material in SamplePools.PickDistinct(rng, pool, rng.Next(pool.Count / 2, pool.Count + 1)))
+        {
+            var count = rng.Next(6) == 0 ? material.Cap : rng.Next(1, material.Cap);
+            arr.Add(new JsonObject { ["Name"] = material.Symbol, ["Count"] = count });
+        }
         return arr;
+    }
+}
+
+/// <summary>
+/// A random body with biological signals, a part-finished sample run and a Vista Genomics sale,
+/// so the Exobiology card can be driven without flying to a landable world.
+/// </summary>
+public sealed class ExobiologySampleSource : JournalSampleSource
+{
+    public override string CardKey => "exobio";
+    public override string DisplayName => "Exobiology";
+
+    public override IReadOnlyList<string> Sample(Random rng)
+    {
+        var catalog = Exobio.ExobiologyCatalog.Default;
+        var system = Pick(rng, SamplePools.Systems);
+        var systemAddress = (long)rng.Next(1_000_000, int.MaxValue) * 1000;
+        var bodyId = rng.Next(1, 40);
+        var bodyName = system + Pick(rng, SamplePools.BodySuffixes);
+
+        // Genera the DSS reveals, and the species actually being sampled from one of them.
+        var genera = SamplePools.PickDistinct(rng, catalog.Genera, rng.Next(1, 4));
+        var species = Pick(rng, genera[0].Species);
+
+        var lines = new List<string>
+        {
+            Event("SAASignalsFound", o =>
+            {
+                o["BodyName"] = bodyName;
+                o["SystemAddress"] = systemAddress;
+                o["BodyID"] = bodyId;
+                o["Signals"] = new JsonArray
+                {
+                    new JsonObject
+                    {
+                        ["Type"] = "$SAA_SignalType_Biological;",
+                        ["Type_Localised"] = "Biological",
+                        ["Count"] = genera.Count,
+                    },
+                };
+                var list = new JsonArray();
+                foreach (var g in genera)
+                    list.Add(new JsonObject { ["Genus"] = g.Symbol, ["Genus_Localised"] = g.Name });
+                o["Genuses"] = list;
+            }),
+            Event("ApproachBody", o =>
+            {
+                o["StarSystem"] = system;
+                o["SystemAddress"] = systemAddress;
+                o["Body"] = bodyName;
+                o["BodyID"] = bodyId;
+            }),
+        };
+
+        // Walk a sample run part-way, or all the way, so both the in-progress and pending-sale
+        // states show up across reshuffles.
+        var stages = new[] { "Log", "Sample", "Analyse" };
+        foreach (var stage in stages.Take(rng.Next(1, 4)))
+            lines.Add(Event("ScanOrganic", o =>
+            {
+                o["ScanType"] = stage;
+                o["Genus"] = species.GenusSymbol;
+                o["Genus_Localised"] = species.Genus;
+                o["Species"] = species.Symbol;
+                o["Species_Localised"] = species.Name;
+                o["SystemAddress"] = systemAddress;
+                o["Body"] = bodyId;
+            }));
+
+        if (rng.Next(2) == 0)
+        {
+            var sold = Pick(rng, catalog.Species);
+            var firstLogged = rng.Next(4) == 0;
+            lines.Add(Event("SellOrganicData", o =>
+            {
+                o["MarketID"] = rng.Next(3_000_000, 3_900_000);
+                o["BioData"] = new JsonArray
+                {
+                    new JsonObject
+                    {
+                        ["Genus"] = sold.GenusSymbol,
+                        ["Species"] = sold.Symbol,
+                        ["Species_Localised"] = sold.Name,
+                        ["Value"] = sold.Value,
+                        ["Bonus"] = firstLogged ? sold.Value * 4 : 0,
+                    },
+                };
+            }));
+        }
+
+        return lines;
     }
 }
 

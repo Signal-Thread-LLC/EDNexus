@@ -12,17 +12,37 @@ public sealed record Engineer(
     string Unlock,
     IReadOnlyList<string> Specialities);
 
-/// <summary>A crafting material and where it is farmed. Reference data, loaded from JSON.</summary>
+/// <summary>A crafting material: where it is farmed, and what a material trader will swap it for.</summary>
 /// <param name="Symbol">Journal symbol (lowercase), matching <c>CommanderState.Materials</c> keys.</param>
 /// <param name="Category">Raw / Manufactured / Encoded — selects which inventory the held count comes from.</param>
-/// <param name="Grade">Rarity 1–5.</param>
-/// <param name="Source">Human-readable "where to find it", shown as the row tooltip.</param>
+/// <param name="Grade">Rarity 1–5 (raw materials stop at 4). Also fixes the storage cap.</param>
+/// <param name="Source">Human-readable "where to find it", shown as the row tooltip. May be empty.</param>
+/// <param name="Group">
+/// The trader group this material sits in — one of the seven numbered columns for raw materials,
+/// or a named family ("Alloys", "Wake Scans", …) for manufactured and encoded. Swapping inside a
+/// group is cheaper than crossing to another, so <see cref="Materials.MaterialTrader"/> needs it.
+/// </param>
 public sealed record MaterialInfo(
     string Symbol,
     string Name,
     string Category,
     int Grade,
-    string Source);
+    string Source,
+    string Group = "")
+{
+    /// <summary>
+    /// How many of this material the commander can hold. The cap is a pure function of grade —
+    /// the rarer the material, the fewer fit — and is the same for all three categories.
+    /// </summary>
+    public int Cap => Grade switch
+    {
+        1 => 300,
+        2 => 250,
+        3 => 200,
+        4 => 150,
+        _ => 100,
+    };
+}
 
 /// <summary>A blueprint and its per-grade ingredient lists. Reference data, loaded from JSON.</summary>
 public sealed record Blueprint(

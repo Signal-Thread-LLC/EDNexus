@@ -117,7 +117,10 @@ the required Actions secrets.
 
 - [x] Journal engine (watcher, event bus, commander state)
 - [x] Avalonia dashboard shell
-- [ ] Colonisation tracker (construction depots, shopping lists, hauling progress)
-- [ ] Market / trade search + route plotting (Spansh, EDSM)
-- [ ] Materials & exobiology tracking
+- [x] Colonisation tracker (construction depots, shopping lists, hauling progress)
+- [x] Market / trade search + route plotting (Spansh, EDSM)
+- [x] Engineering (blueprint pinning, material guidance, Odyssey on-foot upgrades)
+- [x] Materials & exobiology tracking
+- [ ] Missions, community goals & Galnet news
+- [ ] Progression & rank trackers
 - [ ] In-game overlay + voice callouts
