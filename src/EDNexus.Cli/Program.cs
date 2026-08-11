@@ -45,6 +45,7 @@ _ = new StateTracker(bus, state);
 var colonisation = new ColonisationTracker(bus, state);
 var market = new MarketTracker(bus, state);
 var exobio = new ExobiologyTracker(bus, state);
+var engineering = new EngineeringTracker(bus);
 
 var liveCounts = new SortedDictionary<string, int>();
 bus.SubscribeAny(e =>
@@ -63,6 +64,7 @@ PrintColonisation(colonisation, state);
 PrintMarket(market, state);
 PrintMaterials(state);
 PrintExobiology(exobio);
+PrintEngineers(engineering);
 if (planId is not null) PrintEngineeringPlan(planId, planGrade, planRolls, state);
 
 if (args.Contains("--once"))
@@ -84,6 +86,7 @@ PrintColonisation(colonisation, state);
 PrintMarket(market, state);
 PrintMaterials(state);
 PrintExobiology(exobio);
+PrintEngineers(engineering);
 if (liveCounts.Count > 0)
 {
     Console.WriteLine("\nLive events this session:");
@@ -285,4 +288,35 @@ static void PrintEngineeringPlan(string blueprintId, int grade, int rolls, Comma
         foreach (var t in EngineeringPlanner.TradeOptions(m, s, limit: 2))
             Console.WriteLine($"            → trade {t.Cost:N0} x {t.Source.Name} (G{t.Source.Grade})");
     }
+}
+
+/// <summary>
+/// The engineer unlock path: where the commander stands with each, and the one thing to do next.
+/// Silent when the journal has never mentioned an engineer, since then there is nothing to report.
+/// </summary>
+static void PrintEngineers(EngineeringTracker tracker)
+{
+    var standings = tracker.Standings();
+    if (standings.All(x => x.Status == EngineerStatus.Unknown)) return;
+
+    var unlocked = standings.Count(x => x.IsUnlocked);
+    var maxed = standings.Count(x => x.IsMaxed);
+
+    Console.WriteLine("\n======== Engineers ========");
+    Console.WriteLine($"  Unlocked  : {unlocked} of {standings.Count}  ({maxed} at grade 5)");
+
+    var todo = standings.Where(x => !x.IsMaxed).ToList();
+    if (todo.Count == 0)
+    {
+        Console.WriteLine("  Every engineer is at grade 5 — nothing left to unlock.");
+        return;
+    }
+
+    Console.WriteLine("  --- next step, most actionable first ---");
+    foreach (var s in todo.Take(12))
+    {
+        Console.WriteLine($"    {s.StatusLabel,-8} {s.Engineer.Name}  ({s.Engineer.Location})");
+        Console.WriteLine($"             {s.NextStep}");
+    }
+    if (todo.Count > 12) Console.WriteLine($"    … and {todo.Count - 12} more.");
 }

@@ -46,6 +46,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             new ShipCardViewModel(_context),
             new MaterialsCardViewModel(_context),
             new EngineeringCardViewModel(_context),
+            new EngineersCardViewModel(_context),
             new CargoCardViewModel(_context),
             new RouteCardViewModel(_context),
             new TradeCardViewModel(_context),
