@@ -94,7 +94,7 @@ public sealed partial class EngineeringCardViewModel : CardViewModel
             return;
         }
 
-        var plan = Context.Host.Engineering.BuildPlan(_pinnedId, _pinnedGrade, s);
+        var plan = Context.Host.Engineering.BuildPlan(_pinnedId, _pinnedGrade, s, PlannedRolls);
         if (plan is null)
         {
             // Pinned id no longer in the catalogue — fall back to the picker.
@@ -102,8 +102,9 @@ public sealed partial class EngineeringCardViewModel : CardViewModel
             return;
         }
 
-        var signature = _pinnedId + "|" + _pinnedGrade + "|" + (plan.Engineer?.Name ?? "") + "|" + plan.EngineerUnlocked
-            + "|" + string.Join(",", plan.Materials.Select(m => $"{m.Symbol}:{m.Held}"));
+        var signature = _pinnedId + "|" + _pinnedGrade + "|" + PlannedRolls + "|" + (plan.Engineer?.Name ?? "")
+            + "|" + plan.EngineerUnlocked
+            + "|" + string.Join(",", plan.Materials.Select(m => $"{m.Symbol}:{m.Needed}:{m.Held}"));
         if (signature == _signature) return;
         _signature = signature;
 
@@ -139,10 +140,40 @@ public sealed partial class EngineeringCardViewModel : CardViewModel
 
         Materials.Clear();
         foreach (var m in plan.Materials)
-            Materials.Add(new MaterialRow(m.Name, CategoryTag(m.Category), m.Held.ToString("N0"), m.HasAny, m.Source));
+            Materials.Add(new MaterialRow(
+                m.Name,
+                CategoryTag(m.Category),
+                $"{m.Held:N0} / {m.Needed:N0}",
+                m.Shortfall > 0 ? $"need {m.Shortfall:N0}" : "",
+                m.Satisfied,
+                m.Fraction,
+                TradeHint(m, s),
+                m.Source));
 
-        var have = plan.Materials.Count(m => m.HasAny);
-        MaterialsSummary = $"{have}/{plan.Materials.Count} material types in stock";
+        var short_ = plan.Materials.Count(m => !m.Satisfied);
+        MaterialsSummary = plan.Ready
+            ? $"All {plan.Materials.Count} materials aboard — ready to roll"
+            : $"{short_} of {plan.Materials.Count} materials short ({plan.Materials.Sum(m => m.Shortfall):N0} units to find)";
+    }
+
+    /// <summary>
+    /// How many rolls at the pinned grade to shop for. A good roll rarely lands first try, so the
+    /// honest shopping list is "enough for the attempts I expect", not "enough for one".
+    /// </summary>
+    [ObservableProperty] private int _plannedRolls = 1;
+
+    public int[] RollChoices { get; } = { 1, 3, 5, 10 };
+
+    partial void OnPlannedRollsChanged(int value) => _signature = "";   // recost on the next tick
+
+    /// <summary>
+    /// The cheapest trader swap that would cover a shortfall, phrased as one line. Empty when the
+    /// material is covered or nothing in the hold trades into it.
+    /// </summary>
+    private static string TradeHint(MaterialRequirement m, CommanderState s)
+    {
+        var best = EngineeringPlanner.TradeOptions(m, s, limit: 1);
+        return best.Count == 0 ? "" : $"or trade {best[0].Cost:N0} × {best[0].Source.Name}";
     }
 
     [RelayCommand]
@@ -191,7 +222,12 @@ public sealed partial class EngineeringCardViewModel : CardViewModel
 public sealed record BlueprintOption(string Id, string Label, int MaxGrade);
 
 /// <param name="CategoryTag">RAW / MANU / ENC badge.</param>
-/// <param name="HasAny">True when the commander holds at least one — until exact counts are bundled,
-/// that is treated as "covered" and the row is not flagged short.</param>
+/// <param name="Held">"held / needed" for the whole queue.</param>
+/// <param name="Short">"need N" when the hold does not cover it, otherwise empty.</param>
+/// <param name="Satisfied">The hold already covers this material.</param>
+/// <param name="Fraction">Progress towards the requirement, for the row bar.</param>
+/// <param name="TradeHint">Cheapest material-trader swap to cover the shortfall, or empty.</param>
 /// <param name="Source">Where to farm it — shown as the row tooltip.</param>
-public sealed record MaterialRow(string Name, string CategoryTag, string Held, bool HasAny, string Source);
+public sealed record MaterialRow(
+    string Name, string CategoryTag, string Held, string Short, bool Satisfied,
+    double Fraction, string TradeHint, string Source);

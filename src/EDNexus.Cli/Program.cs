@@ -1,4 +1,5 @@
 using EDNexus.Core.Colonisation;
+using EDNexus.Core.Engineering;
 using EDNexus.Core.Exobio;
 using EDNexus.Core.Journal;
 using EDNexus.Core.Market;
@@ -9,10 +10,24 @@ using EDNexus.Core.State;
 //   (no args)   resolve the journal folder, replay to warm state, then watch live.
 //   --once      replay + print final state, then exit (handy for validation / CI).
 //   --dir <p>   use a specific journal directory instead of auto-detecting.
+//   --plan <blueprint-id> [grade] [rolls]
+//               cost an engineering roll against the live inventory and print the shopping list.
+//               With no blueprint id, lists what can be planned.
 
 string? dir = null;
+string? planId = null;
+var planGrade = 5;
+var planRolls = 1;
 for (var i = 0; i < args.Length; i++)
+{
     if (args[i] == "--dir" && i + 1 < args.Length) dir = args[++i];
+    else if (args[i] == "--plan")
+    {
+        planId = i + 1 < args.Length && !args[i + 1].StartsWith("--") ? args[++i] : "";
+        if (i + 1 < args.Length && int.TryParse(args[i + 1], out var g)) { planGrade = g; i++; }
+        if (i + 1 < args.Length && int.TryParse(args[i + 1], out var r)) { planRolls = r; i++; }
+    }
+}
 
 dir ??= JournalPaths.Resolve();
 if (dir is null)
@@ -48,6 +63,7 @@ PrintColonisation(colonisation, state);
 PrintMarket(market, state);
 PrintMaterials(state);
 PrintExobiology(exobio);
+if (planId is not null) PrintEngineeringPlan(planId, planGrade, planRolls, state);
 
 if (args.Contains("--once"))
     return 0;
@@ -227,5 +243,46 @@ static void PrintExobiology(ExobiologyTracker tracker)
             var range = b.ValueRange is { } r2 ? $"{r2.Min,12:N0} – {r2.Max,12:N0} cr" : "  (FSS only — map it)";
             Console.WriteLine($"      {b.SignalCount,2}  {range}  {b.BodyName}");
         }
+    }
+}
+
+/// <summary>
+/// Cost an engineering roll against the live inventory — the shopping-list answer to
+/// "what do I still need for G5 Dirty Drives?". With no blueprint id, lists what can be planned.
+/// </summary>
+static void PrintEngineeringPlan(string blueprintId, int grade, int rolls, CommanderState s)
+{
+    var catalog = EngineeringCatalog.Default;
+
+    if (blueprintId.Length == 0 || catalog.Blueprint(blueprintId) is null)
+    {
+        if (blueprintId.Length > 0)
+            Console.WriteLine($"\nUnknown blueprint '{blueprintId}'.");
+        Console.WriteLine("\n======== Blueprints ========");
+        foreach (var b in catalog.Blueprints.OrderBy(b => b.Module).ThenBy(b => b.Name))
+            Console.WriteLine($"  {b.Id,-40}  {b.Module} — {b.Name} (to G{b.MaxGrade})");
+        return;
+    }
+
+    var blueprint = catalog.Blueprint(blueprintId)!;
+    var plan = EngineeringPlanner.Plan(blueprintId, grade, s, rolls);
+
+    Console.WriteLine($"\n======== Engineering plan ========");
+    Console.WriteLine($"  {blueprint.Module} — {blueprint.Name}  G{grade} x{rolls}");
+
+    if (plan.Materials.Count == 0)
+    {
+        Console.WriteLine($"  Grade {grade} is not defined for this blueprint (max G{blueprint.MaxGrade}).");
+        return;
+    }
+
+    Console.WriteLine($"  {(plan.Ready ? "Ready to roll — everything aboard." : $"{plan.Shopping.Count} material(s) short, {plan.TotalShortfall:N0} unit(s) to find.")}");
+    Console.WriteLine($"      {"held",6} {"need",6} {"short",6}  material");
+    foreach (var m in plan.Materials)
+    {
+        var mark = m.Satisfied ? "  " : "! ";
+        Console.WriteLine($"    {mark}{m.Held,6:N0} {m.Needed,6:N0} {m.Shortfall,6:N0}  {m.Name} (G{m.Grade} {m.Category.ToLowerInvariant()})");
+        foreach (var t in EngineeringPlanner.TradeOptions(m, s, limit: 2))
+            Console.WriteLine($"            → trade {t.Cost:N0} x {t.Source.Name} (G{t.Source.Grade})");
     }
 }

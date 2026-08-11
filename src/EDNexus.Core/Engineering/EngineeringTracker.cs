@@ -76,7 +76,8 @@ public sealed class EngineeringTracker
     /// already unlocked to the required rank) and the materials it needs joined with current holdings.
     /// Returns null if the blueprint id is unknown or the grade isn't defined.
     /// </summary>
-    public PinnedBlueprintPlan? BuildPlan(string blueprintId, int grade, CommanderState state)
+    /// <param name="rolls">How many rolls at this grade to cost for; a good result rarely lands first try.</param>
+    public PinnedBlueprintPlan? BuildPlan(string blueprintId, int grade, CommanderState state, int rolls = 1)
     {
         var blueprint = _catalog.Blueprint(blueprintId);
         var bg = blueprint?.Grade(grade);
@@ -91,18 +92,9 @@ public sealed class EngineeringTracker
 
         var others = offering.Where(x => !ReferenceEquals(x, chosen)).ToList();
 
-        var materials = bg.Ingredients.Select(symbol =>
-        {
-            var info = _catalog.Material(symbol);
-            var category = info?.Category ?? "Unknown";
-            return new MaterialRequirement(
-                Symbol: symbol,
-                Name: info?.Name ?? symbol,
-                Category: category,
-                Grade: info?.Grade ?? 0,
-                Held: HeldCount(state, category, symbol),
-                Source: info?.Source ?? "Source unknown — reference data pending.");
-        }).ToList();
+        // The material maths is the planner's job, so a single pinned roll and a whole queue
+        // compute their shortfall the same way.
+        var materials = EngineeringPlanner.Plan(blueprintId, grade, state, rolls).Materials;
 
         return new PinnedBlueprintPlan(
             blueprint, grade, chosen,

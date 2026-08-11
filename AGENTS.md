@@ -22,6 +22,10 @@ dotnet run --project src/EDNexus.App
 # This is the fastest way to validate engine/feature changes against real data.
 dotnet run --project src/EDNexus.Cli -- --once
 
+# Cost an engineering roll against the live inventory (shopping list + trader hints).
+# Omit the blueprint id to list every plannable blueprint.
+dotnet run --project src/EDNexus.Cli -- --once --plan fsd_increased_range 5 3
+
 # Unit tests (xUnit).
 dotnet test EDNexus.slnx
 ```

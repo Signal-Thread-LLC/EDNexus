@@ -440,25 +440,43 @@
                       </Grid>
                     </Border>
 
-                    <!-- Materials -->
-                    <TextBlock Classes="label" Text="{Binding MaterialsSummary}" Margin="0,0,0,6" />
+                    <!-- Shopping list: how many rolls to shop for, then held/needed per material. -->
+                    <Grid ColumnDefinitions="Auto,Auto,*" Margin="0,0,0,8">
+                      <TextBlock Grid.Column="0" Classes="label" Text="ROLLS" VerticalAlignment="Center" />
+                      <ComboBox Grid.Column="1" ItemsSource="{Binding RollChoices}" Margin="8,0,0,0"
+                                SelectedItem="{Binding PlannedRolls}" MinWidth="64"
+                                ToolTip.Tip="Shop for this many attempts at the pinned grade" />
+                    </Grid>
+                    <TextBlock Classes="label" Text="{Binding MaterialsSummary}" Margin="0,0,0,6" TextWrapping="Wrap" />
                     <ScrollViewer MaxHeight="320" VerticalScrollBarVisibility="Auto"
                                   HorizontalScrollBarVisibility="Disabled">
                       <ItemsControl ItemsSource="{Binding Materials}">
                         <ItemsControl.ItemTemplate>
                           <DataTemplate x:DataType="vm:MaterialRow">
                             <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,4" ToolTip.Tip="{Binding Source}">
-                              <Border Grid.Column="0" Background="#22262E" CornerRadius="4" Padding="6,2" MinWidth="44">
+                              <Border Grid.Column="0" Background="#22262E" CornerRadius="4" Padding="6,2" MinWidth="44"
+                                      VerticalAlignment="Top" Margin="0,2,0,0">
                                 <TextBlock Text="{Binding CategoryTag}" Foreground="{StaticResource InkDim}"
                                            FontSize="10" HorizontalAlignment="Center" />
                               </Border>
-                              <TextBlock Grid.Column="1" Text="{Binding Name}" Classes="value" FontSize="13"
-                                         Margin="10,0,8,0" VerticalAlignment="Center" TextWrapping="Wrap" />
-                              <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                                <TextBlock Text="✓" Foreground="{StaticResource Good}" FontSize="13"
-                                           IsVisible="{Binding HasAny}" />
-                                <TextBlock Text="{Binding Held}" Classes="value" FontSize="13" MinWidth="34"
-                                           TextAlignment="Right" />
+                              <StackPanel Grid.Column="1" Margin="10,0,8,0" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding Name}" Classes="value" FontSize="13" TextWrapping="Wrap" />
+                                <ProgressBar Minimum="0" Maximum="1" Value="{Binding Fraction}" Height="4"
+                                             Foreground="{StaticResource AmberDim}" Background="#1B1E24"
+                                             Margin="0,3,0,0" />
+                                <TextBlock Text="{Binding TradeHint}" Classes="label" FontSize="10" Margin="0,2,0,0"
+                                           IsVisible="{Binding TradeHint, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                              </StackPanel>
+                              <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right">
+                                <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right">
+                                  <TextBlock Text="✓" Foreground="{StaticResource Good}" FontSize="13"
+                                             IsVisible="{Binding Satisfied}" />
+                                  <TextBlock Text="{Binding Held}" Classes="value" FontSize="13"
+                                             TextAlignment="Right" />
+                                </StackPanel>
+                                <TextBlock Text="{Binding Short}" Foreground="{StaticResource Bad}" FontSize="11"
+                                           HorizontalAlignment="Right"
+                                           IsVisible="{Binding Short, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                               </StackPanel>
                             </Grid>
                           </DataTemplate>

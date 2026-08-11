@@ -56,7 +56,10 @@ public sealed class EngineeringCatalog
         var blueprints = ReadResource<List<BlueprintDto>>("blueprints.json")
             .Select(d => new Blueprint(
                 d.Id, d.Name, d.Module,
-                (d.Grades ?? new()).Select(g => new BlueprintGrade(g.Grade, g.EngineerIds ?? new(), g.Ingredients ?? new())).ToList()))
+                (d.Grades ?? new()).Select(g => new BlueprintGrade(
+                    g.Grade,
+                    g.EngineerIds ?? new(),
+                    (g.Materials ?? new()).Select(m => new BlueprintMaterial(m.Symbol, m.Count)).ToList())).ToList()))
             .ToList();
         return new EngineeringCatalog(engineers, materials, blueprints);
     }
@@ -74,5 +77,6 @@ public sealed class EngineeringCatalog
     // DTOs decouple the JSON shape from the public records (e.g. "grade" vs BlueprintGrade.GradeValue).
     private sealed record EngineerDto(string Id, string Name, string System, string Base, string Unlock, List<string>? Specialities);
     private sealed record BlueprintDto(string Id, string Name, string Module, List<BlueprintGradeDto>? Grades);
-    private sealed record BlueprintGradeDto(int Grade, List<string>? EngineerIds, List<string>? Ingredients);
+    private sealed record BlueprintGradeDto(int Grade, List<string>? EngineerIds, List<BlueprintMaterialDto>? Materials);
+    private sealed record BlueprintMaterialDto(string Symbol, int Count);
 }

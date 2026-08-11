@@ -73,12 +73,13 @@ public class EngineeringTrackerTests
 
         var arsenic = Assert.Single(plan.Materials, m => m.Symbol == "arsenic");
         Assert.Equal(7, arsenic.Held);
-        Assert.True(arsenic.HasAny);
+        Assert.True(arsenic.Satisfied);   // one arsenic needed, seven held
         Assert.Equal("Raw", arsenic.Category);
 
         var manip = Assert.Single(plan.Materials, m => m.Symbol == "chemicalmanipulators");
         Assert.Equal(0, manip.Held);
-        Assert.False(manip.HasAny);
+        Assert.False(manip.Satisfied);
+        Assert.Equal(1, manip.Shortfall);
     }
 
     [Fact]
