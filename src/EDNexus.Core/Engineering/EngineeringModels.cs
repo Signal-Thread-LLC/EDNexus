@@ -60,11 +60,14 @@ public sealed record Blueprint(
 /// <summary>One grade of a blueprint: which engineers can apply it and what it consumes.</summary>
 /// <param name="GradeValue">The grade number, 1–5.</param>
 /// <param name="EngineerIds">Ids of engineers offering this blueprint at (at least) this grade.</param>
-/// <param name="Ingredients">Material symbols required. Exact quantities are deferred for now.</param>
+/// <param name="Materials">What one roll at this grade consumes, with quantities.</param>
 public sealed record BlueprintGrade(
     int GradeValue,
     IReadOnlyList<string> EngineerIds,
-    IReadOnlyList<string> Ingredients);
+    IReadOnlyList<BlueprintMaterial> Materials);
+
+/// <summary>One ingredient of a blueprint grade: a material symbol and how many a single roll costs.</summary>
+public sealed record BlueprintMaterial(string Symbol, int Count);
 
 /// <summary>
 /// The computed picture for a pinned blueprint+grade: the engineer to visit and the material
@@ -79,18 +82,34 @@ public sealed record PinnedBlueprintPlan(
     Engineer? Engineer,
     bool EngineerUnlocked,
     IReadOnlyList<Engineer> OtherEngineers,
-    IReadOnlyList<MaterialRequirement> Materials);
+    IReadOnlyList<MaterialRequirement> Materials)
+{
+    /// <summary>Materials still short, scarcest first — the shopping list proper.</summary>
+    public IReadOnlyList<MaterialRequirement> Shopping =>
+        Materials.Where(m => !m.Satisfied).OrderByDescending(m => m.Grade).ThenBy(m => m.Name).ToList();
 
-/// <summary>One material a pinned blueprint needs, joined with the commander's current holdings.</summary>
+    /// <summary>Every material for this roll is already aboard.</summary>
+    public bool Ready => Materials.All(m => m.Satisfied);
+}
+
+/// <summary>One material a plan needs, joined with the commander's current holdings.</summary>
+/// <param name="Needed">How many the plan consumes in total (summed across a queue of rolls).</param>
 /// <param name="Held">How many the commander currently has (0 if none / unknown material).</param>
 public sealed record MaterialRequirement(
     string Symbol,
     string Name,
     string Category,
     int Grade,
+    int Needed,
     int Held,
     string Source)
 {
-    /// <summary>Until exact quantities are bundled, "having any" counts as satisfied.</summary>
-    public bool HasAny => Held > 0;
+    /// <summary>How many still have to be found. 0 once the hold covers the requirement.</summary>
+    public int Shortfall => Math.Max(0, Needed - Held);
+
+    /// <summary>The hold already covers this material — nothing to farm.</summary>
+    public bool Satisfied => Held >= Needed;
+
+    /// <summary>Progress towards the requirement, 0–1, for a per-row bar.</summary>
+    public double Fraction => Needed <= 0 ? 1 : Math.Clamp((double)Held / Needed, 0, 1);
 }

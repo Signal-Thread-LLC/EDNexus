@@ -35,6 +35,10 @@ dotnet run --project src/EDNexus.App
 
 # Headless: replay the latest journal and print current state
 dotnet run --project src/EDNexus.Cli -- --once
+
+# What do I still need for grade 5 Increased FSD Range, over 3 rolls?
+# (omit the blueprint id to list every blueprint that can be planned)
+dotnet run --project src/EDNexus.Cli -- --once --plan fsd_increased_range 5 3
 ```
 
 The journal folder is auto-detected (Windows Saved Games, and the Steam/Proton prefix on Linux).

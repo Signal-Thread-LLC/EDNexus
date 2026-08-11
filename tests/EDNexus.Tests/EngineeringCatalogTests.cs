@@ -21,9 +21,13 @@ public class EngineeringCatalogTests
     {
         foreach (var bp in _catalog.Blueprints)
         foreach (var grade in bp.Grades)
-        foreach (var symbol in grade.Ingredients)
-            Assert.True(_catalog.Material(symbol) is not null,
-                $"Blueprint '{bp.Id}' G{grade.GradeValue} references unknown material '{symbol}'.");
+        foreach (var material in grade.Materials)
+        {
+            Assert.True(_catalog.Material(material.Symbol) is not null,
+                $"Blueprint '{bp.Id}' G{grade.GradeValue} references unknown material '{material.Symbol}'.");
+            Assert.True(material.Count > 0,
+                $"Blueprint '{bp.Id}' G{grade.GradeValue} asks for {material.Count} x '{material.Symbol}'.");
+        }
     }
 
     [Fact]
@@ -32,7 +36,6 @@ public class EngineeringCatalogTests
         foreach (var bp in _catalog.Blueprints)
         foreach (var grade in bp.Grades)
         {
-            Assert.NotEmpty(grade.EngineerIds);
             foreach (var id in grade.EngineerIds)
                 Assert.True(_catalog.Engineer(id) is not null,
                     $"Blueprint '{bp.Id}' G{grade.GradeValue} references unknown engineer '{id}'.");
