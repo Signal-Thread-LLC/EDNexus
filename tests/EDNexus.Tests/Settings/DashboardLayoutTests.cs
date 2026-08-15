@@ -204,4 +204,129 @@ public class DashboardLayoutTests
         Assert.False(second.Single(c => c.Id == "location").Visible);
         Assert.Equal(920, second.Single(c => c.Id == "market").Width);
     }
+
+    // --- Hand placement: dropping a card into a column. ---
+
+    [Fact]
+    public void A_card_nobody_has_moved_is_left_for_the_packer_to_place()
+    {
+        var merged = DashboardLayout.Merge(Known("location", "ship"), null);
+
+        Assert.All(merged, c => Assert.Equal(CardLayout.AutoColumn, c.Column));
+    }
+
+    [Fact]
+    public void A_dropped_card_takes_the_column_and_lands_above_the_card_it_was_dropped_on()
+    {
+        var layout = DashboardLayout.Merge(Known("location", "ship", "market"), null);
+
+        var moved = DashboardLayout.MoveTo(layout, "market", column: 1, beforeId: "ship");
+
+        Assert.Equal(new[] { "location", "market", "ship" }, moved.Select(c => c.Id));
+        Assert.Equal(1, moved.Single(c => c.Id == "market").Column);
+    }
+
+    [Fact]
+    public void A_drop_below_a_column_parks_the_card_at_its_foot()
+    {
+        var layout = DashboardLayout.Merge(Known("location", "ship", "market"), null);
+
+        var moved = DashboardLayout.MoveTo(layout, "location", column: 2, beforeId: null);
+
+        Assert.Equal(new[] { "ship", "market", "location" }, moved.Select(c => c.Id));
+        Assert.Equal(2, moved.Single(c => c.Id == "location").Column);
+    }
+
+    [Fact]
+    public void A_card_dropped_on_itself_changes_column_without_being_flung_to_the_end()
+    {
+        // A click on a card title that travels a pixel arrives as a drop onto itself.
+        var layout = DashboardLayout.Merge(Known("location", "ship", "market"), null);
+
+        var moved = DashboardLayout.MoveTo(layout, "location", column: 0, beforeId: "location");
+
+        Assert.Equal(new[] { "location", "ship", "market" }, moved.Select(c => c.Id));
+        Assert.Equal(0, moved.Single(c => c.Id == "location").Column);
+    }
+
+    [Fact]
+    public void Placing_a_card_fixes_the_untouched_ones_where_they_are_already_drawn()
+    {
+        var layout = DashboardLayout.Merge(Known("location", "ship", "market"), null);
+
+        var pinned = DashboardLayout.Pin(layout, new Dictionary<string, int>
+        {
+            ["location"] = 0,
+            ["ship"] = 1,
+            ["market"] = 1,
+        });
+
+        Assert.Equal(0, pinned.Single(c => c.Id == "location").Column);
+        Assert.Equal(1, pinned.Single(c => c.Id == "ship").Column);
+        Assert.Equal(1, pinned.Single(c => c.Id == "market").Column);
+    }
+
+    [Fact]
+    public void Pinning_leaves_a_column_a_commander_chose_alone_and_skips_cards_that_are_not_drawn()
+    {
+        var layout = DashboardLayout.Merge(Known("location", "ship"), null).ToList();
+        layout[0].Column = 3;   // already placed by hand
+
+        // "ship" is hidden, so it never rendered and has no column to be fixed to.
+        var pinned = DashboardLayout.Pin(layout, new Dictionary<string, int> { ["location"] = 0 });
+
+        Assert.Equal(3, pinned.Single(c => c.Id == "location").Column);
+        Assert.Equal(CardLayout.AutoColumn, pinned.Single(c => c.Id == "ship").Column);
+    }
+
+    [Fact]
+    public void Move_steps_through_the_cards_sharing_a_column_not_the_flat_list()
+    {
+        // Two columns interleaved in the flat order: moving "market" up has to step over "ship",
+        // which is in the other column, and swap it with "location".
+        var layout = DashboardLayout.Merge(Known("location", "ship", "market"), null).ToList();
+        layout[0].Column = 0;   // location
+        layout[1].Column = 1;   // ship
+        layout[2].Column = 0;   // market
+
+        var moved = DashboardLayout.Move(layout, "market", -1);
+
+        Assert.Equal(new[] { "market", "location", "ship" }, moved.Select(c => c.Id));
+    }
+
+    [Fact]
+    public void Move_does_nothing_for_a_card_already_at_the_top_of_its_column()
+    {
+        var layout = DashboardLayout.Merge(Known("location", "ship"), null).ToList();
+        layout[0].Column = 0;
+        layout[1].Column = 1;
+
+        var moved = DashboardLayout.Move(layout, "ship", -1);
+
+        Assert.Equal(new[] { "location", "ship" }, moved.Select(c => c.Id));
+    }
+
+    [Fact]
+    public void Reset_hands_every_card_back_to_the_packer()
+    {
+        var layout = DashboardLayout.Merge(Known("location", "ship"), null).ToList();
+        layout[0].Column = 2;
+        layout[1].Column = 3;
+
+        var defaults = DashboardLayout.Defaults(Known("location", "ship"));
+
+        Assert.All(defaults, c => Assert.Equal(CardLayout.AutoColumn, c.Column));
+    }
+
+    [Fact]
+    public void A_hand_placed_column_survives_a_save_and_reload_round_trip()
+    {
+        var known = Known("location", "ship");
+        var placed = DashboardLayout.MoveTo(DashboardLayout.Merge(known, null), "ship", 2, null);
+
+        var reloaded = DashboardLayout.Merge(known, placed);
+
+        Assert.Equal(2, reloaded.Single(c => c.Id == "ship").Column);
+        Assert.Equal(CardLayout.AutoColumn, reloaded.Single(c => c.Id == "location").Column);
+    }
 }

@@ -81,5 +81,8 @@ public static class DashboardLayoutFile
         Visible = c.Visible,
         Width = c.Width,
         Collapsed = c.Collapsed,
+        // Absent from files written before hand-placement existed, and the property initialiser
+        // leaves those on automatic placement rather than pinning them all to column 0.
+        Column = c.Column,
     };
 }

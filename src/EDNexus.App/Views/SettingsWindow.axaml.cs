@@ -17,8 +17,16 @@ public partial class SettingsWindow : Window
     // the window is opened without one (the designer, and the pre-layout call sites).
     private readonly ViewModels.MainWindowViewModel? _dashboard;
 
+    // Leaves room for the title bar and a little breathing space around the edges, so the capped
+    // dialog still reads as a window rather than filling the display corner to corner.
+    private const double ScreenMargin = 80;
+
     // Parameterless ctor for the XAML previewer / designer.
-    public SettingsWindow() => InitializeComponent();
+    public SettingsWindow()
+    {
+        InitializeComponent();
+        FitToScreen();
+    }
 
     public SettingsWindow(Bootstrap boot, ViewModels.MainWindowViewModel? dashboard = null) : this()
     {
@@ -38,6 +46,45 @@ public partial class SettingsWindow : Window
 
         UpdateStatus();
         UpdateVersionAndUpdateLine();
+    }
+
+    /// <summary>
+    /// The window auto-sizes to its content, which grows every time a section is added and had
+    /// started running off the bottom of shorter (or scaled) displays. Cap both dimensions to the
+    /// screen's working area — the body <see cref="ScrollViewer"/> takes over from there, and the
+    /// masonry panel just packs into fewer columns when the width has to come down.
+    /// </summary>
+    private void FitToScreen()
+    {
+        try
+        {
+            // Before Show() there is no owner and no placement yet, so fall back to the primary
+            // screen; OnOpened re-runs this once we know which display we actually landed on.
+            var screen = (Owner is WindowBase owner ? Screens.ScreenFromWindow(owner) : null)
+                         ?? Screens.ScreenFromWindow(this)
+                         ?? Screens.Primary;
+            if (screen is null) return;
+
+            // WorkingArea is in physical pixels; window sizes are in device-independent units.
+            var usable = screen.WorkingArea.Size.ToSize(screen.Scaling);
+
+            MaxHeight = Math.Max(MinHeight, usable.Height - ScreenMargin);
+            MaxWidth = Math.Max(MinWidth, usable.Width - ScreenMargin);
+
+            // The default width buys a second column of settings; on a small display take what
+            // fits instead, rather than opening wider than the desktop.
+            Width = Math.Min(Width, MaxWidth);
+        }
+        catch (ObjectDisposedException)
+        {
+            // The platform window went away mid-query; the uncapped default is harmless here.
+        }
+    }
+
+    protected override void OnOpened(EventArgs e)
+    {
+        base.OnOpened(e);
+        FitToScreen();
     }
 
     private void UpdateStatus()

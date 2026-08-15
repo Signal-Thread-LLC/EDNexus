@@ -1,138 +1,154 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:EDNexus.App.ViewModels"
+        xmlns:controls="clr-namespace:EDNexus.App.Controls"
         x:Class="EDNexus.App.Views.SettingsWindow"
         Title="EDNexus — Settings"
         Icon="/Assets/ednexus.png"
-        Width="520" SizeToContent="Height"
+        Width="880" SizeToContent="Height"
+        MinWidth="380" MinHeight="240"
         WindowStartupLocation="CenterOwner"
-        CanResize="False" Background="#14161A">
-  <StackPanel Margin="24" Spacing="16">
-    <TextBlock Text="SETTINGS" Foreground="#F07100" FontSize="12" FontWeight="SemiBold" LetterSpacing="2" />
-
-    <Border Background="#0F1114" CornerRadius="6" Padding="16">
-      <StackPanel Spacing="10">
-        <CheckBox x:Name="CrashToggle" Content="Send anonymous crash &amp; error reports"
-                  Foreground="#E7E9EE" />
-        <TextBlock Foreground="#8A909C" FontSize="12" TextWrapping="Wrap"
-                   Text="App version, OS, and errors with stack traces, plus a random install id. Never your commander name, systems, journal contents, or user name / paths." />
-        <TextBlock x:Name="StatusLine" Foreground="#8A909C" FontSize="11" />
+        CanResize="True" Background="#14161A">
+  <!-- The dialog auto-sizes to its content but is capped to the display in code-behind, so the body
+       scrolls rather than running off the bottom of a short screen. The action row is docked so
+       Save/Close stay reachable however far the body has scrolled. -->
+  <DockPanel>
+    <Border DockPanel.Dock="Bottom" BorderBrush="#242830" BorderThickness="0,1,0,0" Padding="24,14">
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
+        <Button Content="Open logs" Click="OnOpenLogs" Padding="16,8" />
+        <Button Content="Close" Click="OnClose" Padding="16,8" />
+        <Button Content="Save" Click="OnSave" Padding="16,8"
+                Background="#F07100" Foreground="#101216" FontWeight="SemiBold" />
       </StackPanel>
     </Border>
 
-    <TextBlock Text="DATA REPORTING" Foreground="#F07100" FontSize="12" FontWeight="SemiBold" LetterSpacing="2" />
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+      <!-- Each section is a free-standing block: the panel packs them into however many columns the
+           current width fits, so nothing is padded out to match a neighbour's height. -->
+      <controls:MasonryPanel Margin="24,24,24,20" MinColumnWidth="340" ColumnSpacing="16" RowSpacing="16">
 
-    <Border Background="#0F1114" CornerRadius="6" Padding="16">
-      <StackPanel Spacing="10">
-        <CheckBox x:Name="EddnToggle" Content="Contribute anonymized data to EDDN"
-                  Foreground="#E7E9EE" />
-        <TextBlock Foreground="#8A909C" FontSize="12" TextWrapping="Wrap"
-                   Text="Uploads market, scan, and travel data to the community Elite Dangerous Data Network. The relay obfuscates your uploader id — no personal identity is shared." />
-      </StackPanel>
-    </Border>
-
-    <Border Background="#0F1114" CornerRadius="6" Padding="16">
-      <StackPanel Spacing="10">
-        <CheckBox x:Name="InaraToggle" Content="Sync my commander to Inara"
-                  Foreground="#E7E9EE" />
-        <TextBlock Foreground="#8A909C" FontSize="12" TextWrapping="Wrap"
-                   Text="Sends your identity, credits, ranks, and travel to your Inara profile on session start, docking, and FSD jumps. Requires your personal Inara API key (Inara → Profile → API keys)." />
-        <!-- Masked by default: keys get leaked through streams and screenshots, not local attackers. -->
-        <Grid ColumnDefinitions="*,Auto">
-          <TextBox x:Name="InaraApiKey" PlaceholderText="Inara API key" PasswordChar="●"
-                   Foreground="#E7E9EE" Background="#14161A" />
-          <CheckBox x:Name="RevealApiKey" Grid.Column="1" Content="Show" Margin="10,0,0,0"
-                    Foreground="#8A909C" IsCheckedChanged="OnRevealApiKeyChanged" />
-        </Grid>
-      </StackPanel>
-    </Border>
-
-    <TextBlock Text="UPDATES" Foreground="#F07100" FontSize="12" FontWeight="SemiBold" LetterSpacing="2" />
-    <Border Background="#0F1114" CornerRadius="6" Padding="16">
-      <StackPanel Spacing="10">
-        <CheckBox x:Name="AutoDownloadToggle" Content="Automatically download updates on startup"
-                  Foreground="#E7E9EE" />
-        <TextBlock Foreground="#8A909C" FontSize="12" TextWrapping="Wrap"
-                   Text="When enabled, EDNexus will fetch the latest GitHub release asset for your platform and download it to your temp folder. Installation must still be performed by the user." />
-
-        <StackPanel Orientation="Horizontal" Spacing="10">
-          <TextBlock Text="Version:" Foreground="#E7E9EE" VerticalAlignment="Center" />
-          <TextBlock x:Name="VersionLine" Foreground="#8A909C" />
-          <TextBlock Width="24" />
-          <TextBlock Text="Update:" Foreground="#E7E9EE" VerticalAlignment="Center" />
-          <TextBlock x:Name="UpdateLine" Foreground="#8A909C" />
+        <StackPanel Spacing="8">
+          <TextBlock Text="PRIVACY" Foreground="#F07100" FontSize="12" FontWeight="SemiBold" LetterSpacing="2" />
+          <Border Background="#0F1114" CornerRadius="6" Padding="16">
+            <StackPanel Spacing="10">
+              <CheckBox x:Name="CrashToggle" Content="Send anonymous crash &amp; error reports"
+                        Foreground="#E7E9EE" />
+              <TextBlock Foreground="#8A909C" FontSize="12" TextWrapping="Wrap"
+                         Text="App version, OS, and errors with stack traces, plus a random install id. Never your commander name, systems, journal contents, or user name / paths." />
+              <TextBlock x:Name="StatusLine" Foreground="#8A909C" FontSize="11" TextWrapping="Wrap" />
+            </StackPanel>
+          </Border>
         </StackPanel>
 
-        <StackPanel Spacing="6">
-          <Button x:Name="CheckNowButton" Content="Check for updates now" Click="OnCheckNow" Padding="10" HorizontalAlignment="Left" />
-        </StackPanel>
-      </StackPanel>
-    </Border>
+        <StackPanel Spacing="8">
+          <TextBlock Text="DATA REPORTING" Foreground="#F07100" FontSize="12" FontWeight="SemiBold" LetterSpacing="2" />
+          <Border Background="#0F1114" CornerRadius="6" Padding="16">
+            <StackPanel Spacing="10">
+              <CheckBox x:Name="EddnToggle" Content="Contribute anonymized data to EDDN"
+                        Foreground="#E7E9EE" />
+              <TextBlock Foreground="#8A909C" FontSize="12" TextWrapping="Wrap"
+                         Text="Uploads market, scan, and travel data to the community Elite Dangerous Data Network. The relay obfuscates your uploader id — no personal identity is shared." />
+            </StackPanel>
+          </Border>
 
-    <!-- Dashboard layout — order, width and visibility per card. Bound to the live card list, so
-         changes take effect on the dashboard behind this window immediately. -->
-    <StackPanel x:Name="DashboardSection" Spacing="8">
-      <Grid ColumnDefinitions="*,Auto">
-        <TextBlock Grid.Column="0" Text="DASHBOARD" Foreground="#F07100" FontSize="12"
-                   FontWeight="SemiBold" LetterSpacing="2" VerticalAlignment="Center" />
-        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
-          <Button x:Name="ExportLayoutButton" Content="Export…" Click="OnExportLayout"
-                  Padding="10,4" FontSize="12"
-                  ToolTip.Tip="Save this arrangement to a file you can carry to another machine" />
-          <Button x:Name="ImportLayoutButton" Content="Import…" Click="OnImportLayout"
-                  Padding="10,4" FontSize="12"
-                  ToolTip.Tip="Load an arrangement exported from another machine" />
-          <Button x:Name="ResetLayoutButton" Content="Reset" Click="OnResetLayout"
-                  Padding="10,4" FontSize="12" ToolTip.Tip="Restore the shipped order, widths and visibility" />
+          <Border Background="#0F1114" CornerRadius="6" Padding="16">
+            <StackPanel Spacing="10">
+              <CheckBox x:Name="InaraToggle" Content="Sync my commander to Inara"
+                        Foreground="#E7E9EE" />
+              <TextBlock Foreground="#8A909C" FontSize="12" TextWrapping="Wrap"
+                         Text="Sends your identity, credits, ranks, and travel to your Inara profile on session start, docking, and FSD jumps. Requires your personal Inara API key (Inara → Profile → API keys)." />
+              <!-- Masked by default: keys get leaked through streams and screenshots, not local attackers. -->
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBox x:Name="InaraApiKey" PlaceholderText="Inara API key" PasswordChar="●"
+                         Foreground="#E7E9EE" Background="#14161A" />
+                <CheckBox x:Name="RevealApiKey" Grid.Column="1" Content="Show" Margin="10,0,0,0"
+                          Foreground="#8A909C" IsCheckedChanged="OnRevealApiKeyChanged" />
+              </Grid>
+            </StackPanel>
+          </Border>
         </StackPanel>
-      </Grid>
-      <Border Background="#0F1114" CornerRadius="6" Padding="16">
-        <StackPanel Spacing="10">
-          <TextBlock Foreground="#8A909C" FontSize="12" TextWrapping="Wrap"
-                     Text="Reorder, resize and hide cards. Wide cards take a full row; narrow ones sit two to a row. Collapsing a card from its header is remembered too. Export carries only the layout — never your Inara key — so it is safe to sync or share." />
-          <TextBlock x:Name="LayoutStatus" Foreground="#F07100" FontSize="12" TextWrapping="Wrap" IsVisible="False" />
-          <ScrollViewer MaxHeight="320" VerticalScrollBarVisibility="Auto"
-                        HorizontalScrollBarVisibility="Disabled">
-            <ItemsControl x:Name="CardList">
-              <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="vm:CardViewModel">
-                  <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto" Margin="0,3">
-                    <Button Grid.Column="0" Content="▲" Padding="8,2" FontSize="11" MinWidth="30"
-                            Click="OnMoveCardUp" Tag="{Binding Id}" ToolTip.Tip="Move earlier" />
-                    <Button Grid.Column="1" Content="▼" Padding="8,2" FontSize="11" MinWidth="30" Margin="4,0,0,0"
-                            Click="OnMoveCardDown" Tag="{Binding Id}" ToolTip.Tip="Move later" />
-                    <TextBlock Grid.Column="2" Text="{Binding Title}" Foreground="#E7E9EE" FontSize="13"
-                               VerticalAlignment="Center" Margin="10,0,8,0" />
-                    <Button Grid.Column="3" Content="{Binding WidthGlyph}" Padding="8,2" FontSize="11" MinWidth="34"
-                            Command="{Binding ToggleWidthCommand}" ToolTip.Tip="Toggle narrow / wide" />
-                    <CheckBox Grid.Column="4" Content="Show" Margin="10,0,0,0" Foreground="#E7E9EE"
-                              FontSize="12" IsChecked="{Binding IsVisible}" />
-                  </Grid>
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
-          </ScrollViewer>
-        </StackPanel>
-      </Border>
-    </StackPanel>
 
-    <!-- Developer options — hidden entirely when the dev tools are stripped/disabled (FeatureFlags). -->
-    <StackPanel x:Name="DevSection" Spacing="8" IsVisible="False">
-      <TextBlock Text="DEVELOPER OPTIONS" Foreground="#F07100" FontSize="12" FontWeight="SemiBold" LetterSpacing="2" />
-      <Border Background="#0F1114" CornerRadius="6" Padding="16">
-        <StackPanel Spacing="10">
-          <CheckBox x:Name="DevModeToggle" Content="Enable developer mode" Foreground="#E7E9EE" />
-          <TextBlock Foreground="#8A909C" FontSize="12" TextWrapping="Wrap"
-                     Text="Adds a 🎲 control to each dashboard card to fabricate random-but-valid state, plus &quot;Randomize all&quot; and &quot;Reset to live data&quot;. For testing only — this resets to off every launch and is not saved. While it is on, EDDN/Inara reporting is paused so fabricated data is never sent." />
-        </StackPanel>
-      </Border>
-    </StackPanel>
+        <StackPanel Spacing="8">
+          <TextBlock Text="UPDATES" Foreground="#F07100" FontSize="12" FontWeight="SemiBold" LetterSpacing="2" />
+          <Border Background="#0F1114" CornerRadius="6" Padding="16">
+            <StackPanel Spacing="10">
+              <CheckBox x:Name="AutoDownloadToggle" Content="Automatically download updates on startup"
+                        Foreground="#E7E9EE" />
+              <TextBlock Foreground="#8A909C" FontSize="12" TextWrapping="Wrap"
+                         Text="When enabled, EDNexus will fetch the latest GitHub release asset for your platform and download it to your temp folder. Installation must still be performed by the user." />
 
-    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
-      <Button Content="Open logs" Click="OnOpenLogs" Padding="16,8" />
-      <Button Content="Close" Click="OnClose" Padding="16,8" />
-      <Button Content="Save" Click="OnSave" Padding="16,8"
-              Background="#F07100" Foreground="#101216" FontWeight="SemiBold" />
-    </StackPanel>
-  </StackPanel>
+              <!-- Wraps rather than clipping: the update line can be a long file name in a narrow column. -->
+              <WrapPanel ItemSpacing="10" LineSpacing="4">
+                <TextBlock Text="Version:" Foreground="#E7E9EE" VerticalAlignment="Center" />
+                <TextBlock x:Name="VersionLine" Foreground="#8A909C" VerticalAlignment="Center" />
+                <TextBlock Text="Update:" Foreground="#E7E9EE" VerticalAlignment="Center" Margin="14,0,0,0" />
+                <TextBlock x:Name="UpdateLine" Foreground="#8A909C" VerticalAlignment="Center" />
+              </WrapPanel>
+
+              <Button x:Name="CheckNowButton" Content="Check for updates now" Click="OnCheckNow"
+                      Padding="10" HorizontalAlignment="Left" />
+            </StackPanel>
+          </Border>
+        </StackPanel>
+
+        <!-- Dashboard layout — order, width and visibility per card. Bound to the live card list, so
+             changes take effect on the dashboard behind this window immediately. -->
+        <StackPanel x:Name="DashboardSection" Spacing="8">
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBlock Grid.Column="0" Text="DASHBOARD" Foreground="#F07100" FontSize="12"
+                       FontWeight="SemiBold" LetterSpacing="2" VerticalAlignment="Center" />
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+              <Button x:Name="ExportLayoutButton" Content="Export…" Click="OnExportLayout"
+                      Padding="10,4" FontSize="12"
+                      ToolTip.Tip="Save this arrangement to a file you can carry to another machine" />
+              <Button x:Name="ImportLayoutButton" Content="Import…" Click="OnImportLayout"
+                      Padding="10,4" FontSize="12"
+                      ToolTip.Tip="Load an arrangement exported from another machine" />
+              <Button x:Name="ResetLayoutButton" Content="Reset" Click="OnResetLayout"
+                      Padding="10,4" FontSize="12" ToolTip.Tip="Restore the shipped order and widths, and hand placement back to automatic packing" />
+            </StackPanel>
+          </Grid>
+          <Border Background="#0F1114" CornerRadius="6" Padding="16">
+            <StackPanel Spacing="10">
+              <TextBlock Foreground="#8A909C" FontSize="12" TextWrapping="Wrap"
+                         Text="Drag a card by its title to move it to another column or position on the dashboard — that arrangement is saved. The arrows move a card within its own column. Until you move one, cards are packed automatically into as many columns as the window is wide; a wide card claims two of those columns, a narrow one claims one. Collapsing a card from its header is remembered too. Export carries only the layout — never your Inara key — so it is safe to sync or share." />
+              <TextBlock x:Name="LayoutStatus" Foreground="#F07100" FontSize="12" TextWrapping="Wrap" IsVisible="False" />
+              <!-- No inner scroller: the dialog scrolls as a whole now, and a nested scroll region
+                   steals the wheel from the page it sits in. -->
+              <ItemsControl x:Name="CardList">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:CardViewModel">
+                    <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto" Margin="0,3">
+                      <Button Grid.Column="0" Content="▲" Padding="8,2" FontSize="11" MinWidth="30"
+                              Click="OnMoveCardUp" Tag="{Binding Id}" ToolTip.Tip="Move up within its column" />
+                      <Button Grid.Column="1" Content="▼" Padding="8,2" FontSize="11" MinWidth="30" Margin="4,0,0,0"
+                              Click="OnMoveCardDown" Tag="{Binding Id}" ToolTip.Tip="Move down within its column" />
+                      <TextBlock Grid.Column="2" Text="{Binding Title}" Foreground="#E7E9EE" FontSize="13"
+                                 VerticalAlignment="Center" Margin="10,0,8,0" TextTrimming="CharacterEllipsis" />
+                      <Button Grid.Column="3" Content="{Binding WidthGlyph}" Padding="8,2" FontSize="11" MinWidth="34"
+                              Command="{Binding ToggleWidthCommand}" ToolTip.Tip="Toggle narrow / wide" />
+                      <CheckBox Grid.Column="4" Content="Show" Margin="10,0,0,0" Foreground="#E7E9EE"
+                                FontSize="12" IsChecked="{Binding IsVisible}" />
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+          </Border>
+        </StackPanel>
+
+        <!-- Developer options — hidden entirely when the dev tools are stripped/disabled (FeatureFlags). -->
+        <StackPanel x:Name="DevSection" Spacing="8" IsVisible="False">
+          <TextBlock Text="DEVELOPER OPTIONS" Foreground="#F07100" FontSize="12" FontWeight="SemiBold" LetterSpacing="2" />
+          <Border Background="#0F1114" CornerRadius="6" Padding="16">
+            <StackPanel Spacing="10">
+              <CheckBox x:Name="DevModeToggle" Content="Enable developer mode" Foreground="#E7E9EE" />
+              <TextBlock Foreground="#8A909C" FontSize="12" TextWrapping="Wrap"
+                         Text="Adds a 🎲 control to each dashboard card to fabricate random-but-valid state, plus &quot;Randomize all&quot; and &quot;Reset to live data&quot;. For testing only — this resets to off every launch and is not saved. While it is on, EDDN/Inara reporting is paused so fabricated data is never sent." />
+            </StackPanel>
+          </Border>
+        </StackPanel>
+      </controls:MasonryPanel>
+    </ScrollViewer>
+  </DockPanel>
 </Window>

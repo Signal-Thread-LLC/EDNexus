@@ -126,4 +126,38 @@ public class DashboardLayoutFileTests
         read[0].Width = 920;
         Assert.Equal(452, source[0].Width);
     }
+
+    [Fact]
+    public void An_exported_layout_carries_the_columns_cards_were_placed_in()
+    {
+        var source = new[] { Card("market", 0), Card("location", 1) };
+        source[0].Column = 2;
+
+        var read = DashboardLayoutFile.TryRead(DashboardLayoutFile.Write(source))!;
+
+        Assert.Equal(2, read.Single(c => c.Id == "market").Column);
+        Assert.Equal(CardLayout.AutoColumn, read.Single(c => c.Id == "location").Column);
+    }
+
+    [Fact]
+    public void A_layout_exported_before_cards_could_be_placed_by_hand_still_imports()
+    {
+        // No "column" anywhere — every card must come back on automatic placement, not pinned to
+        // column 0, which is what a plain int default would have given us.
+        const string legacy = """
+        {
+          "kind": "ednexus.dashboard-layout",
+          "version": 1,
+          "cards": [
+            { "id": "market", "order": 0, "visible": true, "width": 920, "collapsed": false },
+            { "id": "location", "order": 1, "visible": true, "width": 452, "collapsed": false }
+          ]
+        }
+        """;
+
+        var read = DashboardLayoutFile.TryRead(legacy);
+
+        Assert.NotNull(read);
+        Assert.All(read!, c => Assert.Equal(CardLayout.AutoColumn, c.Column));
+    }
 }
