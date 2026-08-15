@@ -11,12 +11,19 @@ public partial class SettingsWindow : Window
 {
     private readonly Bootstrap? _boot;
 
+    // The live dashboard, so the layout controls drive the real cards rather than a copy. Null when
+    // the window is opened without one (the designer, and the pre-layout call sites).
+    private readonly ViewModels.MainWindowViewModel? _dashboard;
+
     // Parameterless ctor for the XAML previewer / designer.
     public SettingsWindow() => InitializeComponent();
 
-    public SettingsWindow(Bootstrap boot) : this()
+    public SettingsWindow(Bootstrap boot, ViewModels.MainWindowViewModel? dashboard = null) : this()
     {
         _boot = boot;
+        _dashboard = dashboard;
+        DashboardSection.IsVisible = dashboard is not null;
+        if (dashboard is not null) CardList.ItemsSource = dashboard.Cards;
         CrashToggle.IsChecked = boot.Settings.CrashReportingEnabled == true;
         EddnToggle.IsChecked = boot.Settings.Reporting.Eddn.Enabled;
         InaraToggle.IsChecked = boot.Settings.Reporting.Inara.Enabled;
@@ -149,5 +156,34 @@ public partial class SettingsWindow : Window
             CheckNowButton.IsEnabled = true;
         }
     }
-}
 
+    // --- Dashboard layout ---
+
+    private void OnMoveCardUp(object? sender, RoutedEventArgs e) => MoveCard(sender, up: true);
+
+    private void OnMoveCardDown(object? sender, RoutedEventArgs e) => MoveCard(sender, up: false);
+
+    /// <summary>
+    /// The row's card id rides on the button's Tag, because the reorder commands live on the
+    /// dashboard rather than the card being moved.
+    /// </summary>
+    private void MoveCard(object? sender, bool up)
+    {
+        if (_dashboard is null || sender is not Control { Tag: string id }) return;
+
+        if (up) _dashboard.MoveCardUpCommand.Execute(id);
+        else _dashboard.MoveCardDownCommand.Execute(id);
+
+        // The dashboard rebuilds its collection to reorder, so rebind to show the new order here.
+        CardList.ItemsSource = null;
+        CardList.ItemsSource = _dashboard.Cards;
+    }
+
+    private void OnResetLayout(object? sender, RoutedEventArgs e)
+    {
+        if (_dashboard is null) return;
+        _dashboard.ResetLayoutCommand.Execute(null);
+        CardList.ItemsSource = null;
+        CardList.ItemsSource = _dashboard.Cards;
+    }
+}
