@@ -4,95 +4,274 @@
     "name": "Felicity Farseer",
     "system": "Deciat",
     "base": "Farseer Inc",
-    "unlock": "Gain exploration rank Scout or higher, then gift 1 unit of Meta Alloys.",
-    "specialities": [ "Frame Shift Drives", "Thrusters", "Sensors", "Detailed Surface Scanner" ]
+    "referredBy": [],
+    "invite": "Reach exploration rank Scout or higher.",
+    "unlock": "Gift 1 unit of Meta Alloys.",
+    "specialities": ["Frame Shift Drives", "Thrusters", "Sensors", "Detailed Surface Scanner"],
+    "topSpecialities": ["Frame Shift Drives"]
   },
   {
     "id": "martuuk",
     "name": "Elvira Martuuk",
     "system": "Khun",
     "base": "Long Sight Base",
-    "unlock": "Travel 300 Ly or more from your career start system, then gift 3 units of Soontill Relics.",
-    "specialities": [ "Frame Shift Drives", "Shield Generators", "Thrusters", "Shield Boosters" ]
+    "referredBy": [],
+    "invite": "Travel at least 300 ly from your starting system.",
+    "unlock": "Gift 3 units of Soontill Relics.",
+    "specialities": ["Frame Shift Drives", "Shield Generators", "Thrusters", "Shield Boosters"],
+    "topSpecialities": ["Frame Shift Drives"]
   },
   {
     "id": "dweller",
     "name": "The Dweller",
     "system": "Wyrd",
     "base": "Black Hide",
-    "unlock": "Deal with at least 5 black-market contacts, then pay 500,000 Cr.",
-    "specialities": [ "Power Distributors", "Pulse Lasers", "Burst Lasers" ]
+    "referredBy": [],
+    "invite": "Deal with black markets at least 5 times.",
+    "unlock": "Pay 500,000 CR.",
+    "specialities": ["Power Distributors", "Pulse Lasers", "Burst Lasers"],
+    "topSpecialities": ["Power Distributors"]
   },
   {
     "id": "mcquinn",
     "name": "Tod \"The Blaster\" McQuinn",
     "system": "Wolf 397",
     "base": "Trophy Camp",
-    "unlock": "Earn 15+ Combat Bonds, then gift 25 units of Modular Terminals.",
-    "specialities": [ "Multi-cannons", "Cannons", "Rail Guns", "Fragment Cannons" ]
+    "referredBy": [],
+    "invite": "Redeem at least 15 bounty vouchers.",
+    "unlock": "Redeem 100,000 CR of bounty vouchers with him.",
+    "specialities": ["Multi-cannons", "Cannons", "Rail Guns", "Fragment Cannons"],
+    "topSpecialities": ["Multi-cannons", "Rail Guns"]
   },
   {
     "id": "ryder",
     "name": "Liz Ryder",
     "system": "Eurybia",
     "base": "Demolition Unlimited",
-    "unlock": "Reach Cordial status with Eurybia Blue Mafia, then gift 200 units of Landmines.",
-    "specialities": [ "Missile Racks", "Torpedo Pylons", "Mine Launchers", "Hull Reinforcement" ]
-  },
-  {
-    "id": "selene",
-    "name": "Selene Jean",
-    "system": "Kuk",
-    "base": "Prospector's Rest",
-    "unlock": "Mine at least 500 tons of ore, then gift 10 units of Painite.",
-    "specialities": [ "Hull Reinforcement", "Armour", "Bulkheads" ]
-  },
-  {
-    "id": "palin",
-    "name": "Professor Palin",
-    "system": "Arque",
-    "base": "Abel Laboratory",
-    "unlock": "Travel 5,000 Ly from career start and meet Marco Qwent, then gift 25 units of Sensor Fragments.",
-    "specialities": [ "Thrusters", "Frame Shift Drives" ]
+    "referredBy": [],
+    "invite": "Reach Cordial or better with the Eurybia Blue Mafia.",
+    "unlock": "Gift 200 units of Landmines.",
+    "specialities": ["Missile Racks", "Torpedo Pylons", "Mine Launchers", "Hull Reinforcement"],
+    "topSpecialities": ["Hull Reinforcement"]
   },
   {
     "id": "qwent",
     "name": "Marco Qwent",
     "system": "Sirius",
     "base": "Qwent Research Base",
-    "unlock": "Obtain a Sirius Corp permit (invite) and gift 25 units of Modular Terminals.",
-    "specialities": [ "Power Plants", "Power Distributors" ]
+    "referredBy": [],
+    "invite": "Reach Allied with Sirius Corporation (needs the Sirius permit).",
+    "unlock": "Gift 25 units of Modular Terminals.",
+    "specialities": ["Power Plants", "Power Distributors"],
+    "topSpecialities": ["Power Plants"]
+  },
+  {
+    "id": "nemo",
+    "name": "Zacariah Nemo",
+    "system": "Yoru",
+    "base": "Nemo Cyber Party Base",
+    "referredBy": [],
+    "invite": "Gain an invitation from the Party of Yoru.",
+    "unlock": "Gift 25 units of Xihe Companions.",
+    "specialities": ["Fragment Cannons", "Multi-cannons"],
+    "topSpecialities": ["Fragment Cannons"]
+  },
+  {
+    "id": "brandon",
+    "name": "Mel Brandon",
+    "system": "Luchtaine",
+    "base": "The Brig",
+    "referredBy": [],
+    "invite": "Gain an invitation from the Colonia Council.",
+    "unlock": "Redeem 100,000 CR of bounty vouchers with him.",
+    "specialities": ["Frame Shift Drives", "Thrusters", "Shield Generators", "Shield Cell Banks", "Beam Lasers", "Pulse Lasers", "Burst Lasers"],
+    "topSpecialities": []
+  },
+  {
+    "id": "ishmaak",
+    "name": "Juri Ishmaak",
+    "system": "Giryak",
+    "base": "Pater's Memorial",
+    "referredBy": ["farseer"],
+    "invite": "Earn a referral from Felicity Farseer.",
+    "unlock": "Redeem at least 100,000 CR of combat bonds with him.",
+    "specialities": ["Sensors", "Mine Launchers", "Frame Shift Drive Interdictor", "Detailed Surface Scanner"],
+    "topSpecialities": []
+  },
+  {
+    "id": "selene",
+    "name": "Selene Jean",
+    "system": "Kuk",
+    "base": "Prospector's Rest",
+    "referredBy": ["mcquinn"],
+    "invite": "Earn a referral from Tod \"The Blaster\" McQuinn.",
+    "unlock": "Gift 10 units of Painite.",
+    "specialities": ["Hull Reinforcement", "Armour", "Bulkheads"],
+    "topSpecialities": ["Hull Reinforcement", "Armour"]
   },
   {
     "id": "tani",
     "name": "Hera Tani",
     "system": "Kuwemaki",
     "base": "The Jet's Hole",
-    "unlock": "Reach at least Outsider rank with the Empire and meet Liz Ryder, then gift 50 units of Kamitra Cigars.",
-    "specialities": [ "Power Plants", "Power Distributors", "Detailed Surface Scanner", "Sensors" ]
-  },
-  {
-    "id": "dorn",
-    "name": "Etienne Dorn",
-    "system": "Los",
-    "base": "Kraken's Retreat",
-    "unlock": "Reach at least Master rank with the Empire and meet Liz Ryder, then gift 25 units of Occupied Escape Pods.",
-    "specialities": [ "Power Distributors", "Power Plants", "Life Support", "Sensors", "Frame Shift Drives" ]
-  },
-  {
-    "id": "bris_dekker",
-    "name": "Colonel Bris Dekker",
-    "system": "Sol",
-    "base": "Dekker's Yard",
-    "unlock": "Obtain a Sol permit (Federation Midshipman) and meet Juri Ishmaak, then gift 1,000,000 Cr.",
-    "specialities": [ "Frame Shift Drive Interdictor", "Frame Shift Drives" ]
+    "referredBy": ["ryder"],
+    "invite": "Earn a referral from Liz Ryder and reach Empire rank Outsider or higher.",
+    "unlock": "Gift 50 units of Kamitra Cigars.",
+    "specialities": ["Power Plants", "Power Distributors", "Detailed Surface Scanner", "Sensors"],
+    "topSpecialities": ["Power Plants"]
   },
   {
     "id": "cheung",
     "name": "Lei Cheung",
     "system": "Laksak",
     "base": "Trader's Rest",
-    "unlock": "Trade with 50+ different markets and meet The Dweller, then gift 200 units of Gold.",
-    "specialities": [ "Shield Generators", "Shield Boosters", "Detailed Surface Scanner", "Sensors" ]
+    "referredBy": ["dweller"],
+    "invite": "Earn a referral from The Dweller and trade with 50 different markets.",
+    "unlock": "Gift 200 units of Gold.",
+    "specialities": ["Shield Generators", "Shield Boosters", "Detailed Surface Scanner", "Sensors"],
+    "topSpecialities": ["Shield Generators"]
+  },
+  {
+    "id": "sarge",
+    "name": "The Sarge",
+    "system": "Beta-3 Tucani",
+    "base": "The Beach",
+    "referredBy": ["ishmaak"],
+    "invite": "Earn a referral from Juri Ishmaak and reach Federal rank Midshipman.",
+    "unlock": "Gift 50 units of Aberrant Shield Pattern Analysis.",
+    "specialities": ["Cannons", "Rail Guns", "Collector Limpet Controller", "Prospector Limpet Controller"],
+    "topSpecialities": []
+  },
+  {
+    "id": "bris_dekker",
+    "name": "Colonel Bris Dekker",
+    "system": "Sol",
+    "base": "Dekker's Yard",
+    "referredBy": ["ishmaak"],
+    "invite": "Earn a referral from Juri Ishmaak and reach Friendly with the Federation (needs the Sol permit).",
+    "unlock": "Redeem at least 1,000,000 CR of Federal combat bonds.",
+    "specialities": ["Frame Shift Drive Interdictor", "Frame Shift Drives"],
+    "topSpecialities": ["Frame Shift Drive Interdictor"]
+  },
+  {
+    "id": "vatermann",
+    "name": "Didi Vatermann",
+    "system": "Leesti",
+    "base": "Vatermann LLC",
+    "referredBy": ["selene"],
+    "invite": "Earn a referral from Selene Jean and reach trade rank Merchant.",
+    "unlock": "Gift 50 units of Lavian Brandy.",
+    "specialities": ["Shield Boosters", "Shield Generators"],
+    "topSpecialities": ["Shield Boosters"]
+  },
+  {
+    "id": "turner",
+    "name": "Bill Turner",
+    "system": "Alioth",
+    "base": "Turner Metallics Inc",
+    "referredBy": ["selene"],
+    "invite": "Earn a referral from Selene Jean and reach Friendly with the Alliance (needs the Alioth permit).",
+    "unlock": "Gift 50 units of Bromellite.",
+    "specialities": ["Plasma Accelerators", "Sensors", "Detailed Surface Scanner", "Auto Field-Maintenance Unit", "Refinery"],
+    "topSpecialities": []
+  },
+  {
+    "id": "tarquin",
+    "name": "Broo Tarquin",
+    "system": "Muang",
+    "base": "Broo's Legacy",
+    "referredBy": ["tani"],
+    "invite": "Earn a referral from Hera Tani and reach combat rank Competent.",
+    "unlock": "Gift 50 units of Fujin Tea.",
+    "specialities": ["Pulse Lasers", "Burst Lasers", "Beam Lasers"],
+    "topSpecialities": ["Pulse Lasers", "Burst Lasers", "Beam Lasers"]
+  },
+  {
+    "id": "fortune",
+    "name": "Tiana Fortune",
+    "system": "Achenar",
+    "base": "Fortune's Loss",
+    "referredBy": ["tani"],
+    "invite": "Earn a referral from Hera Tani and reach Friendly with the Empire (needs the Achenar permit).",
+    "unlock": "Gift 50 units of Decoded Emission Data.",
+    "specialities": ["Sensors", "Detailed Surface Scanner", "Collector Limpet Controller", "Fuel Transfer Limpet Controller", "Hatch Breaker Limpet Controller"],
+    "topSpecialities": []
+  },
+  {
+    "id": "ramtah",
+    "name": "Ram Tah",
+    "system": "Meene",
+    "base": "Phoenix Base",
+    "referredBy": ["cheung"],
+    "invite": "Earn a referral from Lei Cheung and reach exploration rank Surveyor.",
+    "unlock": "Gift 50 units of Classified Scan Databanks.",
+    "specialities": ["Detailed Surface Scanner", "Sensors", "Collector Limpet Controller", "Prospector Limpet Controller", "Hatch Breaker Limpet Controller"],
+    "topSpecialities": []
+  },
+  {
+    "id": "palin",
+    "name": "Professor Palin",
+    "system": "Arque",
+    "base": "Abel Laboratory",
+    "referredBy": ["qwent"],
+    "invite": "Earn a referral from Marco Qwent and travel at least 5,000 ly from your starting system.",
+    "unlock": "Gift 25 units of Sensor Fragments.",
+    "specialities": ["Thrusters", "Frame Shift Drives"],
+    "topSpecialities": ["Thrusters"]
+  },
+  {
+    "id": "jameson",
+    "name": "Lori Jameson",
+    "system": "Shinrarta Dezhra",
+    "base": "Jameson Base",
+    "referredBy": ["qwent"],
+    "invite": "Earn a referral from Marco Qwent and reach combat rank Dangerous (needs the Shinrarta Dezhra permit).",
+    "unlock": "Gift 25 units of Kongga Ale.",
+    "specialities": ["Power Distributors", "Sensors", "Detailed Surface Scanner", "Auto Field-Maintenance Unit", "Life Support", "Refinery"],
+    "topSpecialities": ["Power Distributors"]
+  },
+  {
+    "id": "sedesi",
+    "name": "Chloe Sedesi",
+    "system": "Shenve",
+    "base": "Cinder Dock",
+    "referredBy": ["qwent"],
+    "invite": "Earn a referral from Marco Qwent and travel at least 5,000 ly from your starting system.",
+    "unlock": "Gift 25 units of Sensor Fragments.",
+    "specialities": ["Thrusters", "Frame Shift Drives"],
+    "topSpecialities": ["Thrusters"]
+  },
+  {
+    "id": "olmanova",
+    "name": "Petra Olmanova",
+    "system": "Asura",
+    "base": "Sanctuary",
+    "referredBy": ["mcquinn"],
+    "invite": "Earn a referral from Tod \"The Blaster\" McQuinn and reach combat rank Expert.",
+    "unlock": "Gift 200 units of Progenitor Cells.",
+    "specialities": ["Armour", "Bulkheads", "Hull Reinforcement", "Auto Field-Maintenance Unit", "Chaff Launcher", "Heat Sink Launcher", "Point Defence"],
+    "topSpecialities": []
+  },
+  {
+    "id": "dorn",
+    "name": "Etienne Dorn",
+    "system": "Los",
+    "base": "Kraken's Retreat",
+    "referredBy": ["ryder"],
+    "invite": "Earn a referral from Liz Ryder and reach trade rank Dealer.",
+    "unlock": "Gift 25 units of Occupied Escape Pods.",
+    "specialities": ["Life Support", "Power Distributors", "Power Plants", "Sensors", "Frame Shift Drives"],
+    "topSpecialities": ["Life Support"]
+  },
+  {
+    "id": "hicks",
+    "name": "Marsha Hicks",
+    "system": "Tir",
+    "base": "The Watchtower",
+    "referredBy": ["dweller"],
+    "invite": "Earn a referral from The Dweller and reach exploration rank Surveyor.",
+    "unlock": "Gift 10 tonnes of Osmium you mined yourself.",
+    "specialities": ["Fuel Scoop", "Refinery", "Collector Limpet Controller", "Prospector Limpet Controller", "Cannons", "Multi-cannons"],
+    "topSpecialities": ["Fuel Scoop"]
   }
 ]

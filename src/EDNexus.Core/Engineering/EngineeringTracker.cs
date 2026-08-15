@@ -21,6 +21,10 @@ public sealed class EngineeringTracker
     // dictionary covers both.
     private readonly ConcurrentDictionary<string, int> _unlockedRanks = new(StringComparer.OrdinalIgnoreCase);
 
+    // The full picture, including the stages before Unlocked. Kept separately from _unlockedRanks so
+    // existing "can I craft with them" checks stay a single lookup.
+    private readonly ConcurrentDictionary<string, EngineerProgressEntry> _progress = new(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>Raised after an <c>EngineerProgress</c> event changes the unlocked picture.</summary>
     public event Action? Changed;
 
@@ -60,15 +64,106 @@ public sealed class EngineeringTracker
         if (string.IsNullOrEmpty(name)) return;
 
         var progress = item.TryGetProperty("Progress", out var p) && p.ValueKind == JsonValueKind.String ? p.GetString() : null;
-        if (!string.Equals(progress, "Unlocked", StringComparison.OrdinalIgnoreCase))
+        var status = progress?.ToLowerInvariant() switch
         {
-            // Invited / Known — not yet usable; drop any stale unlocked entry.
-            _unlockedRanks.TryRemove(name, out _);
-            return;
-        }
+            "unlocked" => EngineerStatus.Unlocked,
+            "invited" => EngineerStatus.Invited,
+            "known" => EngineerStatus.Known,
+            _ => EngineerStatus.Unknown,
+        };
 
-        var rank = item.TryGetProperty("Rank", out var r) && r.ValueKind == JsonValueKind.Number && r.TryGetInt32(out var v) ? v : 1;
-        _unlockedRanks[name] = rank;
+        var rank = item.TryGetProperty("Rank", out var r) && r.ValueKind == JsonValueKind.Number && r.TryGetInt32(out var v) ? v : 0;
+        var rankProgress = item.TryGetProperty("RankProgress", out var rp) && rp.ValueKind == JsonValueKind.Number
+                           && rp.TryGetDouble(out var d) ? d : 0;
+
+        // The journal reports RankProgress as a percentage in some versions and a 0–1 fraction in
+        // others; normalise so the UI can treat it as a fraction either way.
+        if (rankProgress > 1) rankProgress /= 100.0;
+
+        if (status == EngineerStatus.Unlocked)
+            _unlockedRanks[name] = rank > 0 ? rank : 1;
+        else
+            _unlockedRanks.TryRemove(name, out _);   // Invited / Known — not yet usable
+
+        _progress[name] = new EngineerProgressEntry(status, rank, Math.Clamp(rankProgress, 0, 1));
+    }
+
+    /// <summary>What <c>EngineerProgress</c> last said about one engineer.</summary>
+    private readonly record struct EngineerProgressEntry(EngineerStatus Status, int Rank, double RankProgress);
+
+    /// <summary>The commander's standing with one engineer, and the next thing to do about it.</summary>
+    public EngineerStanding Standing(Engineer engineer)
+    {
+        var entry = _progress.GetValueOrDefault(engineer.Name);
+
+        // An engineer reached only by referral is blocked until the referrer is unlocked. Report the
+        // first such referrer, since that is where the commander actually has to start.
+        var blockedBy = entry.Status >= EngineerStatus.Known
+            ? null
+            : engineer.Referrals
+                .Select(_catalog.Engineer)
+                .OfType<Engineer>()
+                .FirstOrDefault(r => !IsUnlocked(r));
+
+        return new EngineerStanding(
+            engineer,
+            entry.Status,
+            entry.Rank,
+            entry.RankProgress,
+            NextStep(engineer, entry, blockedBy),
+            blockedBy);
+    }
+
+    /// <summary>
+    /// Every ship engineer with the commander's standing, ordered so the ones worth acting on come
+    /// first: reachable-but-not-finished before blocked, and finished last.
+    /// </summary>
+    public IReadOnlyList<EngineerStanding> Standings()
+        => _catalog.Engineers
+            .Select(Standing)
+            .OrderBy(s => s.IsMaxed)                        // finished drops to the bottom
+            .ThenBy(s => s.BlockedBy is not null)           // then anything gated behind a referral
+            .ThenByDescending(s => s.Status)                // furthest along first among the rest
+            .ThenByDescending(s => s.Rank)
+            .ThenBy(s => s.Engineer.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+    /// <summary>
+    /// The engineers who can apply a blueprint grade, with the commander's standing on each — so a
+    /// blueprint that cannot be rolled yet says which engineer to go and unlock.
+    /// </summary>
+    public IReadOnlyList<EngineerStanding> GatingEngineers(string blueprintId, int grade)
+    {
+        var bg = _catalog.Blueprint(blueprintId)?.Grade(grade);
+        if (bg is null) return Array.Empty<EngineerStanding>();
+
+        return bg.EngineerIds
+            .Select(_catalog.Engineer)
+            .OfType<Engineer>()
+            .Select(Standing)
+            .OrderByDescending(s => s.IsUnlocked)
+            .ThenByDescending(s => s.Rank)
+            .ToList();
+    }
+
+    /// <summary>
+    /// The single actionable next thing. Only one link of the unknown → invited → unlocked → grade 5
+    /// chain is ever actionable, so this names that one rather than listing the whole path.
+    /// </summary>
+    private static string NextStep(Engineer engineer, EngineerProgressEntry entry, Engineer? blockedBy)
+    {
+        if (blockedBy is not null)
+            return $"Unlock {blockedBy.Name} first — the referral to {engineer.Name} comes from them.";
+
+        return entry.Status switch
+        {
+            EngineerStatus.Unlocked when entry.Rank >= 5 => "Fully levelled — grade 5 available.",
+            EngineerStatus.Unlocked =>
+                $"Craft with {engineer.Name} to reach grade {entry.Rank + 1} of 5.",
+            EngineerStatus.Invited =>
+                engineer.Unlock is { Length: > 0 } u ? $"Gain access: {u}" : "Make the unlock contribution.",
+            _ => engineer.Invite is { Length: > 0 } i ? $"Earn the invitation: {i}" : "Find the invitation requirement.",
+        };
     }
 
     /// <summary>

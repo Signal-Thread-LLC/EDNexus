@@ -1028,6 +1028,61 @@
             </Border>
           </DataTemplate>
 
+          <!-- Engineers: the unlock path, one actionable step each -->
+          <DataTemplate DataType="vm:EngineersCardViewModel">
+            <Border Classes="card" Width="{Binding Width}" IsVisible="{Binding IsVisible}">
+              <StackPanel>
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBlock Grid.Column="0" Classes="cardHeader" Text="{Binding Title}" />
+                  <Button Grid.Column="1" Classes="collapse" Content="{Binding CollapseGlyph}"
+                          Command="{Binding ToggleCollapseCommand}" />
+                </Grid>
+                <StackPanel IsVisible="{Binding !IsCollapsed}">
+                  <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Grid.Column="0" Classes="label" Text="{Binding Summary}"
+                               VerticalAlignment="Center" TextWrapping="Wrap" />
+                    <Button Grid.Column="1" Classes="mini" Command="{Binding ToggleFinishedCommand}"
+                            Content="Show all" IsVisible="{Binding HideFinished}"
+                            ToolTip.Tip="Include engineers already at grade 5" />
+                    <Button Grid.Column="1" Classes="mini" Command="{Binding ToggleFinishedCommand}"
+                            Content="Hide done" IsVisible="{Binding !HideFinished}"
+                            ToolTip.Tip="Hide engineers already at grade 5" />
+                  </Grid>
+
+                  <ScrollViewer MaxHeight="420" VerticalScrollBarVisibility="Auto"
+                                HorizontalScrollBarVisibility="Disabled" Margin="0,8,0,0">
+                    <ItemsControl ItemsSource="{Binding Engineers}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:EngineerRow">
+                          <Border Background="#0E1013" CornerRadius="4" Padding="10,8" Margin="0,0,0,6"
+                                  ToolTip.Tip="{Binding TopGrades}">
+                            <StackPanel>
+                              <Grid ColumnDefinitions="*,Auto">
+                                <TextBlock Grid.Column="0" Text="{Binding Name}" Classes="value" FontSize="13"
+                                           TextWrapping="Wrap" VerticalAlignment="Center" />
+                                <Border Grid.Column="1" Background="#22262E" CornerRadius="3" Padding="6,2"
+                                        VerticalAlignment="Center" MinWidth="56">
+                                  <TextBlock Text="{Binding Status}" FontSize="10" FontWeight="SemiBold"
+                                             HorizontalAlignment="Center" Foreground="{StaticResource InkDim}" />
+                                </Border>
+                              </Grid>
+                              <TextBlock Text="{Binding Location}" Classes="label" FontSize="11" Margin="0,2,0,0" />
+                              <ProgressBar Minimum="0" Maximum="1" Value="{Binding Progress}" Height="4"
+                                           Foreground="{StaticResource AmberDim}" Background="#1B1E24"
+                                           Margin="0,5,0,0" />
+                              <TextBlock Text="{Binding NextStep}" FontSize="11" Margin="0,5,0,0"
+                                         TextWrapping="Wrap" Foreground="{StaticResource Ink}" />
+                            </StackPanel>
+                          </Border>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </ScrollViewer>
+                </StackPanel>
+              </StackPanel>
+            </Border>
+          </DataTemplate>
+
         </ItemsControl.DataTemplates>
       </ItemsControl>
     </ScrollViewer>

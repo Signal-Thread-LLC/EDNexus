@@ -3,14 +3,93 @@ namespace EDNexus.Core.Engineering;
 /// <summary>An engineer: where they are and how to gain access. Reference data, loaded from JSON.</summary>
 /// <param name="Id">Stable slug used by blueprint references (e.g. "farseer").</param>
 /// <param name="Name">Exact in-game name, matched against the journal's <c>EngineerProgress</c> event.</param>
-/// <param name="Unlock">Human-readable invitation / unlock requirement.</param>
+/// <param name="Invite">What earns the invitation — the step before <paramref name="Unlock"/>.</param>
+/// <param name="Unlock">What to contribute once invited, to gain access.</param>
+/// <param name="ReferredBy">
+/// Engineers whose reputation unlocks the referral to this one. Most engineers past the starting
+/// few are reached only through someone else, so this is what makes the path to them computable.
+/// </param>
+/// <param name="TopSpecialities">Specialities this engineer takes all the way to grade 5.</param>
 public sealed record Engineer(
     string Id,
     string Name,
     string System,
     string Base,
     string Unlock,
-    IReadOnlyList<string> Specialities);
+    IReadOnlyList<string> Specialities,
+    string Invite = "",
+    IReadOnlyList<string>? ReferredBy = null,
+    IReadOnlyList<string>? TopSpecialities = null)
+{
+    public IReadOnlyList<string> Referrals => ReferredBy ?? Array.Empty<string>();
+    public IReadOnlyList<string> Top => TopSpecialities ?? Array.Empty<string>();
+
+    /// <summary>"Deciat · Farseer Inc" — where to point the ship.</summary>
+    public string Location => $"{System} · {Base}";
+}
+
+/// <summary>
+/// How far the commander has got with an engineer, as the journal's <c>EngineerProgress</c>
+/// reports it.
+/// </summary>
+public enum EngineerStatus
+{
+    /// <summary>Not in the journal at all — the referral that reveals them hasn't happened yet.</summary>
+    Unknown = 0,
+
+    /// <summary>Their existence is known, but no invitation has been earned.</summary>
+    Known = 1,
+
+    /// <summary>Invited, but the unlock contribution hasn't been made.</summary>
+    Invited = 2,
+
+    /// <summary>Unlocked and usable, at some rank 1–5.</summary>
+    Unlocked = 3,
+}
+
+/// <summary>
+/// One engineer joined to the commander's standing with them, and the single concrete thing to do
+/// next — which is the whole point: "unknown → grade 5" is a chain, and only one link is actionable
+/// at a time.
+/// </summary>
+/// <param name="Rank">Reputation grade reached, 1–5. 0 until unlocked.</param>
+/// <param name="RankProgress">Progress towards the next rank, 0–1, when the journal reports it.</param>
+/// <param name="NextStep">The actionable next thing, or a "fully levelled" note when there is none.</param>
+/// <param name="BlockedBy">
+/// The engineer that has to be unlocked first, when this one is only reachable by referral.
+/// Null once the path is open.
+/// </param>
+public sealed record EngineerStanding(
+    Engineer Engineer,
+    EngineerStatus Status,
+    int Rank,
+    double RankProgress,
+    string NextStep,
+    Engineer? BlockedBy = null)
+{
+    public bool IsUnlocked => Status == EngineerStatus.Unlocked;
+
+    /// <summary>Nothing left to do — unlocked and at the maximum reputation grade.</summary>
+    public bool IsMaxed => Status == EngineerStatus.Unlocked && Rank >= 5;
+
+    /// <summary>Short label for a status pill.</summary>
+    public string StatusLabel => Status switch
+    {
+        EngineerStatus.Unlocked => Rank >= 5 ? "G5" : $"G{Rank}",
+        EngineerStatus.Invited => "INVITED",
+        EngineerStatus.Known => "KNOWN",
+        _ => "UNKNOWN",
+    };
+
+    /// <summary>Overall progress 0–1 across the whole unknown → grade 5 path, for a bar.</summary>
+    public double Progress => Status switch
+    {
+        EngineerStatus.Unlocked => Math.Clamp(Rank / 5.0, 0, 1),
+        EngineerStatus.Invited => 0.15,
+        EngineerStatus.Known => 0.05,
+        _ => 0,
+    };
+}
 
 /// <summary>A crafting material: where it is farmed, and what a material trader will swap it for.</summary>
 /// <param name="Symbol">Journal symbol (lowercase), matching <c>CommanderState.Materials</c> keys.</param>

@@ -6,7 +6,11 @@
     "grades": [
       {
         "grade": 1,
-        "engineerIds": [],
+        "engineerIds": [
+          "turner",
+          "jameson",
+          "olmanova"
+        ],
         "materials": [
           {
             "symbol": "wornshieldemitters",
@@ -16,7 +20,11 @@
       },
       {
         "grade": 2,
-        "engineerIds": [],
+        "engineerIds": [
+          "turner",
+          "jameson",
+          "olmanova"
+        ],
         "materials": [
           {
             "symbol": "carbon",
@@ -30,7 +38,11 @@
       },
       {
         "grade": 3,
-        "engineerIds": [],
+        "engineerIds": [
+          "turner",
+          "jameson",
+          "olmanova"
+        ],
         "materials": [
           {
             "symbol": "carbon",
@@ -48,7 +60,11 @@
       },
       {
         "grade": 4,
-        "engineerIds": [],
+        "engineerIds": [
+          "turner",
+          "jameson",
+          "olmanova"
+        ],
         "materials": [
           {
             "symbol": "fedproprietarycomposites",
@@ -66,7 +82,11 @@
       },
       {
         "grade": 5,
-        "engineerIds": [],
+        "engineerIds": [
+          "turner",
+          "jameson",
+          "olmanova"
+        ],
         "materials": [
           {
             "symbol": "compoundshielding",
@@ -562,7 +582,9 @@
     "grades": [
       {
         "grade": 1,
-        "engineerIds": [],
+        "engineerIds": [
+          "olmanova"
+        ],
         "materials": [
           {
             "symbol": "mechanicalscrap",
@@ -587,7 +609,9 @@
     "grades": [
       {
         "grade": 1,
-        "engineerIds": [],
+        "engineerIds": [
+          "olmanova"
+        ],
         "materials": [
           {
             "symbol": "phosphorus",
@@ -597,7 +621,9 @@
       },
       {
         "grade": 2,
-        "engineerIds": [],
+        "engineerIds": [
+          "olmanova"
+        ],
         "materials": [
           {
             "symbol": "manganese",
@@ -611,7 +637,9 @@
       },
       {
         "grade": 3,
-        "engineerIds": [],
+        "engineerIds": [
+          "olmanova"
+        ],
         "materials": [
           {
             "symbol": "conductiveceramics",
@@ -629,7 +657,9 @@
       },
       {
         "grade": 4,
-        "engineerIds": [],
+        "engineerIds": [
+          "olmanova"
+        ],
         "materials": [
           {
             "symbol": "conductivecomponents",
@@ -647,7 +677,9 @@
       },
       {
         "grade": 5,
-        "engineerIds": [],
+        "engineerIds": [
+          "olmanova"
+        ],
         "materials": [
           {
             "symbol": "conductiveceramics",
@@ -672,7 +704,9 @@
     "grades": [
       {
         "grade": 1,
-        "engineerIds": [],
+        "engineerIds": [
+          "olmanova"
+        ],
         "materials": [
           {
             "symbol": "nickel",
@@ -682,7 +716,9 @@
       },
       {
         "grade": 2,
-        "engineerIds": [],
+        "engineerIds": [
+          "olmanova"
+        ],
         "materials": [
           {
             "symbol": "nickel",
@@ -696,7 +732,9 @@
       },
       {
         "grade": 3,
-        "engineerIds": [],
+        "engineerIds": [
+          "olmanova"
+        ],
         "materials": [
           {
             "symbol": "nickel",
@@ -714,7 +752,9 @@
       },
       {
         "grade": 4,
-        "engineerIds": [],
+        "engineerIds": [
+          "olmanova"
+        ],
         "materials": [
           {
             "symbol": "molybdenum",
@@ -732,7 +772,9 @@
       },
       {
         "grade": 5,
-        "engineerIds": [],
+        "engineerIds": [
+          "olmanova"
+        ],
         "materials": [
           {
             "symbol": "highdensitycomposites",
@@ -757,7 +799,9 @@
     "grades": [
       {
         "grade": 1,
-        "engineerIds": [],
+        "engineerIds": [
+          "olmanova"
+        ],
         "materials": [
           {
             "symbol": "wornshieldemitters",
@@ -767,7 +811,9 @@
       },
       {
         "grade": 2,
-        "engineerIds": [],
+        "engineerIds": [
+          "olmanova"
+        ],
         "materials": [
           {
             "symbol": "carbon",
@@ -781,7 +827,9 @@
       },
       {
         "grade": 3,
-        "engineerIds": [],
+        "engineerIds": [
+          "olmanova"
+        ],
         "materials": [
           {
             "symbol": "carbon",
@@ -799,7 +847,9 @@
       },
       {
         "grade": 4,
-        "engineerIds": [],
+        "engineerIds": [
+          "olmanova"
+        ],
         "materials": [
           {
             "symbol": "fedproprietarycomposites",
@@ -817,7 +867,9 @@
       },
       {
         "grade": 5,
-        "engineerIds": [],
+        "engineerIds": [
+          "olmanova"
+        ],
         "materials": [
           {
             "symbol": "compoundshielding",
@@ -842,7 +894,12 @@
     "grades": [
       {
         "grade": 1,
-        "engineerIds": [],
+        "engineerIds": [
+          "sarge",
+          "fortune",
+          "ramtah",
+          "hicks"
+        ],
         "materials": [
           {
             "symbol": "phosphorus",
@@ -852,7 +909,12 @@
       },
       {
         "grade": 2,
-        "engineerIds": [],
+        "engineerIds": [
+          "sarge",
+          "fortune",
+          "ramtah",
+          "hicks"
+        ],
         "materials": [
           {
             "symbol": "manganese",
@@ -866,7 +928,12 @@
       },
       {
         "grade": 3,
-        "engineerIds": [],
+        "engineerIds": [
+          "sarge",
+          "fortune",
+          "ramtah",
+          "hicks"
+        ],
         "materials": [
           {
             "symbol": "conductiveceramics",
@@ -884,7 +951,12 @@
       },
       {
         "grade": 4,
-        "engineerIds": [],
+        "engineerIds": [
+          "sarge",
+          "fortune",
+          "ramtah",
+          "hicks"
+        ],
         "materials": [
           {
             "symbol": "conductivecomponents",
@@ -902,7 +974,12 @@
       },
       {
         "grade": 5,
-        "engineerIds": [],
+        "engineerIds": [
+          "sarge",
+          "fortune",
+          "ramtah",
+          "hicks"
+        ],
         "materials": [
           {
             "symbol": "conductiveceramics",
@@ -927,7 +1004,12 @@
     "grades": [
       {
         "grade": 1,
-        "engineerIds": [],
+        "engineerIds": [
+          "sarge",
+          "fortune",
+          "ramtah",
+          "hicks"
+        ],
         "materials": [
           {
             "symbol": "nickel",
@@ -937,7 +1019,12 @@
       },
       {
         "grade": 2,
-        "engineerIds": [],
+        "engineerIds": [
+          "sarge",
+          "fortune",
+          "ramtah",
+          "hicks"
+        ],
         "materials": [
           {
             "symbol": "nickel",
@@ -951,7 +1038,12 @@
       },
       {
         "grade": 3,
-        "engineerIds": [],
+        "engineerIds": [
+          "sarge",
+          "fortune",
+          "ramtah",
+          "hicks"
+        ],
         "materials": [
           {
             "symbol": "nickel",
@@ -969,7 +1061,12 @@
       },
       {
         "grade": 4,
-        "engineerIds": [],
+        "engineerIds": [
+          "sarge",
+          "fortune",
+          "ramtah",
+          "hicks"
+        ],
         "materials": [
           {
             "symbol": "molybdenum",
@@ -987,7 +1084,12 @@
       },
       {
         "grade": 5,
-        "engineerIds": [],
+        "engineerIds": [
+          "sarge",
+          "fortune",
+          "ramtah",
+          "hicks"
+        ],
         "materials": [
           {
             "symbol": "highdensitycomposites",
@@ -1012,7 +1114,12 @@
     "grades": [
       {
         "grade": 1,
-        "engineerIds": [],
+        "engineerIds": [
+          "sarge",
+          "fortune",
+          "ramtah",
+          "hicks"
+        ],
         "materials": [
           {
             "symbol": "wornshieldemitters",
@@ -1022,7 +1129,12 @@
       },
       {
         "grade": 2,
-        "engineerIds": [],
+        "engineerIds": [
+          "sarge",
+          "fortune",
+          "ramtah",
+          "hicks"
+        ],
         "materials": [
           {
             "symbol": "carbon",
@@ -1036,7 +1148,12 @@
       },
       {
         "grade": 3,
-        "engineerIds": [],
+        "engineerIds": [
+          "sarge",
+          "fortune",
+          "ramtah",
+          "hicks"
+        ],
         "materials": [
           {
             "symbol": "carbon",
@@ -1054,7 +1171,12 @@
       },
       {
         "grade": 4,
-        "engineerIds": [],
+        "engineerIds": [
+          "sarge",
+          "fortune",
+          "ramtah",
+          "hicks"
+        ],
         "materials": [
           {
             "symbol": "fedproprietarycomposites",
@@ -1072,7 +1194,12 @@
       },
       {
         "grade": 5,
-        "engineerIds": [],
+        "engineerIds": [
+          "sarge",
+          "fortune",
+          "ramtah",
+          "hicks"
+        ],
         "materials": [
           {
             "symbol": "compoundshielding",
@@ -1098,9 +1225,9 @@
       {
         "grade": 1,
         "engineerIds": [
+          "cheung",
           "farseer",
-          "tani",
-          "cheung"
+          "tani"
         ],
         "materials": [
           {
@@ -1112,9 +1239,9 @@
       {
         "grade": 2,
         "engineerIds": [
+          "cheung",
           "farseer",
-          "tani",
-          "cheung"
+          "tani"
         ],
         "materials": [
           {
@@ -1130,9 +1257,9 @@
       {
         "grade": 3,
         "engineerIds": [
+          "cheung",
           "farseer",
-          "tani",
-          "cheung"
+          "tani"
         ],
         "materials": [
           {
@@ -1152,9 +1279,9 @@
       {
         "grade": 4,
         "engineerIds": [
+          "cheung",
           "farseer",
-          "tani",
-          "cheung"
+          "tani"
         ],
         "materials": [
           {
@@ -1174,9 +1301,9 @@
       {
         "grade": 5,
         "engineerIds": [
+          "cheung",
           "farseer",
-          "tani",
-          "cheung"
+          "tani"
         ],
         "materials": [
           {
@@ -1203,11 +1330,11 @@
       {
         "grade": 1,
         "engineerIds": [
+          "bris_dekker",
+          "dorn",
           "farseer",
           "martuuk",
-          "palin",
-          "dorn",
-          "bris_dekker"
+          "palin"
         ],
         "materials": [
           {
@@ -1219,11 +1346,11 @@
       {
         "grade": 2,
         "engineerIds": [
+          "bris_dekker",
+          "dorn",
           "farseer",
           "martuuk",
-          "palin",
-          "dorn",
-          "bris_dekker"
+          "palin"
         ],
         "materials": [
           {
@@ -1239,11 +1366,11 @@
       {
         "grade": 3,
         "engineerIds": [
+          "bris_dekker",
+          "dorn",
           "farseer",
           "martuuk",
-          "palin",
-          "dorn",
-          "bris_dekker"
+          "palin"
         ],
         "materials": [
           {
@@ -1263,11 +1390,11 @@
       {
         "grade": 4,
         "engineerIds": [
+          "bris_dekker",
+          "dorn",
           "farseer",
           "martuuk",
-          "palin",
-          "dorn",
-          "bris_dekker"
+          "palin"
         ],
         "materials": [
           {
@@ -1287,11 +1414,11 @@
       {
         "grade": 5,
         "engineerIds": [
+          "bris_dekker",
+          "dorn",
           "farseer",
           "martuuk",
-          "palin",
-          "dorn",
-          "bris_dekker"
+          "palin"
         ],
         "materials": [
           {
@@ -1418,11 +1545,11 @@
       {
         "grade": 1,
         "engineerIds": [
+          "bris_dekker",
+          "dorn",
           "farseer",
           "martuuk",
-          "palin",
-          "dorn",
-          "bris_dekker"
+          "palin"
         ],
         "materials": [
           {
@@ -1434,11 +1561,11 @@
       {
         "grade": 2,
         "engineerIds": [
+          "bris_dekker",
+          "dorn",
           "farseer",
           "martuuk",
-          "palin",
-          "dorn",
-          "bris_dekker"
+          "palin"
         ],
         "materials": [
           {
@@ -1454,11 +1581,11 @@
       {
         "grade": 3,
         "engineerIds": [
+          "bris_dekker",
+          "dorn",
           "farseer",
           "martuuk",
-          "palin",
-          "dorn",
-          "bris_dekker"
+          "palin"
         ],
         "materials": [
           {
@@ -1478,11 +1605,11 @@
       {
         "grade": 4,
         "engineerIds": [
+          "bris_dekker",
+          "dorn",
           "farseer",
           "martuuk",
-          "palin",
-          "dorn",
-          "bris_dekker"
+          "palin"
         ],
         "materials": [
           {
@@ -1502,11 +1629,11 @@
       {
         "grade": 5,
         "engineerIds": [
+          "bris_dekker",
+          "dorn",
           "farseer",
           "martuuk",
-          "palin",
-          "dorn",
-          "bris_dekker"
+          "palin"
         ],
         "materials": [
           {
@@ -1722,7 +1849,9 @@
     "grades": [
       {
         "grade": 1,
-        "engineerIds": [],
+        "engineerIds": [
+          "hicks"
+        ],
         "materials": [
           {
             "symbol": "wornshieldemitters",
@@ -1732,7 +1861,9 @@
       },
       {
         "grade": 2,
-        "engineerIds": [],
+        "engineerIds": [
+          "hicks"
+        ],
         "materials": [
           {
             "symbol": "carbon",
@@ -1746,7 +1877,9 @@
       },
       {
         "grade": 3,
-        "engineerIds": [],
+        "engineerIds": [
+          "hicks"
+        ],
         "materials": [
           {
             "symbol": "carbon",
@@ -1764,7 +1897,9 @@
       },
       {
         "grade": 4,
-        "engineerIds": [],
+        "engineerIds": [
+          "hicks"
+        ],
         "materials": [
           {
             "symbol": "fedproprietarycomposites",
@@ -1782,7 +1917,9 @@
       },
       {
         "grade": 5,
-        "engineerIds": [],
+        "engineerIds": [
+          "hicks"
+        ],
         "materials": [
           {
             "symbol": "compoundshielding",
@@ -1807,7 +1944,9 @@
     "grades": [
       {
         "grade": 1,
-        "engineerIds": [],
+        "engineerIds": [
+          "fortune"
+        ],
         "materials": [
           {
             "symbol": "phosphorus",
@@ -1817,7 +1956,9 @@
       },
       {
         "grade": 2,
-        "engineerIds": [],
+        "engineerIds": [
+          "fortune"
+        ],
         "materials": [
           {
             "symbol": "manganese",
@@ -1831,7 +1972,9 @@
       },
       {
         "grade": 3,
-        "engineerIds": [],
+        "engineerIds": [
+          "fortune"
+        ],
         "materials": [
           {
             "symbol": "conductiveceramics",
@@ -1849,7 +1992,9 @@
       },
       {
         "grade": 4,
-        "engineerIds": [],
+        "engineerIds": [
+          "fortune"
+        ],
         "materials": [
           {
             "symbol": "conductivecomponents",
@@ -1867,7 +2012,9 @@
       },
       {
         "grade": 5,
-        "engineerIds": [],
+        "engineerIds": [
+          "fortune"
+        ],
         "materials": [
           {
             "symbol": "conductiveceramics",
@@ -1892,7 +2039,9 @@
     "grades": [
       {
         "grade": 1,
-        "engineerIds": [],
+        "engineerIds": [
+          "fortune"
+        ],
         "materials": [
           {
             "symbol": "nickel",
@@ -1902,7 +2051,9 @@
       },
       {
         "grade": 2,
-        "engineerIds": [],
+        "engineerIds": [
+          "fortune"
+        ],
         "materials": [
           {
             "symbol": "nickel",
@@ -1916,7 +2067,9 @@
       },
       {
         "grade": 3,
-        "engineerIds": [],
+        "engineerIds": [
+          "fortune"
+        ],
         "materials": [
           {
             "symbol": "nickel",
@@ -1934,7 +2087,9 @@
       },
       {
         "grade": 4,
-        "engineerIds": [],
+        "engineerIds": [
+          "fortune"
+        ],
         "materials": [
           {
             "symbol": "molybdenum",
@@ -1952,7 +2107,9 @@
       },
       {
         "grade": 5,
-        "engineerIds": [],
+        "engineerIds": [
+          "fortune"
+        ],
         "materials": [
           {
             "symbol": "highdensitycomposites",
@@ -1977,7 +2134,9 @@
     "grades": [
       {
         "grade": 1,
-        "engineerIds": [],
+        "engineerIds": [
+          "fortune"
+        ],
         "materials": [
           {
             "symbol": "wornshieldemitters",
@@ -1987,7 +2146,9 @@
       },
       {
         "grade": 2,
-        "engineerIds": [],
+        "engineerIds": [
+          "fortune"
+        ],
         "materials": [
           {
             "symbol": "carbon",
@@ -2001,7 +2162,9 @@
       },
       {
         "grade": 3,
-        "engineerIds": [],
+        "engineerIds": [
+          "fortune"
+        ],
         "materials": [
           {
             "symbol": "carbon",
@@ -2019,7 +2182,9 @@
       },
       {
         "grade": 4,
-        "engineerIds": [],
+        "engineerIds": [
+          "fortune"
+        ],
         "materials": [
           {
             "symbol": "fedproprietarycomposites",
@@ -2037,7 +2202,9 @@
       },
       {
         "grade": 5,
-        "engineerIds": [],
+        "engineerIds": [
+          "fortune"
+        ],
         "materials": [
           {
             "symbol": "compoundshielding",
@@ -2062,7 +2229,10 @@
     "grades": [
       {
         "grade": 1,
-        "engineerIds": [],
+        "engineerIds": [
+          "fortune",
+          "ramtah"
+        ],
         "materials": [
           {
             "symbol": "phosphorus",
@@ -2072,7 +2242,10 @@
       },
       {
         "grade": 2,
-        "engineerIds": [],
+        "engineerIds": [
+          "fortune",
+          "ramtah"
+        ],
         "materials": [
           {
             "symbol": "manganese",
@@ -2086,7 +2259,10 @@
       },
       {
         "grade": 3,
-        "engineerIds": [],
+        "engineerIds": [
+          "fortune",
+          "ramtah"
+        ],
         "materials": [
           {
             "symbol": "conductiveceramics",
@@ -2104,7 +2280,10 @@
       },
       {
         "grade": 4,
-        "engineerIds": [],
+        "engineerIds": [
+          "fortune",
+          "ramtah"
+        ],
         "materials": [
           {
             "symbol": "conductivecomponents",
@@ -2122,7 +2301,10 @@
       },
       {
         "grade": 5,
-        "engineerIds": [],
+        "engineerIds": [
+          "fortune",
+          "ramtah"
+        ],
         "materials": [
           {
             "symbol": "conductiveceramics",
@@ -2147,7 +2329,10 @@
     "grades": [
       {
         "grade": 1,
-        "engineerIds": [],
+        "engineerIds": [
+          "fortune",
+          "ramtah"
+        ],
         "materials": [
           {
             "symbol": "nickel",
@@ -2157,7 +2342,10 @@
       },
       {
         "grade": 2,
-        "engineerIds": [],
+        "engineerIds": [
+          "fortune",
+          "ramtah"
+        ],
         "materials": [
           {
             "symbol": "nickel",
@@ -2171,7 +2359,10 @@
       },
       {
         "grade": 3,
-        "engineerIds": [],
+        "engineerIds": [
+          "fortune",
+          "ramtah"
+        ],
         "materials": [
           {
             "symbol": "nickel",
@@ -2189,7 +2380,10 @@
       },
       {
         "grade": 4,
-        "engineerIds": [],
+        "engineerIds": [
+          "fortune",
+          "ramtah"
+        ],
         "materials": [
           {
             "symbol": "molybdenum",
@@ -2207,7 +2401,10 @@
       },
       {
         "grade": 5,
-        "engineerIds": [],
+        "engineerIds": [
+          "fortune",
+          "ramtah"
+        ],
         "materials": [
           {
             "symbol": "highdensitycomposites",
@@ -2232,7 +2429,10 @@
     "grades": [
       {
         "grade": 1,
-        "engineerIds": [],
+        "engineerIds": [
+          "fortune",
+          "ramtah"
+        ],
         "materials": [
           {
             "symbol": "wornshieldemitters",
@@ -2242,7 +2442,10 @@
       },
       {
         "grade": 2,
-        "engineerIds": [],
+        "engineerIds": [
+          "fortune",
+          "ramtah"
+        ],
         "materials": [
           {
             "symbol": "carbon",
@@ -2256,7 +2459,10 @@
       },
       {
         "grade": 3,
-        "engineerIds": [],
+        "engineerIds": [
+          "fortune",
+          "ramtah"
+        ],
         "materials": [
           {
             "symbol": "carbon",
@@ -2274,7 +2480,10 @@
       },
       {
         "grade": 4,
-        "engineerIds": [],
+        "engineerIds": [
+          "fortune",
+          "ramtah"
+        ],
         "materials": [
           {
             "symbol": "fedproprietarycomposites",
@@ -2292,7 +2501,10 @@
       },
       {
         "grade": 5,
-        "engineerIds": [],
+        "engineerIds": [
+          "fortune",
+          "ramtah"
+        ],
         "materials": [
           {
             "symbol": "compoundshielding",
@@ -2317,7 +2529,9 @@
     "grades": [
       {
         "grade": 1,
-        "engineerIds": [],
+        "engineerIds": [
+          "olmanova"
+        ],
         "materials": [
           {
             "symbol": "mechanicalscrap",
@@ -3127,7 +3341,9 @@
     "grades": [
       {
         "grade": 1,
-        "engineerIds": [],
+        "engineerIds": [
+          "olmanova"
+        ],
         "materials": [
           {
             "symbol": "mechanicalscrap",
@@ -3153,10 +3369,10 @@
       {
         "grade": 1,
         "engineerIds": [
+          "dorn",
           "dweller",
           "qwent",
-          "tani",
-          "dorn"
+          "tani"
         ],
         "materials": [
           {
@@ -3168,10 +3384,10 @@
       {
         "grade": 2,
         "engineerIds": [
+          "dorn",
           "dweller",
           "qwent",
-          "tani",
-          "dorn"
+          "tani"
         ],
         "materials": [
           {
@@ -3187,10 +3403,10 @@
       {
         "grade": 3,
         "engineerIds": [
+          "dorn",
           "dweller",
           "qwent",
-          "tani",
-          "dorn"
+          "tani"
         ],
         "materials": [
           {
@@ -3210,10 +3426,10 @@
       {
         "grade": 4,
         "engineerIds": [
+          "dorn",
           "dweller",
           "qwent",
-          "tani",
-          "dorn"
+          "tani"
         ],
         "materials": [
           {
@@ -3233,10 +3449,10 @@
       {
         "grade": 5,
         "engineerIds": [
+          "dorn",
           "dweller",
           "qwent",
-          "tani",
-          "dorn"
+          "tani"
         ],
         "materials": [
           {
@@ -3368,10 +3584,10 @@
       {
         "grade": 1,
         "engineerIds": [
+          "dorn",
           "dweller",
           "qwent",
-          "tani",
-          "dorn"
+          "tani"
         ],
         "materials": [
           {
@@ -3383,10 +3599,10 @@
       {
         "grade": 2,
         "engineerIds": [
+          "dorn",
           "dweller",
           "qwent",
-          "tani",
-          "dorn"
+          "tani"
         ],
         "materials": [
           {
@@ -3402,10 +3618,10 @@
       {
         "grade": 3,
         "engineerIds": [
+          "dorn",
           "dweller",
           "qwent",
-          "tani",
-          "dorn"
+          "tani"
         ],
         "materials": [
           {
@@ -3425,10 +3641,10 @@
       {
         "grade": 4,
         "engineerIds": [
+          "dorn",
           "dweller",
           "qwent",
-          "tani",
-          "dorn"
+          "tani"
         ],
         "materials": [
           {
@@ -3448,10 +3664,10 @@
       {
         "grade": 5,
         "engineerIds": [
+          "dorn",
           "dweller",
           "qwent",
-          "tani",
-          "dorn"
+          "tani"
         ],
         "materials": [
           {
@@ -3478,10 +3694,10 @@
       {
         "grade": 1,
         "engineerIds": [
+          "dorn",
           "dweller",
           "qwent",
-          "tani",
-          "dorn"
+          "tani"
         ],
         "materials": [
           {
@@ -3493,10 +3709,10 @@
       {
         "grade": 2,
         "engineerIds": [
+          "dorn",
           "dweller",
           "qwent",
-          "tani",
-          "dorn"
+          "tani"
         ],
         "materials": [
           {
@@ -3512,10 +3728,10 @@
       {
         "grade": 3,
         "engineerIds": [
+          "dorn",
           "dweller",
           "qwent",
-          "tani",
-          "dorn"
+          "tani"
         ],
         "materials": [
           {
@@ -3535,10 +3751,10 @@
       {
         "grade": 4,
         "engineerIds": [
+          "dorn",
           "dweller",
           "qwent",
-          "tani",
-          "dorn"
+          "tani"
         ],
         "materials": [
           {
@@ -3558,10 +3774,10 @@
       {
         "grade": 5,
         "engineerIds": [
+          "dorn",
           "dweller",
           "qwent",
-          "tani",
-          "dorn"
+          "tani"
         ],
         "materials": [
           {
@@ -3588,10 +3804,10 @@
       {
         "grade": 1,
         "engineerIds": [
+          "dorn",
           "dweller",
           "qwent",
-          "tani",
-          "dorn"
+          "tani"
         ],
         "materials": [
           {
@@ -3603,10 +3819,10 @@
       {
         "grade": 2,
         "engineerIds": [
+          "dorn",
           "dweller",
           "qwent",
-          "tani",
-          "dorn"
+          "tani"
         ],
         "materials": [
           {
@@ -3622,10 +3838,10 @@
       {
         "grade": 3,
         "engineerIds": [
+          "dorn",
           "dweller",
           "qwent",
-          "tani",
-          "dorn"
+          "tani"
         ],
         "materials": [
           {
@@ -3645,10 +3861,10 @@
       {
         "grade": 4,
         "engineerIds": [
+          "dorn",
           "dweller",
           "qwent",
-          "tani",
-          "dorn"
+          "tani"
         ],
         "materials": [
           {
@@ -3668,10 +3884,10 @@
       {
         "grade": 5,
         "engineerIds": [
+          "dorn",
           "dweller",
           "qwent",
-          "tani",
-          "dorn"
+          "tani"
         ],
         "materials": [
           {
@@ -3698,10 +3914,10 @@
       {
         "grade": 1,
         "engineerIds": [
+          "dorn",
           "dweller",
           "qwent",
-          "tani",
-          "dorn"
+          "tani"
         ],
         "materials": [
           {
@@ -3713,10 +3929,10 @@
       {
         "grade": 2,
         "engineerIds": [
+          "dorn",
           "dweller",
           "qwent",
-          "tani",
-          "dorn"
+          "tani"
         ],
         "materials": [
           {
@@ -3732,10 +3948,10 @@
       {
         "grade": 3,
         "engineerIds": [
+          "dorn",
           "dweller",
           "qwent",
-          "tani",
-          "dorn"
+          "tani"
         ],
         "materials": [
           {
@@ -3755,10 +3971,10 @@
       {
         "grade": 4,
         "engineerIds": [
+          "dorn",
           "dweller",
           "qwent",
-          "tani",
-          "dorn"
+          "tani"
         ],
         "materials": [
           {
@@ -3778,10 +3994,10 @@
       {
         "grade": 5,
         "engineerIds": [
+          "dorn",
           "dweller",
           "qwent",
-          "tani",
-          "dorn"
+          "tani"
         ],
         "materials": [
           {
@@ -3808,9 +4024,9 @@
       {
         "grade": 1,
         "engineerIds": [
+          "dorn",
           "qwent",
-          "tani",
-          "dorn"
+          "tani"
         ],
         "materials": [
           {
@@ -3822,9 +4038,9 @@
       {
         "grade": 2,
         "engineerIds": [
+          "dorn",
           "qwent",
-          "tani",
-          "dorn"
+          "tani"
         ],
         "materials": [
           {
@@ -3840,9 +4056,9 @@
       {
         "grade": 3,
         "engineerIds": [
+          "dorn",
           "qwent",
-          "tani",
-          "dorn"
+          "tani"
         ],
         "materials": [
           {
@@ -3862,9 +4078,9 @@
       {
         "grade": 4,
         "engineerIds": [
+          "dorn",
           "qwent",
-          "tani",
-          "dorn"
+          "tani"
         ],
         "materials": [
           {
@@ -3884,9 +4100,9 @@
       {
         "grade": 5,
         "engineerIds": [
+          "dorn",
           "qwent",
-          "tani",
-          "dorn"
+          "tani"
         ],
         "materials": [
           {
@@ -3913,9 +4129,9 @@
       {
         "grade": 1,
         "engineerIds": [
+          "dorn",
           "qwent",
-          "tani",
-          "dorn"
+          "tani"
         ],
         "materials": [
           {
@@ -3927,9 +4143,9 @@
       {
         "grade": 2,
         "engineerIds": [
+          "dorn",
           "qwent",
-          "tani",
-          "dorn"
+          "tani"
         ],
         "materials": [
           {
@@ -3945,9 +4161,9 @@
       {
         "grade": 3,
         "engineerIds": [
+          "dorn",
           "qwent",
-          "tani",
-          "dorn"
+          "tani"
         ],
         "materials": [
           {
@@ -3967,9 +4183,9 @@
       {
         "grade": 4,
         "engineerIds": [
+          "dorn",
           "qwent",
-          "tani",
-          "dorn"
+          "tani"
         ],
         "materials": [
           {
@@ -3989,9 +4205,9 @@
       {
         "grade": 5,
         "engineerIds": [
+          "dorn",
           "qwent",
-          "tani",
-          "dorn"
+          "tani"
         ],
         "materials": [
           {
@@ -4117,7 +4333,11 @@
     "grades": [
       {
         "grade": 1,
-        "engineerIds": [],
+        "engineerIds": [
+          "sarge",
+          "ramtah",
+          "hicks"
+        ],
         "materials": [
           {
             "symbol": "phosphorus",
@@ -4127,7 +4347,11 @@
       },
       {
         "grade": 2,
-        "engineerIds": [],
+        "engineerIds": [
+          "sarge",
+          "ramtah",
+          "hicks"
+        ],
         "materials": [
           {
             "symbol": "manganese",
@@ -4141,7 +4365,11 @@
       },
       {
         "grade": 3,
-        "engineerIds": [],
+        "engineerIds": [
+          "sarge",
+          "ramtah",
+          "hicks"
+        ],
         "materials": [
           {
             "symbol": "conductiveceramics",
@@ -4159,7 +4387,11 @@
       },
       {
         "grade": 4,
-        "engineerIds": [],
+        "engineerIds": [
+          "sarge",
+          "ramtah",
+          "hicks"
+        ],
         "materials": [
           {
             "symbol": "conductivecomponents",
@@ -4177,7 +4409,11 @@
       },
       {
         "grade": 5,
-        "engineerIds": [],
+        "engineerIds": [
+          "sarge",
+          "ramtah",
+          "hicks"
+        ],
         "materials": [
           {
             "symbol": "conductiveceramics",
@@ -4202,7 +4438,11 @@
     "grades": [
       {
         "grade": 1,
-        "engineerIds": [],
+        "engineerIds": [
+          "sarge",
+          "ramtah",
+          "hicks"
+        ],
         "materials": [
           {
             "symbol": "nickel",
@@ -4212,7 +4452,11 @@
       },
       {
         "grade": 2,
-        "engineerIds": [],
+        "engineerIds": [
+          "sarge",
+          "ramtah",
+          "hicks"
+        ],
         "materials": [
           {
             "symbol": "nickel",
@@ -4226,7 +4470,11 @@
       },
       {
         "grade": 3,
-        "engineerIds": [],
+        "engineerIds": [
+          "sarge",
+          "ramtah",
+          "hicks"
+        ],
         "materials": [
           {
             "symbol": "nickel",
@@ -4244,7 +4492,11 @@
       },
       {
         "grade": 4,
-        "engineerIds": [],
+        "engineerIds": [
+          "sarge",
+          "ramtah",
+          "hicks"
+        ],
         "materials": [
           {
             "symbol": "molybdenum",
@@ -4262,7 +4514,11 @@
       },
       {
         "grade": 5,
-        "engineerIds": [],
+        "engineerIds": [
+          "sarge",
+          "ramtah",
+          "hicks"
+        ],
         "materials": [
           {
             "symbol": "highdensitycomposites",
@@ -4287,7 +4543,11 @@
     "grades": [
       {
         "grade": 1,
-        "engineerIds": [],
+        "engineerIds": [
+          "sarge",
+          "ramtah",
+          "hicks"
+        ],
         "materials": [
           {
             "symbol": "wornshieldemitters",
@@ -4297,7 +4557,11 @@
       },
       {
         "grade": 2,
-        "engineerIds": [],
+        "engineerIds": [
+          "sarge",
+          "ramtah",
+          "hicks"
+        ],
         "materials": [
           {
             "symbol": "carbon",
@@ -4311,7 +4575,11 @@
       },
       {
         "grade": 3,
-        "engineerIds": [],
+        "engineerIds": [
+          "sarge",
+          "ramtah",
+          "hicks"
+        ],
         "materials": [
           {
             "symbol": "carbon",
@@ -4329,7 +4597,11 @@
       },
       {
         "grade": 4,
-        "engineerIds": [],
+        "engineerIds": [
+          "sarge",
+          "ramtah",
+          "hicks"
+        ],
         "materials": [
           {
             "symbol": "fedproprietarycomposites",
@@ -4347,7 +4619,11 @@
       },
       {
         "grade": 5,
-        "engineerIds": [],
+        "engineerIds": [
+          "sarge",
+          "ramtah",
+          "hicks"
+        ],
         "materials": [
           {
             "symbol": "compoundshielding",
@@ -4372,7 +4648,11 @@
     "grades": [
       {
         "grade": 1,
-        "engineerIds": [],
+        "engineerIds": [
+          "turner",
+          "jameson",
+          "hicks"
+        ],
         "materials": [
           {
             "symbol": "wornshieldemitters",
@@ -4382,7 +4662,11 @@
       },
       {
         "grade": 2,
-        "engineerIds": [],
+        "engineerIds": [
+          "turner",
+          "jameson",
+          "hicks"
+        ],
         "materials": [
           {
             "symbol": "carbon",
@@ -4396,7 +4680,11 @@
       },
       {
         "grade": 3,
-        "engineerIds": [],
+        "engineerIds": [
+          "turner",
+          "jameson",
+          "hicks"
+        ],
         "materials": [
           {
             "symbol": "carbon",
@@ -4414,7 +4702,11 @@
       },
       {
         "grade": 4,
-        "engineerIds": [],
+        "engineerIds": [
+          "turner",
+          "jameson",
+          "hicks"
+        ],
         "materials": [
           {
             "symbol": "fedproprietarycomposites",
@@ -4432,7 +4724,11 @@
       },
       {
         "grade": 5,
-        "engineerIds": [],
+        "engineerIds": [
+          "turner",
+          "jameson",
+          "hicks"
+        ],
         "materials": [
           {
             "symbol": "compoundshielding",
@@ -4458,10 +4754,10 @@
       {
         "grade": 1,
         "engineerIds": [
-          "farseer",
-          "tani",
+          "cheung",
           "dorn",
-          "cheung"
+          "farseer",
+          "tani"
         ],
         "materials": [
           {
@@ -4473,10 +4769,10 @@
       {
         "grade": 2,
         "engineerIds": [
-          "farseer",
-          "tani",
+          "cheung",
           "dorn",
-          "cheung"
+          "farseer",
+          "tani"
         ],
         "materials": [
           {
@@ -4492,10 +4788,10 @@
       {
         "grade": 3,
         "engineerIds": [
-          "farseer",
-          "tani",
+          "cheung",
           "dorn",
-          "cheung"
+          "farseer",
+          "tani"
         ],
         "materials": [
           {
@@ -4515,10 +4811,10 @@
       {
         "grade": 4,
         "engineerIds": [
-          "farseer",
-          "tani",
+          "cheung",
           "dorn",
-          "cheung"
+          "farseer",
+          "tani"
         ],
         "materials": [
           {
@@ -4538,10 +4834,10 @@
       {
         "grade": 5,
         "engineerIds": [
-          "farseer",
-          "tani",
+          "cheung",
           "dorn",
-          "cheung"
+          "farseer",
+          "tani"
         ],
         "materials": [
           {
@@ -4568,10 +4864,10 @@
       {
         "grade": 1,
         "engineerIds": [
-          "farseer",
-          "tani",
+          "cheung",
           "dorn",
-          "cheung"
+          "farseer",
+          "tani"
         ],
         "materials": [
           {
@@ -4583,10 +4879,10 @@
       {
         "grade": 2,
         "engineerIds": [
-          "farseer",
-          "tani",
+          "cheung",
           "dorn",
-          "cheung"
+          "farseer",
+          "tani"
         ],
         "materials": [
           {
@@ -4602,10 +4898,10 @@
       {
         "grade": 3,
         "engineerIds": [
-          "farseer",
-          "tani",
+          "cheung",
           "dorn",
-          "cheung"
+          "farseer",
+          "tani"
         ],
         "materials": [
           {
@@ -4625,10 +4921,10 @@
       {
         "grade": 4,
         "engineerIds": [
-          "farseer",
-          "tani",
+          "cheung",
           "dorn",
-          "cheung"
+          "farseer",
+          "tani"
         ],
         "materials": [
           {
@@ -4648,10 +4944,10 @@
       {
         "grade": 5,
         "engineerIds": [
-          "farseer",
-          "tani",
+          "cheung",
           "dorn",
-          "cheung"
+          "farseer",
+          "tani"
         ],
         "materials": [
           {
@@ -4678,10 +4974,10 @@
       {
         "grade": 1,
         "engineerIds": [
-          "farseer",
-          "tani",
+          "cheung",
           "dorn",
-          "cheung"
+          "farseer",
+          "tani"
         ],
         "materials": [
           {
@@ -4693,10 +4989,10 @@
       {
         "grade": 2,
         "engineerIds": [
-          "farseer",
-          "tani",
+          "cheung",
           "dorn",
-          "cheung"
+          "farseer",
+          "tani"
         ],
         "materials": [
           {
@@ -4712,10 +5008,10 @@
       {
         "grade": 3,
         "engineerIds": [
-          "farseer",
-          "tani",
+          "cheung",
           "dorn",
-          "cheung"
+          "farseer",
+          "tani"
         ],
         "materials": [
           {
@@ -4735,10 +5031,10 @@
       {
         "grade": 4,
         "engineerIds": [
-          "farseer",
-          "tani",
+          "cheung",
           "dorn",
-          "cheung"
+          "farseer",
+          "tani"
         ],
         "materials": [
           {
@@ -4758,10 +5054,10 @@
       {
         "grade": 5,
         "engineerIds": [
-          "farseer",
-          "tani",
+          "cheung",
           "dorn",
-          "cheung"
+          "farseer",
+          "tani"
         ],
         "materials": [
           {
@@ -4788,8 +5084,8 @@
       {
         "grade": 1,
         "engineerIds": [
-          "martuuk",
-          "cheung"
+          "cheung",
+          "martuuk"
         ],
         "materials": [
           {
@@ -4801,8 +5097,8 @@
       {
         "grade": 2,
         "engineerIds": [
-          "martuuk",
-          "cheung"
+          "cheung",
+          "martuuk"
         ],
         "materials": [
           {
@@ -4818,8 +5114,8 @@
       {
         "grade": 3,
         "engineerIds": [
-          "martuuk",
-          "cheung"
+          "cheung",
+          "martuuk"
         ],
         "materials": [
           {
@@ -4839,8 +5135,8 @@
       {
         "grade": 4,
         "engineerIds": [
-          "martuuk",
-          "cheung"
+          "cheung",
+          "martuuk"
         ],
         "materials": [
           {
@@ -4860,8 +5156,8 @@
       {
         "grade": 5,
         "engineerIds": [
-          "martuuk",
-          "cheung"
+          "cheung",
+          "martuuk"
         ],
         "materials": [
           {
@@ -4888,8 +5184,8 @@
       {
         "grade": 1,
         "engineerIds": [
-          "martuuk",
-          "cheung"
+          "cheung",
+          "martuuk"
         ],
         "materials": [
           {
@@ -4901,8 +5197,8 @@
       {
         "grade": 2,
         "engineerIds": [
-          "martuuk",
-          "cheung"
+          "cheung",
+          "martuuk"
         ],
         "materials": [
           {
@@ -4918,8 +5214,8 @@
       {
         "grade": 3,
         "engineerIds": [
-          "martuuk",
-          "cheung"
+          "cheung",
+          "martuuk"
         ],
         "materials": [
           {
@@ -4939,8 +5235,8 @@
       {
         "grade": 4,
         "engineerIds": [
-          "martuuk",
-          "cheung"
+          "cheung",
+          "martuuk"
         ],
         "materials": [
           {
@@ -4960,8 +5256,8 @@
       {
         "grade": 5,
         "engineerIds": [
-          "martuuk",
-          "cheung"
+          "cheung",
+          "martuuk"
         ],
         "materials": [
           {
@@ -4988,8 +5284,8 @@
       {
         "grade": 1,
         "engineerIds": [
-          "martuuk",
-          "cheung"
+          "cheung",
+          "martuuk"
         ],
         "materials": [
           {
@@ -5001,8 +5297,8 @@
       {
         "grade": 2,
         "engineerIds": [
-          "martuuk",
-          "cheung"
+          "cheung",
+          "martuuk"
         ],
         "materials": [
           {
@@ -5018,8 +5314,8 @@
       {
         "grade": 3,
         "engineerIds": [
-          "martuuk",
-          "cheung"
+          "cheung",
+          "martuuk"
         ],
         "materials": [
           {
@@ -5039,8 +5335,8 @@
       {
         "grade": 4,
         "engineerIds": [
-          "martuuk",
-          "cheung"
+          "cheung",
+          "martuuk"
         ],
         "materials": [
           {
@@ -5060,8 +5356,8 @@
       {
         "grade": 5,
         "engineerIds": [
-          "martuuk",
-          "cheung"
+          "cheung",
+          "martuuk"
         ],
         "materials": [
           {
@@ -5088,8 +5384,8 @@
       {
         "grade": 1,
         "engineerIds": [
-          "martuuk",
-          "cheung"
+          "cheung",
+          "martuuk"
         ],
         "materials": [
           {
@@ -5101,8 +5397,8 @@
       {
         "grade": 2,
         "engineerIds": [
-          "martuuk",
-          "cheung"
+          "cheung",
+          "martuuk"
         ],
         "materials": [
           {
@@ -5118,8 +5414,8 @@
       {
         "grade": 3,
         "engineerIds": [
-          "martuuk",
-          "cheung"
+          "cheung",
+          "martuuk"
         ],
         "materials": [
           {
@@ -5139,8 +5435,8 @@
       {
         "grade": 4,
         "engineerIds": [
-          "martuuk",
-          "cheung"
+          "cheung",
+          "martuuk"
         ],
         "materials": [
           {
@@ -5160,8 +5456,8 @@
       {
         "grade": 5,
         "engineerIds": [
-          "martuuk",
-          "cheung"
+          "cheung",
+          "martuuk"
         ],
         "materials": [
           {
@@ -5188,8 +5484,8 @@
       {
         "grade": 1,
         "engineerIds": [
-          "martuuk",
-          "cheung"
+          "cheung",
+          "martuuk"
         ],
         "materials": [
           {
@@ -5201,8 +5497,8 @@
       {
         "grade": 2,
         "engineerIds": [
-          "martuuk",
-          "cheung"
+          "cheung",
+          "martuuk"
         ],
         "materials": [
           {
@@ -5218,8 +5514,8 @@
       {
         "grade": 3,
         "engineerIds": [
-          "martuuk",
-          "cheung"
+          "cheung",
+          "martuuk"
         ],
         "materials": [
           {
@@ -5239,8 +5535,8 @@
       {
         "grade": 4,
         "engineerIds": [
-          "martuuk",
-          "cheung"
+          "cheung",
+          "martuuk"
         ],
         "materials": [
           {
@@ -5260,8 +5556,8 @@
       {
         "grade": 5,
         "engineerIds": [
-          "martuuk",
-          "cheung"
+          "cheung",
+          "martuuk"
         ],
         "materials": [
           {
@@ -5287,7 +5583,9 @@
     "grades": [
       {
         "grade": 1,
-        "engineerIds": [],
+        "engineerIds": [
+          "brandon"
+        ],
         "materials": [
           {
             "symbol": "sulphur",
@@ -5297,7 +5595,9 @@
       },
       {
         "grade": 2,
-        "engineerIds": [],
+        "engineerIds": [
+          "brandon"
+        ],
         "materials": [
           {
             "symbol": "chromium",
@@ -5311,7 +5611,9 @@
       },
       {
         "grade": 3,
-        "engineerIds": [],
+        "engineerIds": [
+          "brandon"
+        ],
         "materials": [
           {
             "symbol": "hybridcapacitors",
@@ -5329,7 +5631,9 @@
       },
       {
         "grade": 4,
-        "engineerIds": [],
+        "engineerIds": [
+          "brandon"
+        ],
         "materials": [
           {
             "symbol": "hybridcapacitors",
@@ -5354,7 +5658,9 @@
     "grades": [
       {
         "grade": 1,
-        "engineerIds": [],
+        "engineerIds": [
+          "brandon"
+        ],
         "materials": [
           {
             "symbol": "legacyfirmware",
@@ -5364,7 +5670,9 @@
       },
       {
         "grade": 2,
-        "engineerIds": [],
+        "engineerIds": [
+          "brandon"
+        ],
         "materials": [
           {
             "symbol": "conductivecomponents",
@@ -5378,7 +5686,9 @@
       },
       {
         "grade": 3,
-        "engineerIds": [],
+        "engineerIds": [
+          "brandon"
+        ],
         "materials": [
           {
             "symbol": "conductivecomponents",
@@ -5396,7 +5706,9 @@
       },
       {
         "grade": 4,
-        "engineerIds": [],
+        "engineerIds": [
+          "brandon"
+        ],
         "materials": [
           {
             "symbol": "conductivecomponents",
@@ -5422,8 +5734,8 @@
       {
         "grade": 1,
         "engineerIds": [
-          "martuuk",
-          "cheung"
+          "cheung",
+          "martuuk"
         ],
         "materials": [
           {
@@ -5435,8 +5747,8 @@
       {
         "grade": 2,
         "engineerIds": [
-          "martuuk",
-          "cheung"
+          "cheung",
+          "martuuk"
         ],
         "materials": [
           {
@@ -5452,8 +5764,8 @@
       {
         "grade": 3,
         "engineerIds": [
-          "martuuk",
-          "cheung"
+          "cheung",
+          "martuuk"
         ],
         "materials": [
           {
@@ -5473,8 +5785,8 @@
       {
         "grade": 4,
         "engineerIds": [
-          "martuuk",
-          "cheung"
+          "cheung",
+          "martuuk"
         ],
         "materials": [
           {
@@ -5494,8 +5806,8 @@
       {
         "grade": 5,
         "engineerIds": [
-          "martuuk",
-          "cheung"
+          "cheung",
+          "martuuk"
         ],
         "materials": [
           {
@@ -5522,8 +5834,8 @@
       {
         "grade": 1,
         "engineerIds": [
-          "martuuk",
-          "cheung"
+          "cheung",
+          "martuuk"
         ],
         "materials": [
           {
@@ -5535,8 +5847,8 @@
       {
         "grade": 2,
         "engineerIds": [
-          "martuuk",
-          "cheung"
+          "cheung",
+          "martuuk"
         ],
         "materials": [
           {
@@ -5552,8 +5864,8 @@
       {
         "grade": 3,
         "engineerIds": [
-          "martuuk",
-          "cheung"
+          "cheung",
+          "martuuk"
         ],
         "materials": [
           {
@@ -5573,8 +5885,8 @@
       {
         "grade": 4,
         "engineerIds": [
-          "martuuk",
-          "cheung"
+          "cheung",
+          "martuuk"
         ],
         "materials": [
           {
@@ -5594,8 +5906,8 @@
       {
         "grade": 5,
         "engineerIds": [
-          "martuuk",
-          "cheung"
+          "cheung",
+          "martuuk"
         ],
         "materials": [
           {
@@ -5722,8 +6034,8 @@
       {
         "grade": 1,
         "engineerIds": [
-          "martuuk",
-          "cheung"
+          "cheung",
+          "martuuk"
         ],
         "materials": [
           {
@@ -5735,8 +6047,8 @@
       {
         "grade": 2,
         "engineerIds": [
-          "martuuk",
-          "cheung"
+          "cheung",
+          "martuuk"
         ],
         "materials": [
           {
@@ -5752,8 +6064,8 @@
       {
         "grade": 3,
         "engineerIds": [
-          "martuuk",
-          "cheung"
+          "cheung",
+          "martuuk"
         ],
         "materials": [
           {
@@ -5773,8 +6085,8 @@
       {
         "grade": 4,
         "engineerIds": [
-          "martuuk",
-          "cheung"
+          "cheung",
+          "martuuk"
         ],
         "materials": [
           {
@@ -5794,8 +6106,8 @@
       {
         "grade": 5,
         "engineerIds": [
-          "martuuk",
-          "cheung"
+          "cheung",
+          "martuuk"
         ],
         "materials": [
           {
