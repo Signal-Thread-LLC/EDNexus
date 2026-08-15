@@ -95,8 +95,16 @@ Installers are self-contained (no separate .NET install needed).
   The immutable Steam Deck filesystem rules out native package installs, and Flatpak also covers
   Debian/Ubuntu/Fedora/Arch from a single build. See [`packaging/flatpak/`](packaging/flatpak/).
 
-Preferences are stored in **`Documents\EDNexus`** (Windows) / **`~/EDNexus`** (Linux) — never in the
-install directory, so the app folder can stay read-only.
+Preferences are stored in **`%LOCALAPPDATA%\EDNexus`** (Windows) / **`~/.local/share/EDNexus`**
+(Linux), alongside the logs — never in the install directory, so the app folder can stay read-only.
+They deliberately do **not** live in Documents: that folder is commonly cloud-synced (OneDrive
+Known Folder Move), which would copy the settings — including your Inara API key — off-machine, and
+invite sync conflicts on a file that is rewritten every time you tweak the dashboard. An older
+install's settings are migrated out of `Documents\EDNexus` automatically on first run.
+
+To carry your **dashboard arrangement** between machines, use **Settings → Dashboard → Export…**
+and **Import…**. That file contains only the card layout — never your API key — so it is safe to
+sync, share or keep in version control.
 
 ### Building the installers locally
 

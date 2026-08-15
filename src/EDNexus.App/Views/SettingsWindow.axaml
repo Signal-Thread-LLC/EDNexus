@@ -75,13 +75,22 @@
       <Grid ColumnDefinitions="*,Auto">
         <TextBlock Grid.Column="0" Text="DASHBOARD" Foreground="#F07100" FontSize="12"
                    FontWeight="SemiBold" LetterSpacing="2" VerticalAlignment="Center" />
-        <Button Grid.Column="1" x:Name="ResetLayoutButton" Content="Reset layout" Click="OnResetLayout"
-                Padding="10,4" FontSize="12" ToolTip.Tip="Restore the shipped order, widths and visibility" />
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+          <Button x:Name="ExportLayoutButton" Content="Export…" Click="OnExportLayout"
+                  Padding="10,4" FontSize="12"
+                  ToolTip.Tip="Save this arrangement to a file you can carry to another machine" />
+          <Button x:Name="ImportLayoutButton" Content="Import…" Click="OnImportLayout"
+                  Padding="10,4" FontSize="12"
+                  ToolTip.Tip="Load an arrangement exported from another machine" />
+          <Button x:Name="ResetLayoutButton" Content="Reset" Click="OnResetLayout"
+                  Padding="10,4" FontSize="12" ToolTip.Tip="Restore the shipped order, widths and visibility" />
+        </StackPanel>
       </Grid>
       <Border Background="#0F1114" CornerRadius="6" Padding="16">
         <StackPanel Spacing="10">
           <TextBlock Foreground="#8A909C" FontSize="12" TextWrapping="Wrap"
-                     Text="Reorder, resize and hide cards. Wide cards take a full row; narrow ones sit two to a row. Collapsing a card from its header is remembered too." />
+                     Text="Reorder, resize and hide cards. Wide cards take a full row; narrow ones sit two to a row. Collapsing a card from its header is remembered too. Export carries only the layout — never your Inara key — so it is safe to sync or share." />
+          <TextBlock x:Name="LayoutStatus" Foreground="#F07100" FontSize="12" TextWrapping="Wrap" IsVisible="False" />
           <ScrollViewer MaxHeight="320" VerticalScrollBarVisibility="Auto"
                         HorizontalScrollBarVisibility="Disabled">
             <ItemsControl x:Name="CardList">
