@@ -125,18 +125,19 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         foreach (var card in ordered) Cards.Add(card);
     }
 
-    /// <summary>Snapshot the current arrangement and persist it.</summary>
-    private void SaveLayout()
-    {
-        _boot.ApplyDashboardLayout(Cards.Select((c, i) => new CardLayout
+    /// <summary>The arrangement as it currently stands on screen.</summary>
+    private IReadOnlyList<CardLayout> CurrentLayout()
+        => Cards.Select((c, i) => new CardLayout
         {
             Id = c.Id,
             Order = i,
             Visible = c.IsVisible,
             Width = c.Width,
             Collapsed = c.IsCollapsed,
-        }));
-    }
+        }).ToList();
+
+    /// <summary>Snapshot the current arrangement and persist it.</summary>
+    private void SaveLayout() => _boot.ApplyDashboardLayout(CurrentLayout());
 
     /// <summary>Move a card one place earlier in the flow.</summary>
     [RelayCommand]
@@ -150,12 +151,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     {
         if (string.IsNullOrEmpty(id)) return;
 
-        var current = Cards.Select((c, i) => new CardLayout
-        {
-            Id = c.Id, Order = i, Visible = c.IsVisible, Width = c.Width, Collapsed = c.IsCollapsed,
-        }).ToList();
-
-        Rearrange(DashboardLayout.Move(current, id, delta));
+        Rearrange(DashboardLayout.Move(CurrentLayout(), id, delta));
         SaveLayout();
     }
 
@@ -165,6 +161,24 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     {
         Rearrange(DashboardLayout.Defaults(CardDefaults()));
         SaveLayout();
+    }
+
+    /// <summary>The current arrangement as portable JSON, for sharing between machines.</summary>
+    public string ExportLayoutJson() => DashboardLayoutFile.Write(CurrentLayout());
+
+    /// <summary>
+    /// Apply an exported arrangement. Returns false when the file isn't an EDNexus layout, leaving
+    /// the dashboard untouched — a bad import should be a no-op, not a wrecked dashboard.
+    /// </summary>
+    public bool ImportLayoutJson(string? json)
+    {
+        if (DashboardLayoutFile.TryRead(json) is not { } imported) return false;
+
+        // Merge rather than replace, so a layout from a different build still lands sensibly:
+        // cards it doesn't mention keep their defaults, and ones this build lacks are dropped.
+        Rearrange(DashboardLayout.Merge(CardDefaults(), imported));
+        SaveLayout();
+        return true;
     }
 
     /// <summary>Create a fresh engine host and wire crash reporting to its bus.</summary>

@@ -2,6 +2,8 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Interactivity;
+using Avalonia.Platform.Storage;
+using EDNexus.Core.Settings;
 using System.Diagnostics;
 using System.IO;
 
@@ -174,16 +176,97 @@ public partial class SettingsWindow : Window
         if (up) _dashboard.MoveCardUpCommand.Execute(id);
         else _dashboard.MoveCardDownCommand.Execute(id);
 
-        // The dashboard rebuilds its collection to reorder, so rebind to show the new order here.
-        CardList.ItemsSource = null;
-        CardList.ItemsSource = _dashboard.Cards;
+        RebindCardList();
     }
 
     private void OnResetLayout(object? sender, RoutedEventArgs e)
     {
         if (_dashboard is null) return;
         _dashboard.ResetLayoutCommand.Execute(null);
+        RebindCardList();
+        ShowLayoutStatus("Layout reset to defaults.");
+    }
+
+    /// <summary>
+    /// Write the arrangement to a file the commander chooses. Only the layout travels — the Inara
+    /// key and install id stay in local app data, which is why settings themselves are not synced.
+    /// </summary>
+    private async void OnExportLayout(object? sender, RoutedEventArgs e)
+    {
+        if (_dashboard is null) return;
+
+        var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Export dashboard layout",
+            SuggestedFileName = DashboardLayoutFile.DefaultFileName,
+            DefaultExtension = "json",
+            FileTypeChoices = new[] { LayoutFileType },
+        });
+        if (file is null) return;   // cancelled
+
+        try
+        {
+            await using var stream = await file.OpenWriteAsync();
+            await using var writer = new StreamWriter(stream);
+            await writer.WriteAsync(_dashboard.ExportLayoutJson());
+            ShowLayoutStatus($"Layout exported to {file.Name}.");
+        }
+        catch (Exception ex)
+        {
+            ShowLayoutStatus($"Export failed: {ex.Message}");
+        }
+    }
+
+    private async void OnImportLayout(object? sender, RoutedEventArgs e)
+    {
+        if (_dashboard is null) return;
+
+        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Import dashboard layout",
+            AllowMultiple = false,
+            FileTypeFilter = new[] { LayoutFileType },
+        });
+        if (files.Count == 0) return;   // cancelled
+
+        try
+        {
+            await using var stream = await files[0].OpenReadAsync();
+            using var reader = new StreamReader(stream);
+            var json = await reader.ReadToEndAsync();
+
+            if (_dashboard.ImportLayoutJson(json))
+            {
+                RebindCardList();
+                ShowLayoutStatus($"Layout imported from {files[0].Name}.");
+            }
+            else
+            {
+                ShowLayoutStatus("That file is not an EDNexus dashboard layout — nothing changed.");
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowLayoutStatus($"Import failed: {ex.Message}");
+        }
+    }
+
+    private static FilePickerFileType LayoutFileType => new("EDNexus dashboard layout")
+    {
+        Patterns = new[] { "*.json" },
+    };
+
+    /// <summary>The dashboard rebuilds its collection to reorder, so rebind to show the new order.</summary>
+    private void RebindCardList()
+    {
+        if (_dashboard is null) return;
         CardList.ItemsSource = null;
         CardList.ItemsSource = _dashboard.Cards;
+    }
+
+    private void ShowLayoutStatus(string message)
+    {
+        LayoutStatus.Text = message;
+        LayoutStatus.IsVisible = true;
     }
 }
