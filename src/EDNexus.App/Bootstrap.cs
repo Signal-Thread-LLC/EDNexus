@@ -64,6 +64,13 @@ public sealed class Bootstrap
         Store.Save(Settings);
     }
 
+    /// <summary>Persist the dashboard arrangement (card order, visibility, width, collapse state).</summary>
+    public void ApplyDashboardLayout(IEnumerable<CardLayout> layout)
+    {
+        Settings.Dashboard.Cards = layout.ToList();
+        Store.Save(Settings);
+    }
+
     /// <summary>Persist the pinned Odyssey suit/weapon upgrade (null id clears the pin).</summary>
     public void ApplyOnFootPin(string? kind, string? id, int grade)
     {

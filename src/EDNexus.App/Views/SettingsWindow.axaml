@@ -1,5 +1,6 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:EDNexus.App.ViewModels"
         x:Class="EDNexus.App.Views.SettingsWindow"
         Title="EDNexus — Settings"
         Icon="/Assets/ednexus.png"
@@ -67,6 +68,44 @@
         </StackPanel>
       </StackPanel>
     </Border>
+
+    <!-- Dashboard layout — order, width and visibility per card. Bound to the live card list, so
+         changes take effect on the dashboard behind this window immediately. -->
+    <StackPanel x:Name="DashboardSection" Spacing="8">
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Grid.Column="0" Text="DASHBOARD" Foreground="#F07100" FontSize="12"
+                   FontWeight="SemiBold" LetterSpacing="2" VerticalAlignment="Center" />
+        <Button Grid.Column="1" x:Name="ResetLayoutButton" Content="Reset layout" Click="OnResetLayout"
+                Padding="10,4" FontSize="12" ToolTip.Tip="Restore the shipped order, widths and visibility" />
+      </Grid>
+      <Border Background="#0F1114" CornerRadius="6" Padding="16">
+        <StackPanel Spacing="10">
+          <TextBlock Foreground="#8A909C" FontSize="12" TextWrapping="Wrap"
+                     Text="Reorder, resize and hide cards. Wide cards take a full row; narrow ones sit two to a row. Collapsing a card from its header is remembered too." />
+          <ScrollViewer MaxHeight="320" VerticalScrollBarVisibility="Auto"
+                        HorizontalScrollBarVisibility="Disabled">
+            <ItemsControl x:Name="CardList">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:CardViewModel">
+                  <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto" Margin="0,3">
+                    <Button Grid.Column="0" Content="▲" Padding="8,2" FontSize="11" MinWidth="30"
+                            Click="OnMoveCardUp" Tag="{Binding Id}" ToolTip.Tip="Move earlier" />
+                    <Button Grid.Column="1" Content="▼" Padding="8,2" FontSize="11" MinWidth="30" Margin="4,0,0,0"
+                            Click="OnMoveCardDown" Tag="{Binding Id}" ToolTip.Tip="Move later" />
+                    <TextBlock Grid.Column="2" Text="{Binding Title}" Foreground="#E7E9EE" FontSize="13"
+                               VerticalAlignment="Center" Margin="10,0,8,0" />
+                    <Button Grid.Column="3" Content="{Binding WidthGlyph}" Padding="8,2" FontSize="11" MinWidth="34"
+                            Command="{Binding ToggleWidthCommand}" ToolTip.Tip="Toggle narrow / wide" />
+                    <CheckBox Grid.Column="4" Content="Show" Margin="10,0,0,0" Foreground="#E7E9EE"
+                              FontSize="12" IsChecked="{Binding IsVisible}" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </StackPanel>
+      </Border>
+    </StackPanel>
 
     <!-- Developer options — hidden entirely when the dev tools are stripped/disabled (FeatureFlags). -->
     <StackPanel x:Name="DevSection" Spacing="8" IsVisible="False">

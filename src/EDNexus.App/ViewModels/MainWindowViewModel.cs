@@ -9,6 +9,7 @@ using CommunityToolkit.Mvvm.Input;
 using EDNexus.App.Views;
 using EDNexus.Core;
 using EDNexus.Core.Dev;
+using EDNexus.Core.Settings;
 
 namespace EDNexus.App.ViewModels;
 
@@ -55,6 +56,9 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             new ExobiologyCardViewModel(_context),
         };
 
+        ApplySavedLayout();
+        foreach (var card in Cards) card.LayoutChanged += _ => SaveLayout();
+
         DevMode = _boot.Dev.Enabled;
         JournalStatus = _host.JournalFound
             ? $"● Watching  {_host.JournalDirectory}"
@@ -87,6 +91,81 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
     /// <summary>The dashboard cards, in display order.</summary>
     public ObservableCollection<CardViewModel> Cards { get; }
+
+    // --- Dashboard layout: order, visibility, width and collapse, persisted per card. ---
+
+    private IEnumerable<CardDefaults> CardDefaults() => Cards.Select(c => new CardDefaults(c.Id, c.DefaultWidth));
+
+    /// <summary>
+    /// Reorder and configure the cards from the saved layout. Tolerant by design: a saved entry for
+    /// a card that no longer exists is dropped, and a card added since the layout was saved keeps
+    /// its defaults and lands at the end rather than vanishing.
+    /// </summary>
+    private void ApplySavedLayout()
+    {
+        var layout = DashboardLayout.Merge(CardDefaults(), _boot.Settings.Dashboard.Cards);
+        Rearrange(layout);
+    }
+
+    /// <summary>Put <see cref="Cards"/> into the given order and push each card's settings onto it.</summary>
+    private void Rearrange(IReadOnlyList<CardLayout> layout)
+    {
+        var byId = Cards.ToDictionary(c => c.Id, StringComparer.OrdinalIgnoreCase);
+
+        var ordered = new List<CardViewModel>();
+        foreach (var entry in layout.OrderBy(c => c.Order))
+        {
+            if (!byId.TryGetValue(entry.Id, out var card)) continue;
+            card.ApplyLayout(entry.Visible, entry.Width, entry.Collapsed);
+            ordered.Add(card);
+        }
+
+        // Rebuild in place so the bound ItemsControl re-renders in the new order.
+        Cards.Clear();
+        foreach (var card in ordered) Cards.Add(card);
+    }
+
+    /// <summary>Snapshot the current arrangement and persist it.</summary>
+    private void SaveLayout()
+    {
+        _boot.ApplyDashboardLayout(Cards.Select((c, i) => new CardLayout
+        {
+            Id = c.Id,
+            Order = i,
+            Visible = c.IsVisible,
+            Width = c.Width,
+            Collapsed = c.IsCollapsed,
+        }));
+    }
+
+    /// <summary>Move a card one place earlier in the flow.</summary>
+    [RelayCommand]
+    private void MoveCardUp(string? id) => MoveCard(id, -1);
+
+    /// <summary>Move a card one place later in the flow.</summary>
+    [RelayCommand]
+    private void MoveCardDown(string? id) => MoveCard(id, +1);
+
+    private void MoveCard(string? id, int delta)
+    {
+        if (string.IsNullOrEmpty(id)) return;
+
+        var current = Cards.Select((c, i) => new CardLayout
+        {
+            Id = c.Id, Order = i, Visible = c.IsVisible, Width = c.Width, Collapsed = c.IsCollapsed,
+        }).ToList();
+
+        Rearrange(DashboardLayout.Move(current, id, delta));
+        SaveLayout();
+    }
+
+    /// <summary>Restore the shipped order, widths and visibility.</summary>
+    [RelayCommand]
+    private void ResetLayout()
+    {
+        Rearrange(DashboardLayout.Defaults(CardDefaults()));
+        SaveLayout();
+    }
 
     /// <summary>Create a fresh engine host and wire crash reporting to its bus.</summary>
     private EngineHost BuildHost()
@@ -125,7 +204,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     {
         var owner = (Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.MainWindow;
         var wasDev = _boot.Dev.Enabled;
-        var dialog = new SettingsWindow(_boot);
+        var dialog = new SettingsWindow(_boot, this);
         if (owner is not null) await dialog.ShowDialog(owner);
         else dialog.Show();
         RefreshPrivacyStatus();

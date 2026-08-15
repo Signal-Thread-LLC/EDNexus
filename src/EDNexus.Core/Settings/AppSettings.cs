@@ -26,6 +26,12 @@ public sealed class AppSettings
 
     /// <summary>The commander's pinned engineering goal, if any.</summary>
     public EngineeringSettings Engineering { get; set; } = new();
+
+    /// <summary>
+    /// The commander's dashboard arrangement — card order, visibility, width and collapse state.
+    /// Empty until they first customise it, so a fresh install uses the shipped layout.
+    /// </summary>
+    public DashboardSettings Dashboard { get; set; } = new();
 }
 
 /// <summary>The single pinned blueprint the Engineering card focuses on. Null id means nothing pinned.</summary>

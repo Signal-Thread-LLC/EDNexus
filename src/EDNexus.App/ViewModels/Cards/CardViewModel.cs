@@ -80,6 +80,39 @@ public abstract partial class CardViewModel : CommunityToolkit.Mvvm.ComponentMod
         Id = id;
         Title = title;
         _width = width;
+        DefaultWidth = width;
+    }
+
+    /// <summary>The width this card ships with, so "reset layout" can restore it.</summary>
+    public double DefaultWidth { get; }
+
+    /// <summary>
+    /// Raised when the commander changes something the layout persists. The shell subscribes and
+    /// saves; the card itself has no idea a settings store exists.
+    /// </summary>
+    public event Action<CardViewModel>? LayoutChanged;
+
+    /// <summary>Apply a saved arrangement without raising <see cref="LayoutChanged"/>.</summary>
+    public void ApplyLayout(bool visible, double width, bool collapsed)
+    {
+        _applyingLayout = true;
+        try
+        {
+            IsVisible = visible;
+            Width = width > 0 ? width : DefaultWidth;
+            IsCollapsed = collapsed;
+        }
+        finally
+        {
+            _applyingLayout = false;
+        }
+    }
+
+    private bool _applyingLayout;
+
+    private void RaiseLayoutChanged()
+    {
+        if (!_applyingLayout) LayoutChanged?.Invoke(this);
     }
 
     /// <summary>Stable key, aligned with the dev-mode sample source keys (e.g. "location", "market").</summary>
@@ -98,10 +131,41 @@ public abstract partial class CardViewModel : CommunityToolkit.Mvvm.ComponentMod
     /// <summary>Glyph for the collapse toggle, so the header needs no bool-to-text converter.</summary>
     public string CollapseGlyph => IsCollapsed ? "▸" : "▾";
 
-    partial void OnIsCollapsedChanged(bool value) => OnPropertyChanged(nameof(CollapseGlyph));
+    /// <summary>True when the card is at its wide (full-row) size.</summary>
+    public bool IsWide => Width >= WideWidth;
+
+    /// <summary>Glyph for the width toggle: shrink when wide, expand when narrow.</summary>
+    public string WidthGlyph => IsWide ? "▭" : "▬";
+
+    // The dashboard flows cards in a WrapPanel at one of two sizes: half-row and full-row.
+    private const double NarrowWidth = 452;
+    private const double WideWidth = 920;
+
+    partial void OnIsCollapsedChanged(bool value)
+    {
+        OnPropertyChanged(nameof(CollapseGlyph));
+        RaiseLayoutChanged();
+    }
+
+    partial void OnIsVisibleChanged(bool value) => RaiseLayoutChanged();
+
+    partial void OnWidthChanged(double value)
+    {
+        OnPropertyChanged(nameof(IsWide));
+        OnPropertyChanged(nameof(WidthGlyph));
+        RaiseLayoutChanged();
+    }
 
     [RelayCommand]
     private void ToggleCollapse() => IsCollapsed = !IsCollapsed;
+
+    /// <summary>Swap between the half-row and full-row size.</summary>
+    [RelayCommand]
+    private void ToggleWidth() => Width = IsWide ? NarrowWidth : WideWidth;
+
+    /// <summary>Hide the card. It comes back from Settings → Dashboard.</summary>
+    [RelayCommand]
+    private void Hide() => IsVisible = false;
 
     /// <summary>Pull fresh values from the latest state snapshot. Called on the UI thread each tick.</summary>
     public abstract void Update(CommanderState state);
