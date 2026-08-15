@@ -116,7 +116,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         foreach (var entry in layout.OrderBy(c => c.Order))
         {
             if (!byId.TryGetValue(entry.Id, out var card)) continue;
-            card.ApplyLayout(entry.Visible, entry.Width, entry.Collapsed);
+            card.ApplyLayout(entry.Visible, entry.Width, entry.Collapsed, entry.Column);
             ordered.Add(card);
         }
 
@@ -134,6 +134,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             Visible = c.IsVisible,
             Width = c.Width,
             Collapsed = c.IsCollapsed,
+            Column = c.Column,
         }).ToList();
 
     /// <summary>Snapshot the current arrangement and persist it.</summary>
@@ -152,6 +153,21 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         if (string.IsNullOrEmpty(id)) return;
 
         Rearrange(DashboardLayout.Move(CurrentLayout(), id, delta));
+        SaveLayout();
+    }
+
+    /// <summary>
+    /// Drop a card into a column, above <paramref name="beforeId"/> or at the bottom of that column
+    /// when it is null. <paramref name="renderedColumns"/> is where every visible card currently
+    /// sits on screen: the cards still on automatic placement are fixed there first, so arranging
+    /// one card does not shuffle the ones the commander has already looked at.
+    /// </summary>
+    public void PlaceCard(string id, int column, string? beforeId, IReadOnlyDictionary<string, int> renderedColumns)
+    {
+        if (string.IsNullOrEmpty(id)) return;
+
+        var pinned = DashboardLayout.Pin(CurrentLayout(), renderedColumns);
+        Rearrange(DashboardLayout.MoveTo(pinned, id, column, beforeId));
         SaveLayout();
     }
 

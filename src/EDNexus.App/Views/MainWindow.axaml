@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:EDNexus.App.ViewModels"
+        xmlns:controls="clr-namespace:EDNexus.App.Controls"
         x:Class="EDNexus.App.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Title="EDNexus — Commander Console"
@@ -30,12 +31,16 @@
       <Setter Property="Margin" Value="8" />
       <Setter Property="VerticalAlignment" Value="Top" />
     </Style>
+    <!-- The title doubles as the card's drag handle (see MainWindow.axaml.cs) — hence the hand
+         cursor and the tip. Dragging anywhere else would fight the controls on the card. -->
     <Style Selector="TextBlock.cardHeader">
       <Setter Property="Foreground" Value="{StaticResource AmberBrush}" />
       <Setter Property="FontSize" Value="12" />
       <Setter Property="FontWeight" Value="SemiBold" />
       <Setter Property="Margin" Value="0,0,0,10" />
       <Setter Property="LetterSpacing" Value="2" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="ToolTip.Tip" Value="Drag by the title to move this card to another column or position" />
     </Style>
     <Style Selector="TextBlock.label">
       <Setter Property="Foreground" Value="{StaticResource InkDim}" />
@@ -176,20 +181,35 @@
       </Grid>
     </Border>
 
-    <!-- Body: one templated card per CardViewModel, laid out in a wrapping flow. -->
+    <!-- Body: one templated card per CardViewModel, packed into columns. Each card is only as tall
+         as its own content — a short card no longer holds a band of dead space under it waiting for
+         the tallest card that happened to share its row. Card margins do the spacing, so the panel
+         adds none of its own. -->
+    <Panel>
     <ScrollViewer>
-      <ItemsControl ItemsSource="{Binding Cards}" Margin="12">
+      <ItemsControl x:Name="CardHost" ItemsSource="{Binding Cards}" Margin="12"
+                    DragDrop.AllowDrop="True">
         <ItemsControl.ItemsPanel>
           <ItemsPanelTemplate>
-            <WrapPanel Orientation="Horizontal" />
+            <controls:MasonryPanel MinColumnWidth="468" ColumnSpacing="0" RowSpacing="0" />
           </ItemsPanelTemplate>
         </ItemsControl.ItemsPanel>
+
+        <!-- Column, span and visibility belong to the container the panel lays out, not to the card
+             inside it: a hidden card has to leave no slot behind at all. -->
+        <ItemsControl.Styles>
+          <Style Selector="ItemsControl > ContentPresenter" x:DataType="vm:CardViewModel">
+            <Setter Property="controls:MasonryPanel.Column" Value="{Binding Column}" />
+            <Setter Property="controls:MasonryPanel.ColumnSpan" Value="{Binding ColumnSpan}" />
+            <Setter Property="IsVisible" Value="{Binding IsVisible}" />
+          </Style>
+        </ItemsControl.Styles>
 
         <ItemsControl.DataTemplates>
 
           <!-- Location -->
           <DataTemplate DataType="vm:LocationCardViewModel">
-            <Border Classes="card" Width="{Binding Width}" IsVisible="{Binding IsVisible}">
+            <Border Classes="card">
               <StackPanel>
                 <Grid ColumnDefinitions="*,Auto,Auto">
                   <TextBlock Grid.Column="0" Classes="cardHeader" Text="{Binding Title}" />
@@ -215,7 +235,7 @@
 
           <!-- Ship -->
           <DataTemplate DataType="vm:ShipCardViewModel">
-            <Border Classes="card" Width="{Binding Width}" IsVisible="{Binding IsVisible}">
+            <Border Classes="card">
               <StackPanel>
                 <Grid ColumnDefinitions="*,Auto,Auto">
                   <TextBlock Grid.Column="0" Classes="cardHeader" Text="{Binding Title}" />
@@ -243,7 +263,7 @@
 
           <!-- Materials -->
           <DataTemplate DataType="vm:MaterialsCardViewModel">
-            <Border Classes="card" Width="{Binding Width}" IsVisible="{Binding IsVisible}">
+            <Border Classes="card">
               <StackPanel>
                 <Grid ColumnDefinitions="*,Auto,Auto">
                   <TextBlock Grid.Column="0" Classes="cardHeader" Text="{Binding Title}" />
@@ -355,7 +375,7 @@
 
           <!-- Engineering -->
           <DataTemplate DataType="vm:EngineeringCardViewModel">
-            <Border Classes="card" Width="{Binding Width}" IsVisible="{Binding IsVisible}">
+            <Border Classes="card">
               <StackPanel>
                 <Grid ColumnDefinitions="*,Auto">
                   <TextBlock Grid.Column="0" Classes="cardHeader" Text="{Binding Title}" />
@@ -603,7 +623,7 @@
 
           <!-- Cargo -->
           <DataTemplate DataType="vm:CargoCardViewModel">
-            <Border Classes="card" Width="{Binding Width}" IsVisible="{Binding IsVisible}">
+            <Border Classes="card">
               <StackPanel>
                 <Grid ColumnDefinitions="*,Auto,Auto">
                   <TextBlock Grid.Column="0" Classes="cardHeader" Text="{Binding Title}" />
@@ -641,7 +661,7 @@
 
           <!-- Route plotter -->
           <DataTemplate DataType="vm:RouteCardViewModel">
-            <Border Classes="card" Width="{Binding Width}" IsVisible="{Binding IsVisible}">
+            <Border Classes="card">
               <StackPanel>
                 <Grid ColumnDefinitions="*,Auto">
                   <TextBlock Grid.Column="0" Classes="cardHeader" Text="{Binding Title}" />
@@ -738,7 +758,7 @@
 
           <!-- Trade finder -->
           <DataTemplate DataType="vm:TradeCardViewModel">
-            <Border Classes="card" Width="{Binding Width}" IsVisible="{Binding IsVisible}">
+            <Border Classes="card">
               <StackPanel>
                 <Grid ColumnDefinitions="*,Auto">
                   <TextBlock Grid.Column="0" Classes="cardHeader" Text="{Binding Title}" />
@@ -809,7 +829,7 @@
 
           <!-- Colonisation -->
           <DataTemplate DataType="vm:ColonisationCardViewModel">
-            <Border Classes="card" Width="{Binding Width}" IsVisible="{Binding IsVisible}">
+            <Border Classes="card">
               <StackPanel>
                 <Grid ColumnDefinitions="*,Auto,Auto">
                   <TextBlock Grid.Column="0" Classes="cardHeader" Text="{Binding Title}" />
@@ -876,7 +896,7 @@
 
           <!-- Market -->
           <DataTemplate DataType="vm:MarketCardViewModel">
-            <Border Classes="card" Width="{Binding Width}" IsVisible="{Binding IsVisible}">
+            <Border Classes="card">
               <StackPanel>
                 <Grid ColumnDefinitions="*,Auto,Auto">
                   <TextBlock Grid.Column="0" Classes="cardHeader" Text="{Binding Title}" />
@@ -949,7 +969,7 @@
 
           <!-- Exobiology -->
           <DataTemplate DataType="vm:ExobiologyCardViewModel">
-            <Border Classes="card" Width="{Binding Width}" IsVisible="{Binding IsVisible}">
+            <Border Classes="card">
               <StackPanel>
                 <Grid ColumnDefinitions="*,Auto,Auto">
                   <TextBlock Grid.Column="0" Classes="cardHeader" Text="{Binding Title}" />
@@ -1030,7 +1050,7 @@
 
           <!-- Engineers: the unlock path, one actionable step each -->
           <DataTemplate DataType="vm:EngineersCardViewModel">
-            <Border Classes="card" Width="{Binding Width}" IsVisible="{Binding IsVisible}">
+            <Border Classes="card">
               <StackPanel>
                 <Grid ColumnDefinitions="*,Auto">
                   <TextBlock Grid.Column="0" Classes="cardHeader" Text="{Binding Title}" />
@@ -1086,5 +1106,13 @@
         </ItemsControl.DataTemplates>
       </ItemsControl>
     </ScrollViewer>
+
+      <!-- Drop indicator, floated above the cards. It has to sit outside the ScrollViewer so it is
+           never clipped by it, and it must not swallow the drag events on their way to the panel. -->
+      <Canvas IsHitTestVisible="False">
+        <Border x:Name="DropLine" Background="{StaticResource AmberBrush}" CornerRadius="2"
+                IsVisible="False" />
+      </Canvas>
+    </Panel>
   </DockPanel>
 </Window>

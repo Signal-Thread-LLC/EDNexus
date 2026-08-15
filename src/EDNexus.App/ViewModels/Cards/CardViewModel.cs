@@ -93,7 +93,7 @@ public abstract partial class CardViewModel : CommunityToolkit.Mvvm.ComponentMod
     public event Action<CardViewModel>? LayoutChanged;
 
     /// <summary>Apply a saved arrangement without raising <see cref="LayoutChanged"/>.</summary>
-    public void ApplyLayout(bool visible, double width, bool collapsed)
+    public void ApplyLayout(bool visible, double width, bool collapsed, int column = CardLayout.AutoColumn)
     {
         _applyingLayout = true;
         try
@@ -101,6 +101,7 @@ public abstract partial class CardViewModel : CommunityToolkit.Mvvm.ComponentMod
             IsVisible = visible;
             Width = width > 0 ? width : DefaultWidth;
             IsCollapsed = collapsed;
+            Column = column;
         }
         finally
         {
@@ -128,16 +129,30 @@ public abstract partial class CardViewModel : CommunityToolkit.Mvvm.ComponentMod
     [ObservableProperty] private bool _isVisible = true;
     [ObservableProperty] private bool _isCollapsed;
 
+    /// <summary>
+    /// Dashboard column this card was dropped into, or <see cref="CardLayout.AutoColumn"/> while it
+    /// is still packed automatically. Set through <see cref="ApplyLayout"/> by the shell, never by
+    /// the card itself.
+    /// </summary>
+    [ObservableProperty] private int _column = CardLayout.AutoColumn;
+
     /// <summary>Glyph for the collapse toggle, so the header needs no bool-to-text converter.</summary>
     public string CollapseGlyph => IsCollapsed ? "▸" : "▾";
 
-    /// <summary>True when the card is at its wide (full-row) size.</summary>
+    /// <summary>True when the card is at its wide size.</summary>
     public bool IsWide => Width >= WideWidth;
 
     /// <summary>Glyph for the width toggle: shrink when wide, expand when narrow.</summary>
     public string WidthGlyph => IsWide ? "▭" : "▬";
 
-    // The dashboard flows cards in a WrapPanel at one of two sizes: half-row and full-row.
+    /// <summary>
+    /// How many dashboard columns the card claims. The dashboard packs cards into as many columns
+    /// as the window fits rather than at a fixed pixel width, but <see cref="Width"/> stays the
+    /// persisted form of the choice so saved and exported layouts keep working unchanged.
+    /// </summary>
+    public int ColumnSpan => IsWide ? 2 : 1;
+
+    // Nominal footprint of a card at each size; only the ratio between them still shows on screen.
     private const double NarrowWidth = 452;
     private const double WideWidth = 920;
 
@@ -153,6 +168,7 @@ public abstract partial class CardViewModel : CommunityToolkit.Mvvm.ComponentMod
     {
         OnPropertyChanged(nameof(IsWide));
         OnPropertyChanged(nameof(WidthGlyph));
+        OnPropertyChanged(nameof(ColumnSpan));
         RaiseLayoutChanged();
     }
 
