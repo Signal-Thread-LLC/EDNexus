@@ -1,14 +1,23 @@
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using EDNexus.Core.State;
 
 namespace EDNexus.App.ViewModels;
 
-/// <summary>Active colonisation construction site: progress and the outstanding shopping list.</summary>
+/// <summary>
+/// Active colonisation construction site: progress, the outstanding shopping list, and — when the
+/// build is registered on a shared tracker — what the whole squadron still owes it.
+/// </summary>
 public sealed partial class ColonisationCardViewModel : CardViewModel
 {
     private string _signature = "";
+
+    // The depot the shared totals were fetched for, so a lookup runs once per site rather than per tick.
+    private long _sharedMarketId;
 
     public ColonisationCardViewModel(DashboardContext context) : base(context, "colonisation", "COLONISATION", 920) { }
 
@@ -17,6 +26,22 @@ public sealed partial class ColonisationCardViewModel : CardViewModel
     [ObservableProperty] private string _colonisationStatus = "—";
     [ObservableProperty] private string _colonisationSummary = "";
     [ObservableProperty] private double _colonisationProgress;
+
+    // --- Shared project (Raven Colonial) ---
+
+    /// <summary>True once a shared project has been matched to this depot.</summary>
+    [ObservableProperty] private bool _hasShared;
+
+    [ObservableProperty] private bool _sharedBusy;
+
+    /// <summary>Name the build carries on the shared tracker, plus who started it.</summary>
+    [ObservableProperty] private string _sharedTitle = "";
+
+    /// <summary>What the squadron still owes, which is what the local depot snapshot cannot say.</summary>
+    [ObservableProperty] private string _sharedSummary = "";
+
+    /// <summary>Who else is working the build, and where the figures came from.</summary>
+    [ObservableProperty] private string _sharedContributors = "";
 
     public ObservableCollection<ShoppingLine> ShoppingList { get; } = new();
 
@@ -30,8 +55,16 @@ public sealed partial class ColonisationCardViewModel : CardViewModel
         var site = Context.Host.Colonisation.ActiveSite;
         if (site is null)
         {
-            if (HasColonisation) { HasColonisation = false; ShoppingList.Clear(); _signature = ""; }
+            if (HasColonisation) { HasColonisation = false; ShoppingList.Clear(); _signature = ""; ClearShared(); }
             return;
+        }
+
+        // Docking at a different depot means different shared totals — look them up once, not per tick.
+        if (site.MarketId != _sharedMarketId)
+        {
+            _sharedMarketId = site.MarketId;
+            ClearShared();
+            _ = LoadSharedAsync(site.StarSystem, site.MarketId);
         }
 
         HasColonisation = true;
@@ -63,7 +96,69 @@ public sealed partial class ColonisationCardViewModel : CardViewModel
     public override void Reset()
     {
         _signature = "";
+        _sharedMarketId = 0;
         ShoppingList.Clear();
+        ClearShared();
+    }
+
+    /// <summary>Re-read the shared totals — squadmates deliver while the commander is flying.</summary>
+    [RelayCommand]
+    private Task RefreshShared()
+    {
+        var site = Context.Host.Colonisation.ActiveSite;
+        return site is null ? Task.CompletedTask : LoadSharedAsync(site.StarSystem, site.MarketId);
+    }
+
+    private void ClearShared()
+    {
+        HasShared = false;
+        SharedTitle = "";
+        SharedSummary = "";
+        SharedContributors = "";
+    }
+
+    /// <summary>
+    /// Pull the squadron-wide totals for this depot. Most builds are solo and never registered, so
+    /// finding nothing is the ordinary outcome and simply leaves the shared block hidden.
+    /// </summary>
+    private async Task LoadSharedAsync(string? systemName, long marketId)
+    {
+        if (SharedBusy || string.IsNullOrWhiteSpace(systemName) || marketId <= 0) return;
+
+        SharedBusy = true;
+        try
+        {
+            var lookup = Context.Host.SharedProjects;
+            var shared = await lookup.GetForDepotAsync(systemName, marketId, CancellationToken.None);
+            if (shared is null || marketId != _sharedMarketId) return;   // undocked meanwhile
+
+            var architect = string.IsNullOrWhiteSpace(shared.Architect) ? "" : $" · started by {shared.Architect}";
+            SharedTitle = $"{shared.BuildName}{architect}";
+
+            var delivered = Math.Max(0, shared.MaxNeed - shared.SumRemaining);
+            SharedSummary = shared.Complete
+                ? "Shared tracker reports this build complete."
+                : $"Squadron-wide: {shared.SumRemaining:N0} t still needed · {delivered:N0} of {shared.MaxNeed:N0} t delivered";
+
+            SharedContributors = shared.Contributors.Count switch
+            {
+                0 => lookup.SourceName,
+                1 => $"{shared.Contributors[0]} contributing · {lookup.SourceName}",
+                var n => $"{n} commanders contributing · {lookup.SourceName}",
+            };
+
+            HasShared = true;
+        }
+        catch (Exception)
+        {
+            // The local depot snapshot is authoritative for this commander's own deliveries, so a
+            // shared lookup that fails simply leaves the extra block off the card.
+            ClearShared();
+        }
+        finally
+        {
+            SharedBusy = false;
+        }
     }
 }
 

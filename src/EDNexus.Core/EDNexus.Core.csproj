@@ -11,6 +11,7 @@
     <ProjectReference Include="..\EliteDangerous.Edsm\EliteDangerous.Edsm.csproj" />
     <ProjectReference Include="..\EliteDangerous.Galnet\EliteDangerous.Galnet.csproj" />
     <ProjectReference Include="..\EliteDangerous.Inara\EliteDangerous.Inara.csproj" />
+    <ProjectReference Include="..\EliteDangerous.RavenColonial\EliteDangerous.RavenColonial.csproj" />
     <ProjectReference Include="..\EliteDangerous.Spansh\EliteDangerous.Spansh.csproj" />
   </ItemGroup>
 

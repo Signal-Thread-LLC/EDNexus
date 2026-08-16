@@ -856,6 +856,24 @@
                     </Grid>
                     <TextBlock Classes="label" Text="{Binding ColonisationSummary}" Margin="0,0,0,12" />
 
+                    <!-- Shared totals, when the build is registered on a tracker other commanders
+                         also deliver to. Hidden entirely for a solo build, which is most of them. -->
+                    <Border IsVisible="{Binding HasShared}" Background="#0F1114" CornerRadius="4"
+                            Padding="12,10" Margin="0,0,0,12">
+                      <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel Grid.Column="0" Spacing="2">
+                          <TextBlock Classes="value" FontSize="13" Text="{Binding SharedTitle}" TextWrapping="Wrap" />
+                          <TextBlock Classes="value" FontSize="13" Foreground="{StaticResource AmberBrush}"
+                                     Text="{Binding SharedSummary}" TextWrapping="Wrap" />
+                          <TextBlock Classes="label" Text="{Binding SharedContributors}" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <Button Grid.Column="1" Classes="mini" Content="Refresh" Margin="10,0,0,0"
+                                VerticalAlignment="Top" Command="{Binding RefreshSharedCommand}"
+                                IsEnabled="{Binding !SharedBusy}"
+                                ToolTip.Tip="Re-read the squadron's delivery totals" />
+                      </Grid>
+                    </Border>
+
                     <Grid ColumnDefinitions="*,110,100,150" Margin="0,0,0,2">
                       <TextBlock Grid.Column="0" Classes="label" Text="COMMODITY" />
                       <TextBlock Grid.Column="1" Classes="label" Text="REMAINING" HorizontalAlignment="Right" />
