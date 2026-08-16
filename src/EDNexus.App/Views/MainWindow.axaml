@@ -1103,6 +1103,52 @@
             </Border>
           </DataTemplate>
 
+          <!-- Galnet — a one-line ticker cycling the latest headlines; the whole line opens the
+               reader window. No 🎲: the card has no journal sample source, so developer mode swaps
+               the whole feed for the offline generator instead. -->
+          <DataTemplate DataType="vm:GalnetCardViewModel">
+            <Border Classes="card">
+              <StackPanel>
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBlock Grid.Column="0" Classes="cardHeader" Text="{Binding Title}" />
+                  <Button Grid.Column="1" Classes="collapse" Content="{Binding CollapseGlyph}"
+                          Command="{Binding ToggleCollapseCommand}" />
+                </Grid>
+                <StackPanel IsVisible="{Binding !IsCollapsed}">
+                  <!-- The headline itself is the button: click anywhere on it to read the article. -->
+                  <Button Command="{Binding OpenReaderCommand}" IsVisible="{Binding HasTicker}"
+                          HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                          Background="Transparent" BorderThickness="0" Padding="0"
+                          ToolTip.Tip="Open this article in the Galnet reader">
+                    <Grid ColumnDefinitions="*,Auto">
+                      <TextBlock Grid.Column="0" Text="{Binding TickerHeadline.Title}" Classes="value"
+                                 FontSize="14" TextWrapping="Wrap" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="1" Text="{Binding TickerHeadline.Stamp}" Classes="label"
+                                 Margin="10,0,0,0" VerticalAlignment="Center" />
+                    </Grid>
+                  </Button>
+
+                  <TextBlock Classes="label" Text="{Binding NewsStatus}" TextWrapping="Wrap"
+                             IsVisible="{Binding !HasTicker}" />
+
+                  <Grid ColumnDefinitions="Auto,Auto,*,Auto" Margin="0,10,0,0">
+                    <Button Grid.Column="0" Classes="mini" Content="‹" MinWidth="28"
+                            Command="{Binding PreviousHeadlineCommand}" IsVisible="{Binding HasTicker}"
+                            ToolTip.Tip="Previous headline" />
+                    <Button Grid.Column="1" Classes="mini" Content="›" MinWidth="28" Margin="4,0,0,0"
+                            Command="{Binding NextHeadlineCommand}" IsVisible="{Binding HasTicker}"
+                            ToolTip.Tip="Next headline" />
+                    <TextBlock Grid.Column="2" Classes="label" Text="{Binding TickerPosition}"
+                               Margin="10,0,0,0" VerticalAlignment="Center" />
+                    <Button Grid.Column="3" Classes="mini" Content="Read all"
+                            Command="{Binding OpenReaderCommand}"
+                            ToolTip.Tip="Open the Galnet reader in its own window" />
+                  </Grid>
+                </StackPanel>
+              </StackPanel>
+            </Border>
+          </DataTemplate>
+
         </ItemsControl.DataTemplates>
       </ItemsControl>
     </ScrollViewer>

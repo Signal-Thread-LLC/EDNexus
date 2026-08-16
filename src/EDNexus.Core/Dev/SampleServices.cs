@@ -1,3 +1,4 @@
+using EDNexus.Core.News;
 using EDNexus.Core.Routes;
 using EDNexus.Core.Trade;
 
@@ -160,5 +161,70 @@ public sealed class SampleTradeSearch : ITradeSearch
         }
 
         return Task.FromResult<IReadOnlyList<TradeStationQuote>>(quotes);
+    }
+}
+
+/// <summary>
+/// An offline <see cref="INewsFeed"/> for developer mode: it fabricates plausible Galnet copy from
+/// the shared name pools, so the news card is fully exercisable without the game running or
+/// Frontier's feed reachable.
+/// </summary>
+public sealed class SampleNewsFeed : INewsFeed
+{
+    private readonly Random _rng;
+
+    public string SourceName => "Galnet (dev)";
+
+    public SampleNewsFeed(Random rng) => _rng = rng;
+
+    private static readonly string[] Headlines =
+    {
+        "{power} Consolidates Control of {system}",
+        "Thargoid Activity Reported in {system}",
+        "Community Goal Concludes in {system}",
+        "{power} Announces Expansion into {system}",
+        "Starport Damage Confirmed at {station}",
+        "Pilots' Federation Issues Advisory for {system}",
+        "Deep Space Expedition Reaches {system}",
+        "Trade Boom Declared in {system}",
+    };
+
+    private static readonly string[] Powers =
+    {
+        "The Empire", "The Federation", "The Alliance", "Aisling Duval", "Zachary Hudson",
+        "Li Yong-Rui", "Edmund Mahon", "Denton Patreus",
+    };
+
+    private static readonly string[] Paragraphs =
+    {
+        "Independent sources confirm that traffic through the system has risen sharply over the past week, with several corporations moving to secure long-term contracts.",
+        "A spokesperson declined to comment on reports of military movements in the region, stating only that all activity remains within established treaties.",
+        "Commanders operating in the area are advised to review current permits before approaching the system's inhabited bodies.",
+        "Analysts note that the development follows several weeks of steady economic pressure, and expect the situation to stabilise within the month.",
+        "The Pilots' Federation has reminded independent commanders that participation remains voluntary, and that rewards will be distributed on conclusion.",
+    };
+
+    public Task<IReadOnlyList<NewsArticle>> GetLatestAsync(CancellationToken ct = default)
+    {
+        var count = _rng.Next(6, 13);
+        var published = DateTimeOffset.UtcNow;
+        var articles = new List<NewsArticle>(count);
+
+        for (var i = 0; i < count; i++)
+        {
+            var title = SamplePools.Pick(_rng, Headlines)
+                .Replace("{power}", SamplePools.Pick(_rng, Powers))
+                .Replace("{system}", SamplePools.Pick(_rng, SamplePools.Systems))
+                .Replace("{station}", SamplePools.Pick(_rng, SamplePools.Stations));
+
+            var body = string.Join(
+                "\n\n",
+                Enumerable.Range(0, _rng.Next(2, 4)).Select(_ => SamplePools.Pick(_rng, Paragraphs)));
+
+            // Galnet drops articles in batches; stagger the batches by days as the real feed does.
+            articles.Add(new NewsArticle($"dev-{i}", title, body, published.AddDays(-(i / 3))));
+        }
+
+        return Task.FromResult<IReadOnlyList<NewsArticle>>(articles);
     }
 }
