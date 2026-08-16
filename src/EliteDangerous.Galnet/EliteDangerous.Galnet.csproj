@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Standalone, application-agnostic client for the Galnet news feed
+    (https://community.elitedangerous.com/galnet-rss). Like EliteDangerous.Edsm and
+    EliteDangerous.Spansh it has NO dependency on EDNexus: it GETs the feed and parses it into plain
+    article records. Deciding how many to show, how to cache them, or how to present them is the
+    caller's job, which keeps this reusable and independently extractable later.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <PackageId>EliteDangerous.Galnet</PackageId>
+    <Description>A reusable .NET client for reading Elite Dangerous in-universe Galnet news articles from the community RSS feed.</Description>
+    <Authors>Signal &amp; Thread LLC</Authors>
+    <Version Condition="'$(Version)' == ''">0.0.1</Version>
+  </PropertyGroup>
+
+</Project>

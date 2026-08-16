@@ -7,12 +7,14 @@ using EDNexus.Core.Exobio;
 using EDNexus.Core.Journal;
 using EDNexus.Core.Market;
 using EDNexus.Core.Navigation;
+using EDNexus.Core.News;
 using EDNexus.Core.Reporting;
 using EDNexus.Core.Routes;
 using EDNexus.Core.Settings;
 using EDNexus.Core.State;
 using EDNexus.Core.Trade;
 using EliteDangerous.Edsm;
+using EliteDangerous.Galnet;
 using EliteDangerous.Spansh;
 
 namespace EDNexus.Core;
@@ -51,6 +53,9 @@ public sealed class EngineHost : IDisposable
     /// <summary>System position / nearby lookups. Backed by EDSM; swappable via <see cref="ISystemLookup"/>.</summary>
     public ISystemLookup Navigation { get; }
 
+    /// <summary>In-universe news. Backed by the Galnet feed; swappable via <see cref="INewsFeed"/>.</summary>
+    public INewsFeed News { get; }
+
     public string? JournalDirectory { get; }
     public bool JournalFound => JournalDirectory is not null;
 
@@ -87,6 +92,12 @@ public sealed class EngineHost : IDisposable
         Navigation = new EdsmSystemLookup(
             new EdsmClient(new EdsmClientOptions { SoftwareName = "EDNexus", SoftwareVersion = version }, _http),
             new DiskResponseCache(Path.Combine(cacheRoot, "systems"), TimeSpan.FromDays(30)));
+
+        // Galnet publishes a few times a week, so an hour-long TTL is already far more current than
+        // the source — and it keeps a dashboard that reopens all day off Frontier's site.
+        News = new GalnetNewsFeed(
+            new GalnetClient(new GalnetClientOptions { SoftwareName = "EDNexus", SoftwareVersion = version }, _http),
+            new DiskResponseCache(Path.Combine(cacheRoot, "galnet"), TimeSpan.FromHours(1)));
 
         if (settings is not null)
         {

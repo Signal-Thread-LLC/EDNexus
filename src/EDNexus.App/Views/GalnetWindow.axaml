@@ -1,0 +1,69 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:EDNexus.App.ViewModels"
+        x:Class="EDNexus.App.Views.GalnetWindow"
+        x:DataType="vm:GalnetCardViewModel"
+        Title="EDNexus — Galnet"
+        Icon="/Assets/ednexus.png"
+        Width="820" Height="620" MinWidth="460" MinHeight="360"
+        WindowStartupLocation="CenterOwner"
+        Background="#0A0A0C">
+
+  <Window.Resources>
+    <SolidColorBrush x:Key="AmberBrush" Color="#FFF07100" />
+    <SolidColorBrush x:Key="CardBorder" Color="#242830" />
+    <SolidColorBrush x:Key="Ink" Color="#E7E9EE" />
+    <SolidColorBrush x:Key="InkDim" Color="#8A909C" />
+  </Window.Resources>
+
+  <!-- Bound to the live GalnetCardViewModel, so a refresh here and the dashboard ticker stay in step. -->
+  <DockPanel>
+    <Border DockPanel.Dock="Top" Background="#101216" BorderBrush="{StaticResource CardBorder}"
+            BorderThickness="0,0,0,1" Padding="16,12">
+      <Grid ColumnDefinitions="*,Auto">
+        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+          <TextBlock Text="GALNET" Foreground="{StaticResource AmberBrush}" FontSize="12"
+                     FontWeight="SemiBold" LetterSpacing="2" />
+          <TextBlock Text="{Binding NewsStatus}" Foreground="{StaticResource InkDim}" FontSize="12"
+                     TextWrapping="Wrap" Margin="0,2,0,0" />
+        </StackPanel>
+        <Button Grid.Column="1" Content="Refresh" Command="{Binding RefreshCommand}"
+                IsEnabled="{Binding !NewsBusy}" Padding="12,6" VerticalAlignment="Center"
+                Background="#1B1E24" Foreground="{StaticResource Ink}" CornerRadius="4" />
+      </Grid>
+    </Border>
+
+    <!-- Headlines on the left, the article on the right; the splitter lets a long headline breathe. -->
+    <Grid ColumnDefinitions="280,Auto,*">
+      <ListBox Grid.Column="0" ItemsSource="{Binding Headlines}" SelectedItem="{Binding SelectedHeadline}"
+               Background="Transparent" BorderThickness="0" Padding="8">
+        <ListBox.ItemTemplate>
+          <DataTemplate x:DataType="vm:NewsHeadline">
+            <StackPanel Margin="0,2">
+              <TextBlock Text="{Binding Title}" Foreground="{StaticResource Ink}" FontSize="13"
+                         TextWrapping="Wrap" />
+              <TextBlock Text="{Binding Stamp}" Foreground="{StaticResource InkDim}" FontSize="11"
+                         Margin="0,2,0,0" />
+            </StackPanel>
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
+
+      <GridSplitter Grid.Column="1" Width="1" Background="{StaticResource CardBorder}"
+                    ResizeDirection="Columns" />
+
+      <ScrollViewer Grid.Column="2" Padding="20,16" VerticalScrollBarVisibility="Auto"
+                    HorizontalScrollBarVisibility="Disabled">
+        <StackPanel IsVisible="{Binding HasArticle}">
+          <TextBlock Text="{Binding ArticleTitle}" Foreground="{StaticResource Ink}" FontSize="20"
+                     FontWeight="SemiBold" TextWrapping="Wrap" />
+          <TextBlock Text="{Binding ArticleDate}" Foreground="{StaticResource AmberBrush}" FontSize="12"
+                     Margin="0,6,0,0" />
+          <!-- The feed's own line breaks are preserved by the parser, so the copy reads as published. -->
+          <TextBlock Text="{Binding ArticleBody}" Foreground="{StaticResource Ink}" FontSize="14"
+                     TextWrapping="Wrap" LineHeight="22" Margin="0,16,0,0" />
+        </StackPanel>
+      </ScrollViewer>
+    </Grid>
+  </DockPanel>
+</Window>
