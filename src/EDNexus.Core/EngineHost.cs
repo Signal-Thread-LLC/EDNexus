@@ -15,6 +15,7 @@ using EDNexus.Core.State;
 using EDNexus.Core.Trade;
 using EliteDangerous.Edsm;
 using EliteDangerous.Galnet;
+using EliteDangerous.RavenColonial;
 using EliteDangerous.Spansh;
 
 namespace EDNexus.Core;
@@ -55,6 +56,12 @@ public sealed class EngineHost : IDisposable
 
     /// <summary>In-universe news. Backed by the Galnet feed; swappable via <see cref="INewsFeed"/>.</summary>
     public INewsFeed News { get; }
+
+    /// <summary>
+    /// The shared, multi-commander view of a construction project. Backed by Raven Colonial;
+    /// swappable via <see cref="ISharedProjectLookup"/>.
+    /// </summary>
+    public ISharedProjectLookup SharedProjects { get; }
 
     public string? JournalDirectory { get; }
     public bool JournalFound => JournalDirectory is not null;
@@ -98,6 +105,10 @@ public sealed class EngineHost : IDisposable
         News = new GalnetNewsFeed(
             new GalnetClient(new GalnetClientOptions { SoftwareName = "EDNexus", SoftwareVersion = version }, _http),
             new DiskResponseCache(Path.Combine(cacheRoot, "galnet"), TimeSpan.FromHours(1)));
+
+        // Read-only: squadmates deliver while you fly, so this one is never cached.
+        SharedProjects = new RavenColonialProjectLookup(new RavenColonialClient(
+            new RavenColonialClientOptions { SoftwareName = "EDNexus", SoftwareVersion = version }, _http));
 
         if (settings is not null)
         {

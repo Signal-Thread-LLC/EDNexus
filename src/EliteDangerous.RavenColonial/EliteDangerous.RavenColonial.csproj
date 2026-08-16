@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Standalone, application-agnostic client for the Raven Colonial API
+    (https://ravencolonial.com, backed by the Azure service its web app calls). Like
+    EliteDangerous.Edsm and EliteDangerous.Spansh it has NO dependency on EDNexus: it GETs a
+    construction project and parses the reply into plain records. Matching a project to whatever the
+    commander is docked at, and deciding what to show, is the caller's job.
+
+    Read-only by design for now: the API declares no authentication at all, so a write would be
+    attributed purely by a commander name in the URL. See the reviewer notes on the PR.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <PackageId>EliteDangerous.RavenColonial</PackageId>
+    <Description>A reusable .NET client for reading Elite Dangerous colonisation construction projects from the Raven Colonial API.</Description>
+    <Authors>Signal &amp; Thread LLC</Authors>
+    <Version Condition="'$(Version)' == ''">0.0.1</Version>
+  </PropertyGroup>
+
+</Project>
