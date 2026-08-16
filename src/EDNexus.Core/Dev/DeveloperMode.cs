@@ -18,6 +18,7 @@ public sealed class DeveloperMode
         new ColonisationSampleSource(),
         new MarketSampleSource(),
         new ExobiologySampleSource(),
+        new MissionsSampleSource(),
     };
 
     /// <summary>

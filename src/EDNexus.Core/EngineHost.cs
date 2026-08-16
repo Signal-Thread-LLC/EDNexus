@@ -6,6 +6,7 @@ using EDNexus.Core.Engineering;
 using EDNexus.Core.Exobio;
 using EDNexus.Core.Journal;
 using EDNexus.Core.Market;
+using EDNexus.Core.Missions;
 using EDNexus.Core.Navigation;
 using EDNexus.Core.News;
 using EDNexus.Core.Reporting;
@@ -45,6 +46,9 @@ public sealed class EngineHost : IDisposable
     /// <summary>Exobiology: body bio signals, three-sample scan progress, and the session's Vista Genomics tally.</summary>
     public ExobiologyTracker Exobiology { get; }
 
+    /// <summary>Missions held, the stacks they form against a common target, and pending hand-ins.</summary>
+    public MissionTracker Missions { get; }
+
     /// <summary>Cross-station "best price nearby" lookups. Backed by Spansh; swappable via <see cref="ITradeSearch"/>.</summary>
     public ITradeSearch Trade { get; }
 
@@ -83,6 +87,9 @@ public sealed class EngineHost : IDisposable
         Market = new MarketTracker(Bus, State);
         Engineering = new EngineeringTracker(Bus);
         Exobiology = new ExobiologyTracker(Bus, State);
+        // Qualified: the property name matches the EDNexus.Core.Missions namespace, which otherwise
+        // wins the bare-name lookup from inside EDNexus.Core.
+        this.Missions = new MissionTracker(Bus);
 
         // Shared client for outbound trade lookups. The EDDN/Inara reporters own their own client
         // inside ReporterHost, so this one is dedicated to the read-side (Spansh) queries.

@@ -602,3 +602,86 @@ public sealed class MarketSampleSource : JournalSampleSource
         return events;
     }
 }
+
+/// <summary>
+/// A plausible massacre stack for the Missions card: several kill missions from different giver
+/// factions against one common target, a couple against a second target, and a redirect so the
+/// hand-in grouping has something ready in it.
+/// </summary>
+public sealed class MissionsSampleSource : JournalSampleSource
+{
+    public override string CardKey => "missions";
+    public override string DisplayName => "Missions";
+
+    private static readonly string[] FactionSuffixes =
+    {
+        "Front", "Purple Council", "Jet Comms", "Blue Society", "Crimson Legal Group",
+        "Corporation", "Independents", "Interstellar", "Silver Mafia",
+    };
+
+    public override IReadOnlyList<string> Sample(Random rng)
+    {
+        var system = Pick(rng, SamplePools.Systems);
+        var station = Pick(rng, SamplePools.Stations);
+        var target = $"{system} {Pick(rng, FactionSuffixes)}";
+
+        var lines = new List<string>();
+        var missionId = rng.Next(800_000_000, 900_000_000);
+
+        // The stack: several boards, one target. Wing missions, as massacre stacking requires.
+        var stackSize = rng.Next(3, 7);
+        var givers = SamplePools.PickDistinct(rng, FactionSuffixes, stackSize);
+        for (var i = 0; i < stackSize; i++)
+        {
+            var kills = rng.Next(8, 60);
+            lines.Add(Accepted(++missionId, $"{system} {givers[i]}", target, kills,
+                rng.Next(400_000, 3_000_000), system, station));
+        }
+
+        // A second, smaller target so the card shows more than one stack.
+        var otherTarget = $"{Pick(rng, SamplePools.Systems)} {Pick(rng, FactionSuffixes)}";
+        for (var i = 0; i < rng.Next(1, 3); i++)
+            lines.Add(Accepted(++missionId, $"{system} {Pick(rng, FactionSuffixes)}", otherTarget,
+                rng.Next(6, 25), rng.Next(200_000, 900_000), system, Pick(rng, SamplePools.Stations)));
+
+        // One already finished, so a hand-in group shows as ready.
+        lines.Add(Event("MissionRedirected", o =>
+        {
+            o["MissionID"] = missionId;
+            o["Name"] = "Mission_MassacreWing";
+            o["NewDestinationSystem"] = system;
+            o["NewDestinationStation"] = station;
+        }));
+
+        // Kills logged against the main target, for the running tally.
+        for (var i = 0; i < rng.Next(0, 15); i++)
+            lines.Add(Event("Bounty", o =>
+            {
+                o["VictimFaction"] = target;
+                o["TotalReward"] = rng.Next(20_000, 400_000);
+            }));
+
+        return lines;
+    }
+
+    private static string Accepted(
+        long id, string giver, string target, int kills, int reward, string system, string station) =>
+        Event("MissionAccepted", o =>
+        {
+            o["MissionID"] = id;
+            o["Faction"] = giver;
+            o["Name"] = "Mission_MassacreWing";
+            o["LocalisedName"] = $"Kill {kills} Pirates";
+            o["TargetType"] = "$MissionUtil_FactionTag_Pirate;";
+            o["TargetType_Localised"] = "Pirates";
+            o["TargetFaction"] = target;
+            o["KillCount"] = kills;
+            o["DestinationSystem"] = system;
+            o["DestinationStation"] = station;
+            o["Expiry"] = DateTimeOffset.UtcNow.AddDays(7).ToString("O");
+            o["Wing"] = true;
+            o["Influence"] = "++";
+            o["Reputation"] = "++";
+            o["Reward"] = reward;
+        });
+}
