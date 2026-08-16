@@ -1121,6 +1121,82 @@
             </Border>
           </DataTemplate>
 
+          <!-- Missions — the stacks currently held, then where to hand them in. -->
+          <DataTemplate DataType="vm:MissionsCardViewModel">
+            <Border Classes="card">
+              <StackPanel>
+                <Grid ColumnDefinitions="*,Auto,Auto">
+                  <TextBlock Grid.Column="0" Classes="cardHeader" Text="{Binding Title}" />
+                  <Button Grid.Column="1" Classes="dice" Content="🎲" Margin="0,0,6,0"
+                          IsVisible="{Binding $parent[ItemsControl].((vm:MainWindowViewModel)DataContext).DevMode}"
+                          Command="{Binding $parent[ItemsControl].((vm:MainWindowViewModel)DataContext).RandomizeCardCommand}"
+                          CommandParameter="{Binding Id}" />
+                  <Button Grid.Column="2" Classes="collapse" Content="{Binding CollapseGlyph}"
+                          Command="{Binding ToggleCollapseCommand}" />
+                </Grid>
+                <StackPanel IsVisible="{Binding !IsCollapsed}">
+                  <TextBlock Classes="label" IsVisible="{Binding NoMissions}" TextWrapping="Wrap"
+                             Text="No missions held. Take some from a station's mission board — kill missions against the same faction stack, so one fight can clear several at once." />
+
+                  <StackPanel IsVisible="{Binding HasMissions}">
+                    <TextBlock Classes="value" FontSize="13" Text="{Binding MissionSummary}" TextWrapping="Wrap" />
+                    <TextBlock Classes="label" Text="{Binding CapNote}" Margin="0,2,0,0" />
+
+                    <ScrollViewer MaxHeight="300" VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled" Margin="0,12,0,0">
+                      <ItemsControl ItemsSource="{Binding Stacks}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:StackLine">
+                            <Border Background="#0F1114" CornerRadius="4" Padding="12,10" Margin="0,0,0,8">
+                              <StackPanel Spacing="2">
+                                <Grid ColumnDefinitions="*,Auto">
+                                  <TextBlock Grid.Column="0" Classes="value" FontSize="14" Text="{Binding Target}"
+                                             TextWrapping="Wrap" />
+                                  <TextBlock Grid.Column="1" Classes="value" FontSize="13" Margin="10,0,0,0"
+                                             Foreground="{StaticResource Good}" Text="{Binding Reward}"
+                                             VerticalAlignment="Center" />
+                                </Grid>
+                                <TextBlock Classes="label" Text="{Binding Subtitle}" TextWrapping="Wrap" />
+                                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
+                                  <TextBlock Classes="value" FontSize="14" Foreground="{StaticResource AmberBrush}"
+                                             Text="{Binding Kills}" />
+                                  <TextBlock Classes="label" Text="{Binding KillsNote}" VerticalAlignment="Center" />
+                                </StackPanel>
+                                <TextBlock Classes="label" Text="{Binding Givers}" TextWrapping="Wrap" Margin="0,2,0,0" />
+                                <TextBlock Classes="label" Text="{Binding Logged}" IsVisible="{Binding HasLogged}" />
+                                <TextBlock Classes="value" FontSize="12" Foreground="{StaticResource Good}"
+                                           Text="{Binding ReadyNote}" IsVisible="{Binding HasReady}" />
+                              </StackPanel>
+                            </Border>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </ScrollViewer>
+
+                    <TextBlock Classes="label" Text="HAND IN AT" Margin="0,8,0,4" />
+                    <ScrollViewer MaxHeight="180" VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled">
+                      <ItemsControl ItemsSource="{Binding TurnIns}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:TurnInLine">
+                            <Grid ColumnDefinitions="*,Auto" Margin="0,3">
+                              <StackPanel Grid.Column="0">
+                                <TextBlock Classes="value" FontSize="13" Text="{Binding Where}" TextWrapping="Wrap" />
+                                <TextBlock Classes="label" Text="{Binding Detail}" />
+                              </StackPanel>
+                              <TextBlock Grid.Column="1" Classes="label" Text="{Binding ReadyNote}"
+                                         Margin="10,0,0,0" VerticalAlignment="Center" />
+                            </Grid>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </ScrollViewer>
+                  </StackPanel>
+                </StackPanel>
+              </StackPanel>
+            </Border>
+          </DataTemplate>
+
           <!-- Galnet — a one-line ticker cycling the latest headlines; the whole line opens the
                reader window. No 🎲: the card has no journal sample source, so developer mode swaps
                the whole feed for the offline generator instead. -->

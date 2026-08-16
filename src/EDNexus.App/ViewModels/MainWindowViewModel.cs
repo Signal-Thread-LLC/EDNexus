@@ -54,6 +54,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             new ColonisationCardViewModel(_context),
             new MarketCardViewModel(_context),
             new ExobiologyCardViewModel(_context),
+            new MissionsCardViewModel(_context),
             new GalnetCardViewModel(_context),
         };
 
