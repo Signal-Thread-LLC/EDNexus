@@ -685,3 +685,55 @@ public sealed class MissionsSampleSource : JournalSampleSource
             o["Reward"] = reward;
         });
 }
+
+/// <summary>
+/// Sample source for the pilot-rank card. Emits the same trio the game does — a <c>Rank</c> snapshot,
+/// a matching <c>Progress</c> snapshot, and sometimes a <c>Promotion</c> — so the card, the ladder
+/// lookup and the promotion path all get exercised through the real parsers.
+/// </summary>
+public sealed class RanksSampleSource : JournalSampleSource
+{
+    public override string CardKey => "ranks";
+    public override string DisplayName => "Ranks";
+
+    // The journal's own field names. Mercenary is "Soldier" here, as the game writes it.
+    private static readonly string[] Fields = { "Combat", "Trade", "Explore", "Exobiologist", "Soldier" };
+
+    public override IReadOnlyList<string> Sample(Random rng)
+    {
+        // Bias towards the mid ladder so the card usually shows names rather than a wall of Elite,
+        // but let it reach the Elite tiers often enough to exercise them.
+        var indices = Fields.ToDictionary(f => f, _ => rng.Next(100) < 15 ? rng.Next(8, 14) : rng.Next(0, 8));
+
+        var lines = new List<string>
+        {
+            Event("Rank", o =>
+            {
+                foreach (var (field, index) in indices) o[field] = index;
+                o["Empire"] = rng.Next(0, 14);
+                o["Federation"] = rng.Next(0, 14);
+                o["CQC"] = 0;
+            }),
+            Event("Progress", o =>
+            {
+                foreach (var field in Fields) o[field] = rng.Next(0, 100);
+                o["Empire"] = rng.Next(0, 100);
+                o["Federation"] = rng.Next(0, 100);
+                o["CQC"] = 0;
+            }),
+        };
+
+        // Every so often, promote one rank that has somewhere left to climb.
+        if (rng.Next(100) < 40)
+        {
+            var climbable = Fields.Where(f => indices[f] < 13).ToList();
+            if (climbable.Count > 0)
+            {
+                var field = Pick(rng, climbable);
+                lines.Add(Event("Promotion", o => o[field] = indices[field] + 1));
+            }
+        }
+
+        return lines;
+    }
+}

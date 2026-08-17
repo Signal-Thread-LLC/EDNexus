@@ -1197,6 +1197,51 @@
             </Border>
           </DataTemplate>
 
+          <!-- Ranks — one row per pilot ladder: current rank name and progress to the next tier.
+               Elite ranks are picked out in amber and drop the bar, which has nothing left to fill. -->
+          <DataTemplate DataType="vm:RanksCardViewModel">
+            <Border Classes="card">
+              <StackPanel>
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBlock Grid.Column="0" Classes="cardHeader" Text="{Binding Title}" />
+                  <Button Grid.Column="1" Classes="collapse" Content="{Binding CollapseGlyph}"
+                          Command="{Binding ToggleCollapseCommand}" />
+                </Grid>
+                <StackPanel IsVisible="{Binding !IsCollapsed}">
+                  <TextBlock Classes="label" Text="{Binding Summary}" TextWrapping="Wrap" />
+
+                  <ItemsControl ItemsSource="{Binding Ranks}" Margin="0,8,0,0">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:RankRow">
+                        <Border Background="#0E1013" CornerRadius="4" Padding="10,8" Margin="0,0,0,6">
+                          <StackPanel>
+                            <Grid ColumnDefinitions="Auto,*,Auto">
+                              <TextBlock Grid.Column="0" Text="{Binding Label}" Classes="label"
+                                         FontSize="11" MinWidth="86" VerticalAlignment="Center" />
+                              <TextBlock Grid.Column="1" Text="{Binding Name}" Classes="value" FontSize="13"
+                                         TextWrapping="Wrap" VerticalAlignment="Center"
+                                         IsVisible="{Binding !IsElite}" />
+                              <TextBlock Grid.Column="1" Text="{Binding Name}" Classes="value" FontSize="13"
+                                         TextWrapping="Wrap" VerticalAlignment="Center"
+                                         IsVisible="{Binding IsElite}" FontWeight="SemiBold"
+                                         Foreground="{StaticResource AmberBrush}" />
+                              <TextBlock Grid.Column="2" Text="{Binding Progress}" FontSize="11"
+                                         VerticalAlignment="Center" Foreground="{StaticResource InkDim}" />
+                            </Grid>
+                            <ProgressBar Minimum="0" Maximum="1" Value="{Binding Fraction}" Height="4"
+                                         IsVisible="{Binding ShowBar}"
+                                         Foreground="{StaticResource AmberDim}" Background="#1B1E24"
+                                         Margin="0,5,0,0" />
+                          </StackPanel>
+                        </Border>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
+              </StackPanel>
+            </Border>
+          </DataTemplate>
+
           <!-- Galnet — a one-line ticker cycling the latest headlines; the whole line opens the
                reader window. No 🎲: the card has no journal sample source, so developer mode swaps
                the whole feed for the offline generator instead. -->
