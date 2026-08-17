@@ -4,6 +4,7 @@ using EDNexus.Core.Exobio;
 using EDNexus.Core.Journal;
 using EDNexus.Core.Market;
 using EDNexus.Core.Materials;
+using EDNexus.Core.Ranks;
 using EDNexus.Core.State;
 
 // EDNexus.Cli — a headless harness for the journal engine.
@@ -46,6 +47,7 @@ var colonisation = new ColonisationTracker(bus, state);
 var market = new MarketTracker(bus, state);
 var exobio = new ExobiologyTracker(bus, state);
 var engineering = new EngineeringTracker(bus);
+var ranks = new RankTracker(bus);
 
 var liveCounts = new SortedDictionary<string, int>();
 bus.SubscribeAny(e =>
@@ -65,6 +67,7 @@ PrintMarket(market, state);
 PrintMaterials(state);
 PrintExobiology(exobio);
 PrintEngineers(engineering);
+PrintRanks(ranks);
 if (planId is not null) PrintEngineeringPlan(planId, planGrade, planRolls, state);
 
 if (args.Contains("--once"))
@@ -87,6 +90,7 @@ PrintMarket(market, state);
 PrintMaterials(state);
 PrintExobiology(exobio);
 PrintEngineers(engineering);
+PrintRanks(ranks);
 if (liveCounts.Count > 0)
 {
     Console.WriteLine("\nLive events this session:");
@@ -319,4 +323,25 @@ static void PrintEngineers(EngineeringTracker tracker)
         Console.WriteLine($"             {s.NextStep}");
     }
     if (todo.Count > 12) Console.WriteLine($"    … and {todo.Count - 12} more.");
+}
+
+/// <summary>
+/// Pilot rank standing across the five tracked ladders. Elite ranks are flagged with a star; a rank
+/// at the top of its ladder shows "max" rather than a meaningless percentage.
+/// </summary>
+static void PrintRanks(RankTracker tracker)
+{
+    Console.WriteLine();
+    Console.WriteLine("======== Ranks ========");
+    if (!tracker.HasData)
+    {
+        Console.WriteLine("  No Rank/Progress events in this journal.");
+        return;
+    }
+
+    foreach (var rank in tracker.All)
+    {
+        var progress = rank.IsMaxed ? "max" : $"{rank.Percent,3}%";
+        Console.WriteLine($"  {rank.Label,-13}: {rank.Name,-18} {progress}{(rank.IsElite ? "  *" : "")}");
+    }
 }
