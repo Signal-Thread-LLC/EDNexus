@@ -1,3 +1,4 @@
+using System.Net.Http;
 using EDNexus.Core.Colonisation;
 using EDNexus.Core.Engineering;
 using EDNexus.Core.Exobio;
@@ -6,6 +7,8 @@ using EDNexus.Core.Market;
 using EDNexus.Core.Materials;
 using EDNexus.Core.Ranks;
 using EDNexus.Core.State;
+using EDNexus.Core.Stations;
+using EliteDangerous.Spansh;
 
 // EDNexus.Cli — a headless harness for the journal engine.
 //   (no args)   resolve the journal folder, replay to warm state, then watch live.
@@ -68,6 +71,7 @@ PrintMaterials(state);
 PrintExobiology(exobio);
 PrintEngineers(engineering);
 PrintRanks(ranks);
+if (args.Contains("--services")) await PrintNearestServices(state);
 if (planId is not null) PrintEngineeringPlan(planId, planGrade, planRolls, state);
 
 if (args.Contains("--once"))
@@ -91,6 +95,7 @@ PrintMaterials(state);
 PrintExobiology(exobio);
 PrintEngineers(engineering);
 PrintRanks(ranks);
+if (args.Contains("--services")) await PrintNearestServices(state);
 if (liveCounts.Count > 0)
 {
     Console.WriteLine("\nLive events this session:");
@@ -323,6 +328,52 @@ static void PrintEngineers(EngineeringTracker tracker)
         Console.WriteLine($"             {s.NextStep}");
     }
     if (todo.Count > 12) Console.WriteLine($"    … and {todo.Count - 12} more.");
+}
+
+/// <summary>
+/// Nearest stations offering each catalogued service, measured from the commander's current system.
+/// Network-backed, so it only runs behind --services rather than on every replay.
+/// </summary>
+static async Task PrintNearestServices(CommanderState s)
+{
+    Console.WriteLine();
+    Console.WriteLine("======== Nearest services ========");
+    if (s.StarSystem is not { Length: > 0 } system)
+    {
+        Console.WriteLine("  No current system in this journal - nothing to measure from.");
+        return;
+    }
+
+    Console.WriteLine($"  Measured from {system} via Spansh.");
+    using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
+    var spansh = new SpanshClient(new SpanshClientOptions { SoftwareName = "EDNexus.Cli", SoftwareVersion = "dev" }, http);
+    var finder = new SpanshStationServiceFinder(spansh);
+
+    foreach (var service in StationServices.All)
+    {
+        // Services with flavours are asked per flavour: "nearest material trader" is the wrong
+        // question when a trader only deals in one of Raw/Manufactured/Encoded.
+        // A single null entry means "ask once, with no flavour filter".
+        IReadOnlyList<string?> flavours = service.HasFlavours
+            ? service.Flavours.Select(f => (string?)f).ToList()
+            : new List<string?> { null };
+        foreach (var flavour in flavours)
+        {
+            var found = await finder.FindAsync(new StationServiceQuery(service, system, flavour, MaxResults: 1));
+            var label = flavour is null ? service.Label : $"{service.Label} ({flavour})";
+            if (found.Count == 0)
+            {
+                Console.WriteLine($"  {label,-32}: none found");
+                continue;
+            }
+
+            var top = found[0];
+            var pad = top.HasLargePad ? "L" : "-";
+            Console.WriteLine(
+                $"  {label,-32}: {top.Station} [{top.System}]  {top.DistanceLy:0.0} ly  " +
+                $"{top.DistanceToArrivalLs:N0} Ls  pad {pad}");
+        }
+    }
 }
 
 /// <summary>

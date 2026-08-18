@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:EDNexus.App.ViewModels"
+        xmlns:stations="clr-namespace:EDNexus.Core.Stations;assembly=EDNexus.Core"
         xmlns:controls="clr-namespace:EDNexus.App.Controls"
         x:Class="EDNexus.App.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
@@ -1186,6 +1187,108 @@
                               </StackPanel>
                               <TextBlock Grid.Column="1" Classes="label" Text="{Binding ReadyNote}"
                                          Margin="10,0,0,0" VerticalAlignment="Center" />
+                            </Grid>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </ScrollViewer>
+                  </StackPanel>
+                </StackPanel>
+              </StackPanel>
+            </Border>
+          </DataTemplate>
+
+          <!-- Nearest services — where to go for a material trader, shipyard, Vista Genomics etc.
+               The flavour picker matters: a material trader deals in exactly one of Raw/Manufactured/
+               Encoded, so "nearest trader" without it is a 2-in-3 wasted trip. -->
+          <DataTemplate DataType="vm:ServicesCardViewModel">
+            <Border Classes="card">
+              <StackPanel>
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBlock Grid.Column="0" Classes="cardHeader" Text="{Binding Title}" />
+                  <Button Grid.Column="1" Classes="collapse" Content="{Binding CollapseGlyph}"
+                          Command="{Binding ToggleCollapseCommand}" />
+                </Grid>
+                <StackPanel IsVisible="{Binding !IsCollapsed}">
+                  <TextBlock Classes="label" Text="SERVICE" />
+                  <ComboBox Classes="field" ItemsSource="{Binding Services}" SelectedItem="{Binding SelectedService}"
+                            HorizontalAlignment="Stretch" Margin="0,2,0,4">
+                    <ComboBox.ItemTemplate>
+                      <DataTemplate x:DataType="stations:StationServiceKind">
+                        <TextBlock Text="{Binding Label}" />
+                      </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                  </ComboBox>
+                  <TextBlock Classes="label" Text="{Binding ServiceHint}" TextWrapping="Wrap" FontSize="11"
+                             Margin="0,0,0,8"
+                             IsVisible="{Binding ServiceHint, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+                  <StackPanel IsVisible="{Binding HasFlavours}">
+                    <TextBlock Classes="label" Text="TYPE" />
+                    <ComboBox Classes="field" ItemsSource="{Binding Flavours}" SelectedItem="{Binding SelectedFlavour}"
+                              HorizontalAlignment="Stretch" Margin="0,2,0,8" />
+                  </StackPanel>
+
+                  <TextBlock Classes="label" Text="NEAR SYSTEM" />
+                  <TextBox Classes="field" Text="{Binding ReferenceSystem}" PlaceholderText="Current system"
+                           Margin="0,2,0,8" />
+
+                  <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,10">
+                    <CheckBox Grid.Column="0" IsChecked="{Binding RequireLargePad}" Foreground="{StaticResource Ink}"
+                              Content="Large pad only" VerticalAlignment="Bottom"
+                              ToolTip.Tip="Only stations a large ship can dock at" />
+                    <Button Grid.Column="1" Classes="action" Content="Find" VerticalAlignment="Bottom"
+                            Command="{Binding SearchCommand}" IsEnabled="{Binding !Busy}" />
+                  </Grid>
+
+                  <TextBlock Classes="label" Text="{Binding Status}" TextWrapping="Wrap"
+                             IsVisible="{Binding Status, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+                  <StackPanel IsVisible="{Binding HasResults}" Margin="0,8,0,0">
+                    <Grid ColumnDefinitions="*,80,70,Auto" Margin="0,0,0,2">
+                      <TextBlock Grid.Column="0" Classes="label" Text="STATION" />
+                      <TextBlock Grid.Column="1" Classes="label" Text="ARRIVAL" HorizontalAlignment="Right" />
+                      <TextBlock Grid.Column="2" Classes="label" Text="DIST" HorizontalAlignment="Right" />
+                      <TextBlock Grid.Column="3" Classes="label" Text="" />
+                    </Grid>
+                    <ScrollViewer MaxHeight="320" VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled">
+                      <ItemsControl ItemsSource="{Binding Results}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:ServiceResultLine">
+                            <Grid ColumnDefinitions="*,80,70,Auto" Margin="0,5">
+                              <StackPanel Grid.Column="0" Margin="0,0,8,0" VerticalAlignment="Center">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                  <TextBlock Text="{Binding Station}" Classes="value" FontSize="13" TextWrapping="Wrap" />
+                                  <Border Background="#22262E" CornerRadius="3" Padding="5,1" VerticalAlignment="Center"
+                                          IsVisible="{Binding HasFlavour}">
+                                    <TextBlock Text="{Binding Flavour}" FontSize="10" FontWeight="SemiBold"
+                                               Foreground="{StaticResource AmberBrush}" />
+                                  </Border>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                  <TextBlock Text="{Binding System}" Classes="label" FontSize="11" />
+                                  <TextBlock Text="{Binding Detail}" Classes="label" FontSize="11"
+                                             Foreground="{StaticResource InkDim}" />
+                                  <TextBlock Text="{Binding Age}" Classes="label" FontSize="11"
+                                             Foreground="{StaticResource InkDim}" />
+                                </StackPanel>
+                              </StackPanel>
+                              <TextBlock Grid.Column="1" Text="{Binding Arrival}" FontSize="12"
+                                         HorizontalAlignment="Right" VerticalAlignment="Center"
+                                         Foreground="{StaticResource Ink}"
+                                         IsVisible="{Binding !IsFarFromEntry}" />
+                              <TextBlock Grid.Column="1" Text="{Binding Arrival}" FontSize="12"
+                                         HorizontalAlignment="Right" VerticalAlignment="Center"
+                                         Foreground="{StaticResource Bad}" FontWeight="Medium"
+                                         IsVisible="{Binding IsFarFromEntry}"
+                                         ToolTip.Tip="A long supercruise from the system entry point" />
+                              <TextBlock Grid.Column="2" Text="{Binding Distance}" Classes="value" FontSize="12"
+                                         HorizontalAlignment="Right" VerticalAlignment="Center" />
+                              <Button Grid.Column="3" Classes="mini" Content="Copy" Margin="8,0,0,0"
+                                      VerticalAlignment="Center"
+                                      Command="{Binding $parent[ItemsControl].((vm:ServicesCardViewModel)DataContext).CopySystemCommand}"
+                                      CommandParameter="{Binding System}" ToolTip.Tip="Copy this system" />
                             </Grid>
                           </DataTemplate>
                         </ItemsControl.ItemTemplate>

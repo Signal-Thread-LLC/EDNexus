@@ -57,6 +57,31 @@ public sealed class SpanshClient : IDisposable
     }
 
     /// <summary>
+    /// Find the nearest stations offering a given service — material trader, shipyard, Vista Genomics
+    /// and so on. Shares the <c>/stations/search</c> endpoint with
+    /// <see cref="SearchStationsAsync"/> but filters on services rather than a commodity, and asks for
+    /// none of the market payload. Never throws: failures come back as
+    /// <see cref="SpanshServicesResult.TransportError"/>.
+    /// </summary>
+    public async Task<SpanshServicesResult> SearchServicesAsync(SpanshServiceQuery query, CancellationToken ct = default)
+    {
+        try
+        {
+            using var response = await _http.PostAsJsonAsync(
+                $"{_options.BaseUrl.TrimEnd('/')}/stations/search", BuildServiceRequest(query), Json, ct).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode)
+                return SpanshServicesResult.TransportError($"HTTP {(int)response.StatusCode}");
+
+            var text = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+            return ParseServices(text, query.SubtypeField);
+        }
+        catch (Exception ex)
+        {
+            return SpanshServicesResult.TransportError(ex.Message);
+        }
+    }
+
+    /// <summary>
     /// Plot a neutron-highway route (boosting off neutron stars). Spansh runs this as a background job:
     /// this submits the job, then polls for the result (spacing polls by
     /// <see cref="SpanshClientOptions.RoutePollInterval"/>) until it is ready, the attempt budget runs
@@ -303,6 +328,58 @@ public sealed class SpanshClient : IDisposable
     /// Build the <c>stations/search</c> body: rank by distance from the reference system and filter
     /// to stations that have the wanted side of the commodity's market. (Spansh filter shape.)
     /// </summary>
+    private static object BuildServiceRequest(SpanshServiceQuery query)
+    {
+        var filters = new Dictionary<string, object>
+        {
+            ["services"] = new[] { new Dictionary<string, object> { ["name"] = query.ServiceName } },
+        };
+
+        // Only send the flavour filter when one was asked for — an empty value array matches nothing.
+        if (!string.IsNullOrWhiteSpace(query.SubtypeField) && !string.IsNullOrWhiteSpace(query.Subtype))
+            filters[query.SubtypeField] = new { value = new[] { query.Subtype } };
+
+        if (query.RequireLargePad)
+            filters["has_large_pad"] = new { value = true };
+
+        return new
+        {
+            filters,
+            sort = new[] { new Dictionary<string, object> { ["distance"] = new { direction = "asc" } } },
+            size = query.MaxResults,
+            reference_system = query.ReferenceSystem,
+        };
+    }
+
+    private static SpanshServicesResult ParseServices(string body, string? subtypeField)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            if (!doc.RootElement.TryGetProperty("results", out var results) || results.ValueKind != JsonValueKind.Array)
+                return SpanshServicesResult.Ok(Array.Empty<SpanshServiceStation>());
+
+            var stations = new List<SpanshServiceStation>();
+            foreach (var station in results.EnumerateArray())
+                stations.Add(new SpanshServiceStation(
+                    SystemName: ReadString(station, "system_name") ?? "Unknown",
+                    StationName: ReadString(station, "name") ?? "Unknown",
+                    DistanceLy: ReadDouble(station, "distance"),
+                    DistanceToArrivalLs: ReadDouble(station, "distance_to_arrival"),
+                    StationType: ReadString(station, "type"),
+                    IsPlanetary: ReadBool(station, "is_planetary"),
+                    HasLargePad: ReadBool(station, "has_large_pad"),
+                    Subtype: subtypeField is null ? null : ReadString(station, subtypeField),
+                    Updated: ReadDate(station, "updated_at")));
+
+            return SpanshServicesResult.Ok(stations);
+        }
+        catch (JsonException ex)
+        {
+            return SpanshServicesResult.TransportError("unparseable response: " + ex.Message);
+        }
+    }
+
     private static object BuildRequest(SpanshStationQuery query)
     {
         // Selling to a station needs demand there; buying from one needs supply. Spansh range filters

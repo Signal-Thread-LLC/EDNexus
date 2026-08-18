@@ -13,6 +13,7 @@ using EDNexus.Core.News;
 using EDNexus.Core.Reporting;
 using EDNexus.Core.Routes;
 using EDNexus.Core.Settings;
+using EDNexus.Core.Stations;
 using EDNexus.Core.State;
 using EDNexus.Core.Trade;
 using EliteDangerous.Edsm;
@@ -66,6 +67,12 @@ public sealed class EngineHost : IDisposable
     public INewsFeed News { get; }
 
     /// <summary>
+    /// "Where is the nearest station with X" lookups — material traders, shipyards, Vista Genomics.
+    /// Backed by Spansh; swappable via <see cref="IStationServiceFinder"/>.
+    /// </summary>
+    public IStationServiceFinder StationServices { get; }
+
+    /// <summary>
     /// The shared, multi-commander view of a construction project. Backed by Raven Colonial;
     /// swappable via <see cref="ISharedProjectLookup"/>.
     /// </summary>
@@ -117,6 +124,11 @@ public sealed class EngineHost : IDisposable
         News = new GalnetNewsFeed(
             new GalnetClient(new GalnetClientOptions { SoftwareName = "EDNexus", SoftwareVersion = version }, _http),
             new DiskResponseCache(Path.Combine(cacheRoot, "galnet"), TimeSpan.FromHours(1)));
+
+        // Station services change far more slowly than prices — a port keeps its shipyard between
+        // sessions — so this cache can be long-lived without going stale in any way that matters.
+        StationServices = new SpanshStationServiceFinder(
+            spansh, new DiskResponseCache(Path.Combine(cacheRoot, "services"), TimeSpan.FromDays(7)));
 
         // Read-only: squadmates deliver while you fly, so this one is never cached.
         SharedProjects = new RavenColonialProjectLookup(new RavenColonialClient(

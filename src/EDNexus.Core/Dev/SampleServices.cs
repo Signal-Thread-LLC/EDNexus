@@ -1,5 +1,6 @@
 using EDNexus.Core.News;
 using EDNexus.Core.Routes;
+using EDNexus.Core.Stations;
 using EDNexus.Core.Trade;
 
 namespace EDNexus.Core.Dev;
@@ -226,5 +227,52 @@ public sealed class SampleNewsFeed : INewsFeed
         }
 
         return Task.FromResult<IReadOnlyList<NewsArticle>>(articles);
+    }
+}
+
+/// <summary>
+/// Offline stand-in for <see cref="IStationServiceFinder"/>. Fabricates plausible nearby stations for
+/// whichever service was asked for, so the card can be exercised — and its empty/far-from-entry
+/// states seen — without the game running or a network round trip.
+/// </summary>
+public sealed class SampleStationServiceFinder : IStationServiceFinder
+{
+    private readonly Random _rng;
+
+    public string SourceName => "Spansh (dev)";
+
+    public SampleStationServiceFinder(Random rng) => _rng = rng;
+
+    public Task<IReadOnlyList<StationServiceResult>> FindAsync(
+        StationServiceQuery query, CancellationToken ct = default)
+    {
+        var types = new[] { "Coriolis Starport", "Orbis Starport", "Ocellus Starport", "Outpost", "Planetary Port" };
+        var count = _rng.Next(4, 9);
+        var results = new List<StationServiceResult>();
+        var distance = 0.0;
+
+        for (var i = 0; i < count; i++)
+        {
+            // Monotonic distances, because the real source returns nearest-first and the card says so.
+            distance += _rng.NextDouble() * 12;
+            var type = types[_rng.Next(types.Length)];
+            var planetary = type == "Planetary Port";
+
+            results.Add(new StationServiceResult(
+                System: SamplePools.Systems[_rng.Next(SamplePools.Systems.Length)],
+                Station: SamplePools.Stations[_rng.Next(SamplePools.Stations.Length)],
+                DistanceLy: Math.Round(distance, 2),
+                // Occasionally deep in the system, so the "far from entry" warning gets exercised.
+                DistanceToArrivalLs: _rng.Next(100) < 25 ? _rng.Next(5_000, 250_000) : _rng.Next(10, 3_000),
+                StationType: type,
+                IsPlanetary: planetary,
+                HasLargePad: planetary || _rng.Next(100) < 70,
+                Flavour: query.Service.HasFlavours
+                    ? query.Flavour ?? query.Service.Flavours[_rng.Next(query.Service.Flavours.Count)]
+                    : null,
+                Updated: DateTimeOffset.UtcNow.AddDays(-_rng.Next(0, 30))));
+        }
+
+        return Task.FromResult<IReadOnlyList<StationServiceResult>>(results);
     }
 }
