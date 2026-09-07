@@ -19,7 +19,9 @@ public enum RouteMode
 /// A request to plot a route: from where, to where, and how. <see cref="JumpRangeLy"/> drives the
 /// neutron plot; <see cref="Ship"/> drives a no-boost plot (its FSD physics are what let Spansh model
 /// fuel burn) with <see cref="CargoTons"/> aboard, so laden ships get jumps they can actually make;
-/// <see cref="CarrierCargoUsed"/> is the non-tritium load for a fleet-carrier plot. <see cref="Efficiency"/>
+/// <see cref="CarrierCargoUsed"/> is the carrier's total used capacity (crew, services and cargo,
+/// tonnes — matching the figure shown on the carrier management screen) for a fleet-carrier plot.
+/// <see cref="Efficiency"/>
 /// is Spansh's 0–100 neutron detour tolerance (higher = more boosts, fewer jumps, longer path); 60
 /// matches Spansh's own default.
 /// </summary>

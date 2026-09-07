@@ -87,6 +87,14 @@ public sealed class CommanderState : ObservableObject
     /// <summary>The fleet carrier's current jump range (ly) at its present load, from <c>CarrierStats</c>. 0 when unknown.</summary>
     public double CarrierJumpRange { get => _carrierJumpRange; set => Set(ref _carrierJumpRange, value); }
 
+    private double _carrierUsedCapacity;
+    /// <summary>
+    /// Tonnage of the carrier's capacity already used by crew, services and cargo (<c>SpaceUsage.TotalCapacity
+    /// - SpaceUsage.FreeSpace</c>), from <c>CarrierStats</c>. 0 when unknown. Drives the fleet-carrier route
+    /// plot's fuel model — less free space means less room to carry tritium reserves for restocking.
+    /// </summary>
+    public double CarrierUsedCapacity { get => _carrierUsedCapacity; set => Set(ref _carrierUsedCapacity, value); }
+
     private string? _carrierPendingSystem;
     /// <summary>
     /// The system a fleet-carrier jump is scheduled to, from a <c>CarrierJumpRequest</c> that hasn't yet

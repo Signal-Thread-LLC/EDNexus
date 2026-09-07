@@ -78,6 +78,13 @@ public sealed class StateTracker
         if (e.GetDouble("FuelLevel") is double fuel) _state.CarrierFuel = fuel;
         if (e.GetDouble("JumpRangeCurr") is double range) _state.CarrierJumpRange = range;
 
+        // Used capacity = total minus free, so it tracks crew/services/cargo together the way Spansh's
+        // fleet-carrier plotter expects it (as "capacity_used"), not just the cargo hold.
+        if (e.Raw.TryGetProperty("SpaceUsage", out var usage)
+            && usage.TryGetProperty("TotalCapacity", out var totalEl) && totalEl.TryGetDouble(out var total)
+            && usage.TryGetProperty("FreeSpace", out var freeEl) && freeEl.TryGetDouble(out var free))
+            _state.CarrierUsedCapacity = Math.Max(0, total - free);
+
         // The only place the carrier's chosen name is ever reported — Docked/Location carry the
         // callsign alone. Pairing the two here is what lets the UI show "Nomad's Reach" instead
         // of "K7Q-B3L", and only for the commander's own carrier.
