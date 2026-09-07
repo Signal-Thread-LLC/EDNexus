@@ -31,6 +31,19 @@ public class CarrierStateTrackerTests
     }
 
     [Fact]
+    public void CarrierStats_derives_used_capacity_from_space_usage()
+    {
+        var (bus, state) = NewTracker();
+        Publish(bus, """
+        { "timestamp":"2026-07-12T02:55:06Z", "event":"CarrierStats", "FuelLevel":638, "JumpRangeCurr":500.0,
+          "SpaceUsage": { "TotalCapacity":25000, "Crew":1200, "Cargo":3500, "CargoSpaceReserved":0,
+                          "ShipPacks":0, "ModulePacks":0, "FreeSpace":20300 } }
+        """);
+
+        Assert.Equal(4700, state.CarrierUsedCapacity);
+    }
+
+    [Fact]
     public void CarrierJumpRequest_records_pending_destination_and_departure()
     {
         var (bus, state) = NewTracker();

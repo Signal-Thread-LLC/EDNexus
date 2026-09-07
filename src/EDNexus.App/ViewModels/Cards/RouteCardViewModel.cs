@@ -22,6 +22,7 @@ public sealed partial class RouteCardViewModel : CardViewModel
     private SampleRoutePlotter? _sampleRoutes;
     private ShipFsdProfile? _fsd;
     private double _cargoTons;
+    private double _carrierUsedCapacity;
 
     public RouteCardViewModel(DashboardContext context) : base(context, "route", "ROUTE PLOTTER", 452) => RefreshMode();
 
@@ -90,6 +91,7 @@ public sealed partial class RouteCardViewModel : CardViewModel
 
         _fsd = s.Fsd;
         _cargoTons = s.CargoTons;
+        _carrierUsedCapacity = s.CarrierUsedCapacity;
         if (s.CarrierFuel > 0)
         {
             var range = s.CarrierJumpRange > 0 ? $" · {s.CarrierJumpRange:N0} ly range" : "";
@@ -195,8 +197,8 @@ public sealed partial class RouteCardViewModel : CardViewModel
                 request = new RoutePlotRequest(from, to, hasRange ? range : 0, Mode: mode, Ship: _fsd, CargoTons: _cargoTons);
                 return true;
 
-            default: // FleetCarrier — no range or ship needed.
-                request = new RoutePlotRequest(from, to, 0, Mode: mode);
+            default: // FleetCarrier — no range or ship needed, but used capacity shapes the fuel model.
+                request = new RoutePlotRequest(from, to, 0, Mode: mode, CarrierCargoUsed: _carrierUsedCapacity);
                 return true;
         }
     }

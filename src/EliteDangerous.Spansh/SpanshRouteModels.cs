@@ -73,7 +73,10 @@ public sealed class SpanshFleetCarrierRouteQuery
     public required string From { get; init; }
     public required string To { get; init; }
 
-    /// <summary>Non-tritium cargo aboard (t): it eats into the carrier's mass budget and shortens hops.</summary>
+    /// <summary>
+    /// Total capacity used aboard (t) — crew, services and cargo combined, matching the figure on the
+    /// carrier management screen. It eats into the carrier's mass budget and shortens hops.
+    /// </summary>
     public double CapacityUsed { get; init; }
 
     /// <summary>
