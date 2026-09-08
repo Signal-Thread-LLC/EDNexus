@@ -48,7 +48,7 @@ internal static class Program
             System.Diagnostics.Trace.TraceInformation("Program: starting background auto-update check");
             _ = System.Threading.Tasks.Task.Run(async () =>
             {
-                var res = await EDNexus.App.Services.AutoUpdateService2.CheckForUpdatesAsync().ConfigureAwait(false);
+                var res = await EDNexus.App.Services.AutoUpdateService.CheckForUpdatesAsync().ConfigureAwait(false);
                 System.Diagnostics.Trace.TraceInformation($"Program: background auto-update finished Found={res.Found}, Message={res.Message}, Verified={res.Verified}");
             });
         }

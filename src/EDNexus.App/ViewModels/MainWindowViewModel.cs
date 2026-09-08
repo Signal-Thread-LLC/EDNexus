@@ -76,18 +76,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             {
                 UpdatePath = path;
                 UpdateAvailable = true;
-                System.Diagnostics.Trace.TraceInformation($"UI: UpdateDownloaded event received (AutoUpdateService) path={path}");
-            });
-        };
-
-        // Also listen to the improved updater (AutoUpdateService2) used at startup.
-        EDNexus.App.Services.AutoUpdateService2.UpdateDownloaded += path =>
-        {
-            Dispatcher.UIThread.Post(() =>
-            {
-                UpdatePath = path;
-                UpdateAvailable = true;
-                System.Diagnostics.Trace.TraceInformation($"UI: UpdateDownloaded event received (AutoUpdateService2) path={path}");
+                System.Diagnostics.Trace.TraceInformation($"UI: UpdateDownloaded event received path={path}");
             });
         };
     }

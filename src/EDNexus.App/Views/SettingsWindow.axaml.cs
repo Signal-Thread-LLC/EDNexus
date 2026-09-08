@@ -115,7 +115,7 @@ public partial class SettingsWindow : Window
         try
         {
             // If the updater has already downloaded an update, show the path; otherwise indicate not available.
-            var updatePath = EDNexus.App.Services.AutoUpdateService2.LastDownloadedPath;
+            var updatePath = EDNexus.App.Services.AutoUpdateService.LastDownloadedPath;
             if (!string.IsNullOrEmpty(updatePath))
             {
                 UpdateLine.Text = "Downloaded: " + Path.GetFileName(updatePath);
@@ -180,7 +180,7 @@ public partial class SettingsWindow : Window
             CheckNowButton.IsEnabled = false;
             UpdateLine.Text = "Checking for updates...";
             System.Diagnostics.Trace.TraceInformation("Settings: user initiated update check");
-            var res = await EDNexus.App.Services.AutoUpdateService2.CheckForUpdatesAsync();
+            var res = await EDNexus.App.Services.AutoUpdateService.CheckForUpdatesAsync();
             System.Diagnostics.Trace.TraceInformation($"Settings: update check result Found={res.Found}, Message={res.Message}, Verified={res.Verified}");
             if (res.Found)
             {
