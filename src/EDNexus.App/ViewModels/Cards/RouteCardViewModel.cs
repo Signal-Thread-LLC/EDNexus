@@ -1,11 +1,13 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using EDNexus.Core.Dev;
 using EDNexus.Core.Routes;
+using EDNexus.Core.Settings;
 using EDNexus.Core.Ship;
 using EDNexus.Core.State;
 
@@ -24,7 +26,17 @@ public sealed partial class RouteCardViewModel : CardViewModel
     private double _cargoTons;
     private double _carrierUsedCapacity;
 
-    public RouteCardViewModel(DashboardContext context) : base(context, "route", "ROUTE PLOTTER", 452) => RefreshMode();
+    /// <summary>The plotted route behind the displayed hops — the source of truth <see cref="PersistRoute"/> saves from.</summary>
+    private RoutePlan? _lastPlan;
+
+    /// <summary>True while <see cref="RestoreSavedRoute"/> is applying a saved route, so it doesn't re-save itself.</summary>
+    private bool _restoring;
+
+    public RouteCardViewModel(DashboardContext context) : base(context, "route", "ROUTE PLOTTER", 452)
+    {
+        RefreshMode();
+        RestoreSavedRoute();
+    }
 
     /// <summary>No dev-mode sample source feeds this card, so it has no 🎲 reshuffle.</summary>
     public override bool CanRandomize => false;
@@ -146,11 +158,7 @@ public sealed partial class RouteCardViewModel : CardViewModel
                 return;
             }
 
-            for (var i = 0; i < plan.Hops.Count; i++)
-                RouteHops.Add(ToLine(i, plan.Hops[i], plan.Mode));
-
-            RouteHasPlan = true;
-            RouteSummary = Summarise(plan);
+            ShowPlan(plan);
             RouteStatus = $"via {Plotter.SourceName}";
             SetRouteStep(Math.Min(1, RouteHops.Count - 1));   // first target after the origin
 
@@ -201,6 +209,102 @@ public sealed partial class RouteCardViewModel : CardViewModel
                 request = new RoutePlotRequest(from, to, 0, Mode: mode, CarrierCargoUsed: _carrierUsedCapacity);
                 return true;
         }
+    }
+
+    /// <summary>Populate the hop list and totals from a plotted route, live or restored.</summary>
+    private void ShowPlan(RoutePlan plan)
+    {
+        _lastPlan = plan;
+        RouteHops.Clear();
+        for (var i = 0; i < plan.Hops.Count; i++)
+            RouteHops.Add(ToLine(i, plan.Hops[i], plan.Mode));
+
+        RouteHasPlan = true;
+        RouteSummary = Summarise(plan);
+    }
+
+    /// <summary>
+    /// Bring back the route the commander had plotted last session, so restarting EDNexus mid-trip
+    /// doesn't lose their place. A missing or empty saved route (the common case — nothing plotted
+    /// yet, or it was cleared) leaves the card blank, same as a fresh install.
+    /// </summary>
+    private void RestoreSavedRoute()
+    {
+        var saved = Context.GetSavedRoute();
+        if (string.IsNullOrWhiteSpace(saved.From) || saved.Hops.Count == 0) return;
+
+        _restoring = true;
+        try
+        {
+            var mode = Enum.TryParse<RouteMode>(saved.Mode, out var m) ? m : RouteMode.NeutronHighway;
+            ModeNeutron = mode == RouteMode.NeutronHighway;
+            ModeNoBoost = mode == RouteMode.NoBoost;
+            ModeCarrier = mode == RouteMode.FleetCarrier;
+
+            RouteFrom = saved.From ?? "";
+            RouteTo = saved.To ?? "";
+            RouteJumpRange = saved.JumpRangeText;
+
+            var hops = saved.Hops.Select(h => new RouteHop(
+                h.System, h.Jumps, h.IsNeutron, h.DistanceJumpedLy, h.DistanceRemainingLy,
+                h.FuelUsed, h.FuelInTank, h.IsScoopable, h.MustRestock, h.RestockAmount, h.HasIcyRing)).ToList();
+            ShowPlan(new RoutePlan(RouteFrom, RouteTo, hops, mode));
+            RouteStatus = "Restored from last session.";
+            SetRouteStep(Math.Clamp(saved.StepIndex, 0, RouteHops.Count - 1));
+        }
+        finally
+        {
+            _restoring = false;
+        }
+    }
+
+    /// <summary>
+    /// Save the currently displayed route (inputs, mode and every hop) so it survives a restart. A
+    /// no-op while restoring (nothing changed) or in developer mode (fabricated data has no business
+    /// coming back as a real plan next launch).
+    /// </summary>
+    private void PersistRoute()
+    {
+        if (_restoring || _lastPlan is null || Context.DevEnabled) return;
+
+        Context.SaveRoute(new RouteSettings
+        {
+            From = RouteFrom,
+            To = RouteTo,
+            Mode = CurrentMode.ToString(),
+            JumpRangeText = RouteJumpRange,
+            StepIndex = RouteStepIndex,
+            Hops = _lastPlan.Hops.Select(h => new SavedRouteHop
+            {
+                System = h.System,
+                Jumps = h.Jumps,
+                IsNeutron = h.IsNeutron,
+                DistanceJumpedLy = h.DistanceJumpedLy,
+                DistanceRemainingLy = h.DistanceRemainingLy,
+                FuelUsed = h.FuelUsed,
+                FuelInTank = h.FuelInTank,
+                IsScoopable = h.IsScoopable,
+                MustRestock = h.MustRestock,
+                RestockAmount = h.RestockAmount,
+                HasIcyRing = h.HasIcyRing,
+            }).ToList(),
+        });
+    }
+
+    /// <summary>Drop the plotted route (from the card and from disk) so the commander can start clean.</summary>
+    [RelayCommand]
+    private void ClearRoute()
+    {
+        _lastPlan = null;
+        RouteHops.Clear();
+        RouteHasPlan = false;
+        RouteSummary = "";
+        RouteFrom = "";
+        RouteTo = "";
+        RouteStepIndex = 0;
+        RouteNextSystem = "—";
+        RouteStatus = "Route cleared.";
+        Context.SaveRoute(new RouteSettings());
     }
 
     /// <summary>Fold in the EDSM straight-line distance once it comes back, without blocking the plot.</summary>
@@ -296,6 +400,7 @@ public sealed partial class RouteCardViewModel : CardViewModel
             RouteHops[i].IsCurrent = i == index;
         RouteStepIndex = index;
         RouteNextSystem = RouteHops.Count > 0 ? RouteHops[index].System : "—";
+        PersistRoute();   // keeps the saved step position current as the commander works through the route
     }
 
     private static bool TryParseRange(string text, out double range) =>

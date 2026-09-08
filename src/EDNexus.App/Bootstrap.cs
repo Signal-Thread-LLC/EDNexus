@@ -80,4 +80,11 @@ public sealed class Bootstrap
         Store.Save(Settings);
     }
 
+    /// <summary>Persist the route plotter's last plotted route (or an empty one, to clear it).</summary>
+    public void ApplySavedRoute(RouteSettings route)
+    {
+        Settings.Route = route;
+        Store.Save(Settings);
+    }
+
 }

@@ -24,6 +24,8 @@ public sealed class DashboardContext
     private readonly Action<string?, int> _saveEngineeringPin;
     private readonly Action<bool> _saveEngineeringOnFootMode;
     private readonly Action<string?, string?, int> _saveOnFootPin;
+    private readonly Func<RouteSettings> _getSavedRoute;
+    private readonly Action<RouteSettings> _saveRoute;
 
     public DashboardContext(
         Func<EngineHost> host,
@@ -32,7 +34,9 @@ public sealed class DashboardContext
         Func<EngineeringSettings> getEngineeringPin,
         Action<string?, int> saveEngineeringPin,
         Action<bool> saveEngineeringOnFootMode,
-        Action<string?, string?, int> saveOnFootPin)
+        Action<string?, string?, int> saveOnFootPin,
+        Func<RouteSettings> getSavedRoute,
+        Action<RouteSettings> saveRoute)
     {
         _host = host;
         _devEnabled = devEnabled;
@@ -41,6 +45,8 @@ public sealed class DashboardContext
         _saveEngineeringPin = saveEngineeringPin;
         _saveEngineeringOnFootMode = saveEngineeringOnFootMode;
         _saveOnFootPin = saveOnFootPin;
+        _getSavedRoute = getSavedRoute;
+        _saveRoute = saveRoute;
     }
 
     /// <summary>The live engine host — always the current one, even after a reset-to-live rebuild.</summary>
@@ -62,6 +68,12 @@ public sealed class DashboardContext
 
     /// <summary>Persist the pinned on-foot suit/weapon; a null id clears it.</summary>
     public void SaveOnFootPin(string? kind, string? id, int grade) => _saveOnFootPin(kind, id, grade);
+
+    /// <summary>Read the route plotter's last plotted route, so it can restore across a restart.</summary>
+    public RouteSettings GetSavedRoute() => _getSavedRoute();
+
+    /// <summary>Persist the route plotter's route (an empty/default instance clears it).</summary>
+    public void SaveRoute(RouteSettings route) => _saveRoute(route);
 }
 
 /// <summary>
