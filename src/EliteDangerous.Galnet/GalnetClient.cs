@@ -80,7 +80,7 @@ public sealed class GalnetClient : IDisposable
             articles.Add(new GalnetArticle(
                 Id: Text(item, "guid") is { Length: > 0 } id ? id : title,
                 Title: PlainText(title),
-                Body: PlainText(Text(item, "description")),
+                Body: PlainText(ExtractCmsBody(Text(item, "description"))),
                 Published: ParseDate(Text(item, "pubDate"))));
         }
 
@@ -97,6 +97,39 @@ public sealed class GalnetClient : IDisposable
         => DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed)
             ? parsed
             : null;
+
+    /// <summary>
+    /// The CMS-backed feed wraps each article's real text in a Drupal "Body" field, followed by more
+    /// field blocks that are metadata, not article content (an in-lore date, GUID, image key, slug) —
+    /// all inside the same <c>&lt;description&gt;</c>. Slice out just the body field's value so that
+    /// metadata doesn't leak into the article as extra lines. A description that isn't shaped this way
+    /// (the plain CDATA body the classic feed used) has no such marker and passes through unchanged.
+    /// </summary>
+    private static string ExtractCmsBody(string html)
+    {
+        const string bodyField = "field--name-body";
+        var bodyStart = html.IndexOf(bodyField, StringComparison.OrdinalIgnoreCase);
+        if (bodyStart < 0) return html;
+
+        // Skip past the field's own "Body" label div to where its actual value starts.
+        var labelEnd = html.IndexOf("</div>", bodyStart, StringComparison.OrdinalIgnoreCase);
+        if (labelEnd < 0) return html;
+        var contentStart = labelEnd + "</div>".Length;
+
+        // Everything up to the next Drupal field group (the date/guid/image/slug fields that follow
+        // the body in this feed) is the real article text. The marker sits inside that field's own
+        // *class attribute*, not at its tag's start, so back up to the enclosing "<div" to cut on a
+        // clean tag boundary — cutting at the marker itself would leave a dangling "<div class=..."
+        // fragment that the tag-stripping pass downstream can't clean up (no closing '>' left to match).
+        var fieldMarker = html.IndexOf("field--name-field-", contentStart, StringComparison.OrdinalIgnoreCase);
+        var contentEnd = html.Length;
+        if (fieldMarker >= 0)
+        {
+            var tagStart = html.LastIndexOf("<div", fieldMarker, StringComparison.OrdinalIgnoreCase);
+            contentEnd = tagStart >= contentStart ? tagStart : fieldMarker;
+        }
+        return contentEnd > contentStart ? html[contentStart..contentEnd] : html;
+    }
 
     /// <summary>
     /// Turn the feed's HTML into text: line breaks survive as newlines, every other tag is dropped and

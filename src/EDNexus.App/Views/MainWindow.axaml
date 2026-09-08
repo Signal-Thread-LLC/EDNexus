@@ -691,12 +691,14 @@
                   <TextBlock Classes="label" Text="TO" />
                   <TextBox Classes="field" Text="{Binding RouteTo}" PlaceholderText="Destination system" Margin="0,2,0,8" />
 
-                  <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,10">
+                  <Grid ColumnDefinitions="*,Auto,Auto" Margin="0,0,0,10">
                     <StackPanel Grid.Column="0" Margin="0,0,10,0" IsVisible="{Binding ShowJumpRange}">
                       <TextBlock Classes="label" Text="JUMP RANGE (LY)" />
                       <TextBox Classes="field" Text="{Binding RouteJumpRange}" PlaceholderText="e.g. 48.5" Margin="0,2,0,0" />
                     </StackPanel>
-                    <Button Grid.Column="1" Classes="action" Content="Plot route" VerticalAlignment="Bottom"
+                    <Button Grid.Column="1" Classes="mini" Content="Clear" VerticalAlignment="Bottom" Margin="0,0,6,0"
+                            Command="{Binding ClearRouteCommand}" ToolTip.Tip="Clear the current route" />
+                    <Button Grid.Column="2" Classes="action" Content="Plot route" VerticalAlignment="Bottom"
                             Command="{Binding PlotRouteCommand}" IsEnabled="{Binding !RouteBusy}" />
                   </Grid>
 

@@ -32,6 +32,50 @@ public sealed class AppSettings
     /// Empty until they first customise it, so a fresh install uses the shipped layout.
     /// </summary>
     public DashboardSettings Dashboard { get; set; } = new();
+
+    /// <summary>The route plotter's last plotted route, so it survives a restart. Empty until one is plotted.</summary>
+    public RouteSettings Route { get; set; } = new();
+}
+
+/// <summary>
+/// The route plotter card's last plotted route: inputs enough to redisplay it (and re-plot it)
+/// without a network round-trip, plus where the stepper was left. A null/empty <see cref="From"/>
+/// means no route is saved — the card starts blank, as before this existed.
+/// </summary>
+public sealed class RouteSettings
+{
+    public string? From { get; set; }
+    public string? To { get; set; }
+
+    /// <summary>Name of a <c>RouteMode</c> member (e.g. "NeutronHighway"), stored as text so it's a no-op to add modes later.</summary>
+    public string Mode { get; set; } = "NeutronHighway";
+
+    /// <summary>The neutron plot's jump-range text field, kept verbatim so a restore doesn't lose the commander's exact input.</summary>
+    public string JumpRangeText { get; set; } = "50";
+
+    /// <summary>Which hop the stepper was pointing at.</summary>
+    public int StepIndex { get; set; }
+
+    public List<SavedRouteHop> Hops { get; set; } = new();
+}
+
+/// <summary>
+/// A persisted copy of a plotted waypoint — deliberately its own shape (not the engine's <c>RouteHop</c>)
+/// so a change to the live route model never breaks deserializing an old saved route.
+/// </summary>
+public sealed class SavedRouteHop
+{
+    public string System { get; set; } = "";
+    public int Jumps { get; set; }
+    public bool IsNeutron { get; set; }
+    public double DistanceJumpedLy { get; set; }
+    public double DistanceRemainingLy { get; set; }
+    public double? FuelUsed { get; set; }
+    public double? FuelInTank { get; set; }
+    public bool IsScoopable { get; set; }
+    public bool MustRestock { get; set; }
+    public double? RestockAmount { get; set; }
+    public bool HasIcyRing { get; set; }
 }
 
 /// <summary>The single pinned blueprint the Engineering card focuses on. Null id means nothing pinned.</summary>

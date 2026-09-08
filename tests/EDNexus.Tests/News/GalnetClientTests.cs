@@ -105,6 +105,85 @@ public class GalnetClientTests
         Assert.Equal("Headline", GalnetClient.Parse(feed).Value!.Single().Id);
     }
 
+    /// <summary>
+    /// Shaped like the CMS-backed feed: the article text sits in a Drupal "Body" field, followed by
+    /// more field blocks (in-lore date, GUID, image, slug) that are metadata, not article text — all
+    /// crammed into the same &lt;description&gt;. Unlike the classic feed, pubDate here is the article's
+    /// own publish time, not a shared build timestamp (the bug this feed switch fixes: #123).
+    /// </summary>
+    private const string CmsFeed = """
+    <?xml version="1.0" encoding="utf-8"?>
+    <rss version="2.0"><channel>
+      <item>
+        <guid isPermaLink="false">6a993628a96f951e83045c7e</guid>
+        <title>Wreaken Calls for Surface Mining Support Tests</title>
+        <description><![CDATA[<span class="field field--name-title field--type-string field--label-hidden">Wreaken Calls for Surface Mining Support Tests</span>
+    <span class="field field--name-created field--type-created field--label-hidden"><time datetime="2026-09-03T12:00:46+01:00">Thu, 09/03/2026 - 12:00</time>
+    </span>
+      <div class="clearfix text-formatted field field--name-body field--type-text-with-summary field--label-above">
+        <div class="field__label">Body</div>
+                  <div class="field__item"><p>Independent pilots are needed for field trials.<br />
+    The rig tests new mining laser technology.</p>
+    </div>
+              </div>
+
+      <div class="field field--name-field-galnet-date field--type-string field--label-above">
+        <div class="field__label">Date</div>
+                  <div class="field__item">03 SEP 3312</div>
+              </div>
+
+      <div class="field field--name-field-galnet-guid field--type-string field--label-above">
+        <div class="field__label">GUID</div>
+                  <div class="field__item">6a993628a96f951e83045c7e</div>
+              </div>
+    ]]></description>
+        <pubDate>Thu, 03 Sep 2026 11:00:46 +0000</pubDate>
+      </item>
+      <item>
+        <guid isPermaLink="false">older-article</guid>
+        <title>Colonia Tenth Anniversary Celebrations Get Underway</title>
+        <description><![CDATA[<span class="field field--name-title field--type-string field--label-hidden">Colonia Tenth Anniversary Celebrations Get Underway</span>
+      <div class="clearfix text-formatted field field--name-body field--type-text-with-summary field--label-above">
+        <div class="field__label">Body</div>
+                  <div class="field__item"><p>The festival has begun in earnest.</p>
+    </div>
+              </div>
+
+      <div class="field field--name-field-galnet-date field--type-string field--label-above">
+        <div class="field__label">Date</div>
+                  <div class="field__item">24 AUG 3312</div>
+              </div>
+    ]]></description>
+        <pubDate>Mon, 24 Aug 2026 14:00:46 +0000</pubDate>
+      </item>
+    </channel></rss>
+    """;
+
+    [Fact]
+    public void The_CMS_feeds_metadata_fields_do_not_leak_into_the_article_body()
+    {
+        var article = GalnetClient.Parse(CmsFeed).Value!.First();
+
+        Assert.Equal(
+            "Independent pilots are needed for field trials.\nThe rig tests new mining laser technology.",
+            article.Body);
+        Assert.DoesNotContain("GUID", article.Body);
+        Assert.DoesNotContain("03 SEP 3312", article.Body);
+        Assert.DoesNotContain("Wreaken Calls", article.Body);   // the duplicated title span, also metadata
+    }
+
+    [Fact]
+    public void The_CMS_feeds_articles_keep_their_own_distinct_publish_dates()
+    {
+        var articles = GalnetClient.Parse(CmsFeed).Value!;
+
+        // The bug this feed switch fixes: the classic feed stamped every item in a fetch with the same
+        // build timestamp, so every headline showed "today" regardless of when it actually ran.
+        Assert.Equal(new DateTimeOffset(2026, 9, 3, 11, 0, 46, TimeSpan.Zero), articles[0].Published);
+        Assert.Equal(new DateTimeOffset(2026, 8, 24, 14, 0, 46, TimeSpan.Zero), articles[1].Published);
+        Assert.NotEqual(articles[0].Published, articles[1].Published);
+    }
+
     [Fact]
     public void A_well_formed_but_empty_feed_is_a_success_with_no_articles()
     {

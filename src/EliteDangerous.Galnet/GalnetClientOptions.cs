@@ -12,6 +12,11 @@ public sealed class GalnetClientOptions
     /// <summary>The calling application's version, sent as the User-Agent product version.</summary>
     public required string SoftwareVersion { get; init; }
 
-    /// <summary>The Galnet RSS address. Overridable for tests and for the localised feeds.</summary>
-    public string FeedUrl { get; init; } = "https://community.elitedangerous.com/galnet-rss";
+    /// <summary>
+    /// The Galnet RSS address. Overridable for tests and for the localised feeds. Deliberately the
+    /// CMS-backed feed rather than <c>community.elitedangerous.com/galnet-rss</c>: that one stamps
+    /// every item in a fetch with the same build timestamp instead of the article's own publish time,
+    /// which is why every headline used to show today's date regardless of when it actually ran.
+    /// </summary>
+    public string FeedUrl { get; init; } = "https://cms.zaonce.net/en-GB/rss.xml";
 }
