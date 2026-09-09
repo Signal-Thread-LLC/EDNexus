@@ -3,6 +3,7 @@ using EDNexus.Core.Colonisation;
 using EDNexus.Core.Dev;
 using EDNexus.Core.Journal;
 using EDNexus.Core.Market;
+using EDNexus.Core.Mining;
 using EDNexus.Core.State;
 using Xunit;
 
@@ -101,5 +102,27 @@ public class DeveloperModeTests
 
         // The sampler stocks the hold with commodities the station has demand for.
         Assert.NotEmpty(snap.ValuateHold(state.Cargo));
+    }
+
+    [Fact]
+    public void Mining_sample_produces_a_prospect_with_at_least_one_material()
+    {
+        var bus = new JournalEventBus();
+        var mining = new MiningTracker(bus);
+        var dev = new DeveloperMode();
+        var rng = Seeded();
+
+        // A single draw can land on a rock with zero materials by chance, so draw a few times rather
+        // than asserting on one — the point is that the sampler's output is usable, not that every
+        // single draw is non-empty.
+        ProspectResult? withMaterials = null;
+        for (var i = 0; i < 10 && withMaterials is null; i++)
+        {
+            dev.Randomize(bus, rng, cardKey: "mining");
+            if (mining.Latest is { Materials.Count: > 0 } hit) withMaterials = hit;
+        }
+
+        Assert.NotNull(withMaterials);
+        Assert.All(withMaterials!.Materials, m => Assert.False(string.IsNullOrEmpty(m.Symbol)));
     }
 }

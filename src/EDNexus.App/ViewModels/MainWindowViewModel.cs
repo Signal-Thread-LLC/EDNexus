@@ -42,7 +42,10 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             onFootMode => _boot.ApplyEngineeringOnFootMode(onFootMode),
             (kind, id, grade) => _boot.ApplyOnFootPin(kind, id, grade),
             () => _boot.Settings.Route,
-            route => _boot.ApplySavedRoute(route));
+            route => _boot.ApplySavedRoute(route),
+            () => _boot.Settings.Mining,
+            credits => _boot.ApplyMiningThreshold(credits),
+            prices => _boot.LearnCommodityPrices(prices));
         Cards = new ObservableCollection<CardViewModel>
         {
             new LocationCardViewModel(_context),
@@ -55,6 +58,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             new TradeCardViewModel(_context),
             new ColonisationCardViewModel(_context),
             new MarketCardViewModel(_context),
+            new MiningCardViewModel(_context),
             new ExobiologyCardViewModel(_context),
             new MissionsCardViewModel(_context),
             new RanksCardViewModel(_context),

@@ -35,6 +35,31 @@ public sealed class AppSettings
 
     /// <summary>The route plotter's last plotted route, so it survives a restart. Empty until one is plotted.</summary>
     public RouteSettings Route { get; set; } = new();
+
+    /// <summary>The mining card's price threshold and learned galactic-average prices.</summary>
+    public MiningSettings Mining { get; set; } = new();
+}
+
+/// <summary>
+/// Settings for the mining card's "worth mining" highlight.
+/// </summary>
+/// <remarks>
+/// Frontier doesn't expose a commodity's galactic average price anywhere outside of a station's
+/// market screen, and there's no live API for it either — so rather than ship a table of numbers that
+/// will drift out of date, EDNexus learns it the same way a commander would: every <c>MeanPrice</c>
+/// seen in a docked market is remembered here, keyed by commodity, and never needs re-learning because
+/// that figure is a fixed per-commodity constant, not something that fluctuates station to station.
+/// </remarks>
+public sealed class MiningSettings
+{
+    /// <summary>
+    /// Galactic-average credit threshold: a material at or above this value is called out as worth
+    /// mining. 0 (the default) means unset — nothing is highlighted until the commander picks a value.
+    /// </summary>
+    public int MinValueThreshold { get; set; }
+
+    /// <summary>Learned galactic-average price per commodity (canonical symbol → credits).</summary>
+    public Dictionary<string, int> KnownPrices { get; set; } = new();
 }
 
 /// <summary>

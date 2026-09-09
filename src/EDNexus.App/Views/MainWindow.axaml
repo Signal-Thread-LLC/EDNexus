@@ -987,6 +987,91 @@
             </Border>
           </DataTemplate>
 
+          <!-- Mining: what a prospected asteroid turned up, with anything above the credit threshold
+               called out — deep-core motherlodes separately from the rest of the deposit list, since
+               that is the one distinction the journal actually lets EDNexus draw. -->
+          <DataTemplate DataType="vm:MiningCardViewModel">
+            <Border Classes="card">
+              <StackPanel>
+                <Grid ColumnDefinitions="*,Auto,Auto">
+                  <TextBlock Grid.Column="0" Classes="cardHeader" Text="{Binding Title}" />
+                  <Button Grid.Column="1" Classes="dice" Content="🎲" Margin="0,0,6,0"
+                          IsVisible="{Binding $parent[ItemsControl].((vm:MainWindowViewModel)DataContext).DevMode}"
+                          Command="{Binding $parent[ItemsControl].((vm:MainWindowViewModel)DataContext).RandomizeCardCommand}"
+                          CommandParameter="{Binding Id}" />
+                  <Button Grid.Column="2" Classes="collapse" Content="{Binding CollapseGlyph}"
+                          Command="{Binding ToggleCollapseCommand}" />
+                </Grid>
+                <StackPanel IsVisible="{Binding !IsCollapsed}">
+                  <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,10">
+                    <StackPanel Grid.Column="0" Margin="0,0,10,0">
+                      <TextBlock Classes="label" Text="MIN VALUE TO CALL OUT (CR)" />
+                      <TextBox Classes="field" Text="{Binding ThresholdText}" PlaceholderText="e.g. 50000" Margin="0,2,0,0" />
+                    </StackPanel>
+                    <Button Grid.Column="1" Classes="mini" Content="Clear" VerticalAlignment="Bottom"
+                            Command="{Binding ClearHistoryCommand}" ToolTip.Tip="Clear this session's prospected history" />
+                  </Grid>
+
+                  <TextBlock Classes="value" FontSize="13" Text="{Binding LatestSummary}" TextWrapping="Wrap"
+                             Foreground="{StaticResource Good}" IsVisible="{Binding LatestWorthMining}" />
+                  <TextBlock Classes="label" Text="{Binding LatestSummary}" TextWrapping="Wrap"
+                             IsVisible="{Binding !LatestWorthMining}" />
+                  <TextBlock Classes="label" Text="{Binding SessionSummary}" Margin="0,2,0,0"
+                             IsVisible="{Binding SessionSummary, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+                  <ScrollViewer MaxHeight="340" VerticalScrollBarVisibility="Auto"
+                                HorizontalScrollBarVisibility="Disabled" Margin="0,10,0,0">
+                    <ItemsControl ItemsSource="{Binding Prospects}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ProspectRow">
+                          <Border Background="#0F1114" CornerRadius="4" Padding="12,10" Margin="0,0,0,8">
+                            <StackPanel Spacing="4">
+                              <Grid ColumnDefinitions="*,Auto">
+                                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
+                                  <TextBlock Classes="value" FontSize="12" Foreground="{StaticResource InkDim}" Text="{Binding Time}" />
+                                  <TextBlock Classes="label" Text="{Binding ContentLabel}" IsVisible="{Binding ShowContent}" VerticalAlignment="Center" />
+                                </StackPanel>
+                                <TextBlock Grid.Column="1" Classes="label" Text="{Binding Remaining}" IsVisible="{Binding ShowRemaining}" />
+                              </Grid>
+
+                              <Border Background="#1A1408" CornerRadius="4" Padding="8,6" IsVisible="{Binding HasMotherlode}">
+                                <Grid ColumnDefinitions="*,Auto,Auto">
+                                  <TextBlock Grid.Column="0" Classes="value" FontSize="13" Text="{Binding Motherlode.Name}" />
+                                  <TextBlock Grid.Column="1" Classes="label" Text="DEEP CORE" Foreground="{StaticResource AmberBrush}" Margin="8,0" VerticalAlignment="Center" />
+                                  <TextBlock Grid.Column="2" Classes="value" FontSize="12" Text="{Binding Motherlode.PriceText}"
+                                             Foreground="{StaticResource Good}" VerticalAlignment="Center" />
+                                </Grid>
+                              </Border>
+
+                              <ItemsControl ItemsSource="{Binding Materials}">
+                                <ItemsControl.ItemTemplate>
+                                  <DataTemplate x:DataType="vm:ProspectMaterialRow">
+                                    <Grid ColumnDefinitions="*,Auto,Auto" Margin="0,2">
+                                      <TextBlock Grid.Column="0" Classes="value" FontSize="13" Text="{Binding Name}"
+                                                 Foreground="{StaticResource Good}" FontWeight="SemiBold" IsVisible="{Binding WorthMining}" />
+                                      <TextBlock Grid.Column="0" Classes="value" FontSize="13" Text="{Binding Name}"
+                                                 IsVisible="{Binding !WorthMining}" />
+                                      <TextBlock Grid.Column="1" Classes="label" Text="{Binding ProportionText}"
+                                                 IsVisible="{Binding ShowProportion}" Margin="8,0" VerticalAlignment="Center" />
+                                      <TextBlock Grid.Column="2" Classes="value" FontSize="12" Text="{Binding PriceText}"
+                                                 Foreground="{StaticResource Good}" IsVisible="{Binding WorthMining}" VerticalAlignment="Center" />
+                                      <TextBlock Grid.Column="2" Classes="label" Text="{Binding PriceText}"
+                                                 IsVisible="{Binding !WorthMining}" VerticalAlignment="Center" />
+                                    </Grid>
+                                  </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                              </ItemsControl>
+                            </StackPanel>
+                          </Border>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </ScrollViewer>
+                </StackPanel>
+              </StackPanel>
+            </Border>
+          </DataTemplate>
+
           <!-- Exobiology -->
           <DataTemplate DataType="vm:ExobiologyCardViewModel">
             <Border Classes="card">
