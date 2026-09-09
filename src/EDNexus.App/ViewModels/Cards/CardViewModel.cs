@@ -26,6 +26,9 @@ public sealed class DashboardContext
     private readonly Action<string?, string?, int> _saveOnFootPin;
     private readonly Func<RouteSettings> _getSavedRoute;
     private readonly Action<RouteSettings> _saveRoute;
+    private readonly Func<MiningSettings> _getMiningSettings;
+    private readonly Action<int> _saveMiningThreshold;
+    private readonly Action<IEnumerable<(string Symbol, int MeanPrice)>> _learnCommodityPrices;
 
     public DashboardContext(
         Func<EngineHost> host,
@@ -36,7 +39,10 @@ public sealed class DashboardContext
         Action<bool> saveEngineeringOnFootMode,
         Action<string?, string?, int> saveOnFootPin,
         Func<RouteSettings> getSavedRoute,
-        Action<RouteSettings> saveRoute)
+        Action<RouteSettings> saveRoute,
+        Func<MiningSettings> getMiningSettings,
+        Action<int> saveMiningThreshold,
+        Action<IEnumerable<(string Symbol, int MeanPrice)>> learnCommodityPrices)
     {
         _host = host;
         _devEnabled = devEnabled;
@@ -47,6 +53,9 @@ public sealed class DashboardContext
         _saveOnFootPin = saveOnFootPin;
         _getSavedRoute = getSavedRoute;
         _saveRoute = saveRoute;
+        _getMiningSettings = getMiningSettings;
+        _saveMiningThreshold = saveMiningThreshold;
+        _learnCommodityPrices = learnCommodityPrices;
     }
 
     /// <summary>The live engine host — always the current one, even after a reset-to-live rebuild.</summary>
@@ -74,6 +83,15 @@ public sealed class DashboardContext
 
     /// <summary>Persist the route plotter's route (an empty/default instance clears it).</summary>
     public void SaveRoute(RouteSettings route) => _saveRoute(route);
+
+    /// <summary>Read the mining card's price threshold and learned galactic-average prices.</summary>
+    public MiningSettings GetMiningSettings() => _getMiningSettings();
+
+    /// <summary>Persist the mining card's "worth mining" credit threshold.</summary>
+    public void SaveMiningThreshold(int credits) => _saveMiningThreshold(credits);
+
+    /// <summary>Fold newly observed galactic-average prices into the learned price book.</summary>
+    public void LearnCommodityPrices(IEnumerable<(string Symbol, int MeanPrice)> prices) => _learnCommodityPrices(prices);
 }
 
 /// <summary>

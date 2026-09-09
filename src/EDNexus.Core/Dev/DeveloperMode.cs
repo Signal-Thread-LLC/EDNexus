@@ -20,6 +20,7 @@ public sealed class DeveloperMode
         new ExobiologySampleSource(),
         new MissionsSampleSource(),
         new RanksSampleSource(),
+        new MiningSampleSource(),
     };
 
     /// <summary>

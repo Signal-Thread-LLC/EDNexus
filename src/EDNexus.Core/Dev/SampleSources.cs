@@ -116,6 +116,19 @@ internal static class SamplePools
         ("nonlethalweapons", "Non-Lethal Weapons", "Weapons"), ("reactivearmour", "Reactive Armour", "Weapons"),
     };
 
+    // (journal symbol, localised, typical galactic-average price) for the mining card — a spread from
+    // common laser fodder up through hotspot-only deep-core minerals, so both ends of "worth mining"
+    // get exercised.
+    public static readonly (string Sym, string Loc, int MeanPrice)[] MiningMaterials =
+    {
+        ("painite", "Painite", 44000), ("platinum", "Platinum", 21000),
+        ("osmium", "Osmium", 8600), ("palladium", "Palladium", 14200),
+        ("opal", "Void Opals", 220000), ("alexandrite", "Alexandrite", 400000),
+        ("bromellite", "Bromellite", 8500), ("lowtemperaturediamond", "Low Temperature Diamonds", 80000),
+        ("bauxite", "Bauxite", 850), ("cobalt", "Cobalt", 1300),
+        ("rutile", "Rutile", 2100), ("uraninite", "Uraninite", 2200),
+    };
+
     // (journal symbol, localised) for the commodities colonisation depots ask for.
     public static readonly (string Sym, string Loc)[] Construction =
     {
@@ -732,6 +745,77 @@ public sealed class RanksSampleSource : JournalSampleSource
                 var field = Pick(rng, climbable);
                 lines.Add(Event("Promotion", o => o[field] = indices[field] + 1));
             }
+        }
+
+        return lines;
+    }
+}
+
+/// <summary>
+/// Sample source for the mining card: a fabricated <c>ProspectedAsteroid</c> hit — sometimes with a
+/// deep-core motherlode — plus a <c>Market</c> snapshot quoting real-looking mean prices, so the
+/// price-learning path and the "worth mining" highlight both get exercised without flying anywhere.
+/// </summary>
+public sealed class MiningSampleSource : JournalSampleSource
+{
+    public override string CardKey => "mining";
+    public override string DisplayName => "Mining";
+
+    public override IReadOnlyList<string> Sample(Random rng)
+    {
+        var picks = SamplePools.PickDistinct(rng, SamplePools.MiningMaterials, rng.Next(1, 4));
+        var materials = new JsonArray();
+        foreach (var (sym, loc, _) in picks)
+            materials.Add(new JsonObject
+            {
+                ["Name"] = sym,
+                ["Name_Localised"] = loc,
+                ["Proportion"] = Math.Round(rng.NextDouble() * 35 + 5, 2),
+            });
+
+        var content = Pick(rng, new[] { "Low", "Medium", "High" });
+        var lines = new List<string>
+        {
+            Event("ProspectedAsteroid", o =>
+            {
+                o["Materials"] = materials;
+                if (rng.Next(100) < 30)
+                {
+                    var (sym, loc, _) = Pick(rng, SamplePools.MiningMaterials);
+                    o["MotherlodeMaterial"] = sym;
+                    o["MotherlodeMaterial_Localised"] = loc;
+                }
+                o["Content"] = $"$AsteroidMaterialContent_{content};";
+                o["Content_Localised"] = $"Material Content: {content}";
+                o["Remaining"] = Math.Round(100 - rng.NextDouble() * 40, 1);
+            }),
+        };
+
+        // A market quote every so often, so the "known prices" count in the card actually moves.
+        if (rng.Next(100) < 50)
+        {
+            var goods = new JsonArray();
+            foreach (var (sym, loc, mean) in SamplePools.MiningMaterials)
+                goods.Add(new JsonObject
+                {
+                    ["Name"] = sym,
+                    ["Name_Localised"] = loc,
+                    ["Category_Localised"] = "Minerals",
+                    ["MeanPrice"] = mean,
+                    ["BuyPrice"] = 0,
+                    ["SellPrice"] = (int)Math.Round(mean * (0.9 + rng.NextDouble() * 0.2)),
+                    ["Stock"] = 0,
+                    ["Demand"] = rng.Next(1, 5000),
+                    ["Rare"] = false,
+                });
+
+            lines.Add(Event("Market", o =>
+            {
+                o["MarketID"] = 3_700_000_000L + rng.Next(0, 99_999_999);
+                o["StationName"] = Pick(rng, SamplePools.Stations);
+                o["StarSystem"] = Pick(rng, SamplePools.Systems);
+                o["Items"] = goods;
+            }));
         }
 
         return lines;

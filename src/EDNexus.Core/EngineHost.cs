@@ -6,6 +6,7 @@ using EDNexus.Core.Engineering;
 using EDNexus.Core.Exobio;
 using EDNexus.Core.Journal;
 using EDNexus.Core.Market;
+using EDNexus.Core.Mining;
 using EDNexus.Core.Missions;
 using EDNexus.Core.Navigation;
 using EDNexus.Core.Ranks;
@@ -53,6 +54,9 @@ public sealed class EngineHost : IDisposable
     /// <summary>Pilot rank standing and progress across the five tracked ladders.</summary>
     public RankTracker Ranks { get; }
 
+    /// <summary>Prospected-asteroid history for the current mining session.</summary>
+    public MiningTracker Mining { get; }
+
     /// <summary>Cross-station "best price nearby" lookups. Backed by Spansh; swappable via <see cref="ITradeSearch"/>.</summary>
     public ITradeSearch Trade { get; }
 
@@ -95,6 +99,7 @@ public sealed class EngineHost : IDisposable
         // wins the bare-name lookup from inside EDNexus.Core.
         this.Missions = new MissionTracker(Bus);
         Ranks = new RankTracker(Bus);
+        Mining = new MiningTracker(Bus);
 
         // Shared client for outbound trade lookups. The EDDN/Inara reporters own their own client
         // inside ReporterHost, so this one is dedicated to the read-side (Spansh) queries.

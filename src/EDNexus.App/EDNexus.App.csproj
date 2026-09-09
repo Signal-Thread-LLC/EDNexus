@@ -17,6 +17,8 @@
   <ItemGroup>
     <!-- The window/taskbar icon, addressable as avares://EDNexus.App/Assets/ednexus.png -->
     <AvaloniaResource Include="..\..\assets\icons\ednexus-256.png" Link="Assets\ednexus.png" />
+    <!-- The mining card's "worth mining" chime, addressable as avares://EDNexus.App/Assets/mining-alert.wav -->
+    <AvaloniaResource Include="..\..\assets\sounds\mining-alert.wav" Link="Assets\mining-alert.wav" />
   </ItemGroup>
 
   <ItemGroup>

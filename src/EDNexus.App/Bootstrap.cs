@@ -87,4 +87,29 @@ public sealed class Bootstrap
         Store.Save(Settings);
     }
 
+    /// <summary>Persist the mining card's "worth mining" credit threshold.</summary>
+    public void ApplyMiningThreshold(int credits)
+    {
+        Settings.Mining.MinValueThreshold = Math.Max(0, credits);
+        Store.Save(Settings);
+    }
+
+    /// <summary>
+    /// Fold newly observed galactic-average prices into the learned price book. A commodity's average
+    /// price is a fixed constant, so once learned it is written once and never touched again — this
+    /// only ever adds unseen commodities or corrects one this build's table had wrong.
+    /// </summary>
+    public void LearnCommodityPrices(IEnumerable<(string Symbol, int MeanPrice)> prices)
+    {
+        var changed = false;
+        foreach (var (symbol, mean) in prices)
+        {
+            if (mean <= 0 || string.IsNullOrEmpty(symbol)) continue;
+            if (Settings.Mining.KnownPrices.TryGetValue(symbol, out var existing) && existing == mean) continue;
+            Settings.Mining.KnownPrices[symbol] = mean;
+            changed = true;
+        }
+        if (changed) Store.Save(Settings);
+    }
+
 }
