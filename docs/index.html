@@ -4,8 +4,48 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>EDNexus — Commander console for Elite Dangerous</title>
-<meta name="description" content="EDNexus is a single, does-it-all commander console for Elite Dangerous — market, routes, exobiology, colonisation, and materials in one cross-platform app.">
+<meta name="description" content="EDNexus is a free, open-source commander console for Elite Dangerous — market &amp; trade route search, engineering blueprint tracking, exobiology, colonisation, and materials, all in one cross-platform (Windows/Linux/macOS) app.">
+<meta name="keywords" content="Elite Dangerous, Elite Dangerous tool, EDDN, journal parser, Elite Dangerous commander console, Elite Dangerous market tool, Elite Dangerous trade route planner, Elite Dangerous engineering, Elite Dangerous exobiology, Elite Dangerous colonisation tracker, Inara, Odyssey">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://signal-thread-llc.github.io/EDNexus/">
 <link rel="icon" type="image/svg+xml" href="assets/logo/ednexus-icon.svg">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="EDNexus">
+<meta property="og:title" content="EDNexus — Commander console for Elite Dangerous">
+<meta property="og:description" content="A single, does-it-all commander console for Elite Dangerous — market, routes, exobiology, colonisation, and materials in one cross-platform app.">
+<meta property="og:url" content="https://signal-thread-llc.github.io/EDNexus/">
+<meta property="og:image" content="https://signal-thread-llc.github.io/EDNexus/assets/logo/ednexus-lockup.svg">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="EDNexus — Commander console for Elite Dangerous">
+<meta name="twitter:description" content="A single, does-it-all commander console for Elite Dangerous — market, routes, exobiology, colonisation, and materials in one cross-platform app.">
+<meta name="twitter:image" content="https://signal-thread-llc.github.io/EDNexus/assets/logo/ednexus-lockup.svg">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "EDNexus",
+  "url": "https://signal-thread-llc.github.io/EDNexus/",
+  "description": "A single, does-it-all commander console for Elite Dangerous — market, routes, exobiology, colonisation, and materials in one cross-platform app.",
+  "applicationCategory": "UtilitiesApplication",
+  "operatingSystem": "Windows, Linux, macOS",
+  "softwareVersion": "0.1.0",
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD"
+  },
+  "downloadUrl": "https://github.com/Signal-Thread-LLC/EDNexus/releases",
+  "codeRepository": "https://github.com/Signal-Thread-LLC/EDNexus",
+  "author": {
+    "@type": "Organization",
+    "name": "Signal & Thread LLC"
+  }
+}
+</script>
+
 <style>
   :root {
     --bg: #0E1013;
@@ -17,6 +57,15 @@
     --accent-bright: #FF8C2E;
   }
   * { box-sizing: border-box; }
+  .visually-hidden {
+    position: absolute;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
   html { scroll-behavior: smooth; }
   body {
     margin: 0;
@@ -101,6 +150,7 @@
 <header class="hero">
   <div class="wrap">
     <img class="lockup" src="assets/logo/ednexus-lockup.svg" alt="EDNexus — commander console for Elite Dangerous">
+    <h1 class="visually-hidden">EDNexus — Commander Console for Elite Dangerous</h1>
     <p class="tagline">
       A single, does-it-all commander console for <strong>Elite Dangerous</strong> — built to replace
       the sprawl of separate market, route, exobiology, colonisation, and materials tools with one
