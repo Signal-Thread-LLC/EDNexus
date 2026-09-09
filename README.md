@@ -1,15 +1,43 @@
-# EDNexus
+# EDNexus — Commander Console for Elite Dangerous
 
 <p align="center">
   <img src="assets/logo/ednexus-lockup.svg" width="460" alt="EDNexus — commander console for Elite Dangerous">
 </p>
 
-A single, does-it-all commander console for **Elite Dangerous** — built to replace the sprawl of
-separate market, route, exobiology, colonisation, and materials tools with one cross-platform app.
+<p align="center">
+  <a href="https://github.com/Signal-Thread-LLC/EDNexus/actions/workflows/ci.yml"><img src="https://github.com/Signal-Thread-LLC/EDNexus/actions/workflows/ci.yml/badge.svg" alt="CI status"></a>
+  <a href="https://github.com/Signal-Thread-LLC/EDNexus/releases/latest"><img src="https://img.shields.io/github/v/release/Signal-Thread-LLC/EDNexus" alt="Latest release"></a>
+  <a href="https://signal-thread-llc.github.io/EDNexus/"><img src="https://img.shields.io/badge/homepage-signal--thread--llc.github.io%2FEDNexus-F07100" alt="Homepage"></a>
+</p>
+
+A single, does-it-all **[Elite Dangerous](https://www.elitedangerous.com/) commander console** — a
+free, open-source tool that replaces the sprawl of separate market, trade route, engineering,
+exobiology, colonisation, and materials tools with one desktop app for Windows. (Linux and macOS
+are on the roadmap but not yet officially supported.)
+
+**[📖 Homepage & downloads](https://signal-thread-llc.github.io/EDNexus/)** ·
+**[⬇ Latest release](https://github.com/Signal-Thread-LLC/EDNexus/releases/latest)** ·
+**[🐛 Report an issue](https://github.com/Signal-Thread-LLC/EDNexus/issues)**
 
 It works off the game's own data: a watcher tails the journal (`Journal.*.log`) and the sidecar
 status files (`Status.json`, `Cargo.json`, `Market.json`, …), turns them into a typed event stream,
 and folds that into a single live commander state that every feature reads from.
+
+## Features
+
+- **Colonisation tracker** — construction depot progress, commodity shopping lists, and hauling
+  progress for system colonisation.
+- **Market & trade route search** — commodity market lookups and profitable trade route plotting,
+  powered by [Spansh](https://spansh.co.uk/) and [EDSM](https://www.edsm.net/).
+- **Engineering** — blueprint pinning, material shopping lists across every engineering grade and
+  roll count, and Odyssey on-foot suit/weapon upgrades.
+- **Materials & exobiology** — raw/manufactured/encoded material tracking and exobiology genus/species
+  scan data as you play.
+- **EDDN & Inara integration** — opt-in, anonymized contributions to the
+  [Elite Dangerous Data Network](https://github.com/EDCD/EDDN), and opt-in sync of your commander
+  profile to [Inara](https://inara.cz).
+- **Live journal parsing** — a watcher tails the game's own `Journal.*.log` and status sidecar files
+  (no third-party account or API key required to get started).
 
 ## Stack
 
@@ -91,12 +119,12 @@ Installers are self-contained (no separate .NET install needed).
 - **Windows** — run `EDNexus-<version>-setup.exe`. Installs to
   `C:\Program Files\Signal & Thread\EDNexus\` (path is changeable in the wizard). Built with
   [Inno Setup](https://jrsoftware.org/isinfo.php).
-- **Linux (incl. SteamOS / Steam Deck)** — distributed as a [Flatpak](packaging/flatpak/README.md).
-  The immutable Steam Deck filesystem rules out native package installs, and Flatpak also covers
-  Debian/Ubuntu/Fedora/Arch from a single build. See [`packaging/flatpak/`](packaging/flatpak/).
 
-Preferences are stored in **`%LOCALAPPDATA%\EDNexus`** (Windows) / **`~/.local/share/EDNexus`**
-(Linux), alongside the logs — never in the install directory, so the app folder can stay read-only.
+Linux (including Steam Deck) and macOS are not yet officially supported — see
+[`packaging/flatpak/`](packaging/flatpak/) for in-progress Flatpak packaging.
+
+Preferences are stored in **`%LOCALAPPDATA%\EDNexus`**, alongside the logs — never in the install
+directory, so the app folder can stay read-only.
 They deliberately do **not** live in Documents: that folder is commonly cloud-synced (OneDrive
 Known Folder Move), which would copy the settings — including your Inara API key — off-machine, and
 invite sync conflicts on a file that is rewritten every time you tweak the dashboard. An older
