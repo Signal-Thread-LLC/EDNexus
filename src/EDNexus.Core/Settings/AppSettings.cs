@@ -60,6 +60,24 @@ public sealed class MiningSettings
 
     /// <summary>Learned galactic-average price per commodity (canonical symbol → credits).</summary>
     public Dictionary<string, int> KnownPrices { get; set; } = new();
+
+    /// <summary>
+    /// Local calendar date ("yyyy-MM-dd") the running totals below belong to. Once a commander mines
+    /// past local midnight, the next recorded unit rolls this over: the totals so far are frozen into
+    /// <see cref="LastSessionDate"/> and below, and a fresh day starts at zero.
+    /// </summary>
+    public string? SessionDate { get; set; }
+
+    /// <summary>Credits refined so far today (units whose price isn't known yet don't add to this).</summary>
+    public long SessionValue { get; set; }
+
+    /// <summary>Tonnes refined so far today, regardless of whether their price is known.</summary>
+    public int SessionUnits { get; set; }
+
+    /// <summary>The most recently completed day's frozen totals — "last session" in the mining card.</summary>
+    public string? LastSessionDate { get; set; }
+    public long LastSessionValue { get; set; }
+    public int LastSessionUnits { get; set; }
 }
 
 /// <summary>

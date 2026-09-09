@@ -17,10 +17,19 @@ public sealed class MiningTracker
     private readonly object _gate = new();
     private readonly List<ProspectResult> _history = new();
 
+    // Not capped like _history: this is never rendered directly, only diffed by count (see
+    // MiningCardViewModel), so trimming it would shift indices out from under that diff. A session's
+    // worth of refined units — at most a full cargo hold, a few hundred — costs nothing to keep.
+    private readonly List<RefinedUnit> _refined = new();
+
     /// <summary>Raised after a new prospect is recorded or the history is cleared.</summary>
     public event Action? Changed;
 
-    public MiningTracker(JournalEventBus bus) => bus.Subscribe("ProspectedAsteroid", OnProspected);
+    public MiningTracker(JournalEventBus bus)
+    {
+        bus.Subscribe("ProspectedAsteroid", OnProspected);
+        bus.Subscribe("MiningRefined", OnRefined);
+    }
 
     /// <summary>Every prospect this session, oldest first.</summary>
     public IReadOnlyList<ProspectResult> History
@@ -34,10 +43,35 @@ public sealed class MiningTracker
         get { lock (_gate) return _history.Count > 0 ? _history[^1] : null; }
     }
 
+    /// <summary>Every unit refined into cargo this session, oldest first.</summary>
+    public IReadOnlyList<RefinedUnit> Refined
+    {
+        get { lock (_gate) return _refined.ToList(); }
+    }
+
     /// <summary>Drop the session's history — used by "reset to live" and a commander-requested clear.</summary>
     public void Clear()
     {
-        lock (_gate) _history.Clear();
+        lock (_gate)
+        {
+            _history.Clear();
+            _refined.Clear();
+        }
+        Changed?.Invoke();
+    }
+
+    private void OnRefined(JournalEntry e)
+    {
+        // Same reasoning as OnProspected: a warm-up replay must not re-add units a prior run of the
+        // app already recorded into the persisted daily total.
+        if (e.IsHistorical) return;
+
+        var raw = e.GetString("Type");
+        var localised = e.GetLocalised("Type");
+        var symbol = CommodityName.Canonicalize(raw ?? localised);
+        if (symbol.Length == 0) return;
+
+        lock (_gate) _refined.Add(new RefinedUnit(e.Timestamp, symbol, localised ?? raw ?? symbol));
         Changed?.Invoke();
     }
 

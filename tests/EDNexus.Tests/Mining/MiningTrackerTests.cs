@@ -108,4 +108,48 @@ public class MiningTrackerTests
         Assert.False(result.HasMotherlode);
         Assert.Equal("Low", result.Content);
     }
+
+    [Fact]
+    public void MiningRefined_records_one_unit_with_the_symbol_unwrapped_and_the_localised_name_kept()
+    {
+        var (bus, tracker) = NewTracker();
+
+        // Real capture shape: Type carries the "$..._name;" internal wrapper, same as EDDN's commodity fields.
+        Publish(bus, """{ "timestamp":"2026-09-09T17:47:30Z", "event":"MiningRefined", "Type":"$gold_name;", "Type_Localised":"Gold" }""");
+
+        var unit = Assert.Single(tracker.Refined);
+        Assert.Equal("gold", unit.Symbol);
+        Assert.Equal("Gold", unit.Name);
+    }
+
+    [Fact]
+    public void MiningRefined_fires_once_per_unit_so_two_events_accumulate_two_entries()
+    {
+        var (bus, tracker) = NewTracker();
+        Publish(bus, """{ "timestamp":"2026-09-09T17:47:30Z", "event":"MiningRefined", "Type":"$gold_name;", "Type_Localised":"Gold" }""");
+        Publish(bus, """{ "timestamp":"2026-09-09T17:48:10Z", "event":"MiningRefined", "Type":"$gold_name;", "Type_Localised":"Gold" }""");
+
+        Assert.Equal(2, tracker.Refined.Count);
+    }
+
+    [Fact]
+    public void A_historical_MiningRefined_replay_is_ignored_so_a_restart_does_not_double_count_the_day()
+    {
+        var (bus, tracker) = NewTracker();
+        Publish(bus, """{ "timestamp":"2026-09-09T17:47:30Z", "event":"MiningRefined", "Type":"$gold_name;", "Type_Localised":"Gold" }""", historical: true);
+
+        Assert.Empty(tracker.Refined);
+    }
+
+    [Fact]
+    public void Clear_empties_the_refined_history_too()
+    {
+        var (bus, tracker) = NewTracker();
+        Publish(bus, """{ "timestamp":"2026-09-09T17:47:30Z", "event":"MiningRefined", "Type":"$gold_name;", "Type_Localised":"Gold" }""");
+        Assert.NotEmpty(tracker.Refined);
+
+        tracker.Clear();
+
+        Assert.Empty(tracker.Refined);
+    }
 }

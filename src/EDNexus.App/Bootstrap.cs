@@ -1,3 +1,4 @@
+using System.Globalization;
 using EDNexus.App.Telemetry;
 using EDNexus.Core.Settings;
 
@@ -110,6 +111,42 @@ public sealed class Bootstrap
             changed = true;
         }
         if (changed) Store.Save(Settings);
+    }
+
+    /// <summary>
+    /// Roll the mining day over to <paramref name="now"/>'s local date if it has changed, freezing
+    /// whatever totals stood as "last session" first. Idempotent — a no-op once already on today's
+    /// date — so it is safe to call on every dashboard tick as well as every refined unit.
+    /// </summary>
+    public void EnsureMiningSessionDate(DateTimeOffset now)
+    {
+        var today = now.ToLocalTime().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var mining = Settings.Mining;
+        if (mining.SessionDate == today) return;
+
+        if (mining.SessionDate is not null)
+        {
+            mining.LastSessionDate = mining.SessionDate;
+            mining.LastSessionValue = mining.SessionValue;
+            mining.LastSessionUnits = mining.SessionUnits;
+        }
+        mining.SessionDate = today;
+        mining.SessionValue = 0;
+        mining.SessionUnits = 0;
+        Store.Save(Settings);
+    }
+
+    /// <summary>
+    /// Record one refined unit against today's running mining total (rolling the day over first if
+    /// needed). <paramref name="credits"/> is 0 when the commodity's price isn't known yet — the unit
+    /// still counts toward tonnage refined, just not toward the credit total.
+    /// </summary>
+    public void RecordMiningRefined(DateTimeOffset when, long credits)
+    {
+        EnsureMiningSessionDate(when);
+        Settings.Mining.SessionValue += Math.Max(0, credits);
+        Settings.Mining.SessionUnits += 1;
+        Store.Save(Settings);
     }
 
 }

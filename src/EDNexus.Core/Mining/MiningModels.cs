@@ -27,3 +27,9 @@ public sealed record ProspectResult(
     /// <summary>True when this rock has a deep-core seam requiring seismic charges to crack open.</summary>
     public bool HasMotherlode => !string.IsNullOrEmpty(MotherlodeSymbol);
 }
+
+/// <summary>
+/// One <c>MiningRefined</c> event: the refinery finished converting fragments into a single unit
+/// (one tonne) of cargo. The journal fires one of these per unit, with no quantity field.
+/// </summary>
+public sealed record RefinedUnit(DateTimeOffset Timestamp, string Symbol, string Name);

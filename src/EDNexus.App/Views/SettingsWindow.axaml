@@ -91,6 +91,18 @@
           </Border>
         </StackPanel>
 
+        <StackPanel Spacing="8">
+          <TextBlock Text="MINING" Foreground="#F07100" FontSize="12" FontWeight="SemiBold" LetterSpacing="2" />
+          <Border Background="#0F1114" CornerRadius="6" Padding="16">
+            <StackPanel Spacing="10">
+              <TextBlock Text="MIN VALUE TO CALL OUT (CR)" Foreground="#E7E9EE" FontSize="12" />
+              <TextBox x:Name="MiningThresholdBox" PlaceholderText="e.g. 50000" />
+              <TextBlock Foreground="#8A909C" FontSize="12" TextWrapping="Wrap"
+                         Text="A prospected material — or deep-core motherlode — at or above this galactic-average price is called out on the mining card and rings a chime. Leave blank to turn the highlight off." />
+            </StackPanel>
+          </Border>
+        </StackPanel>
+
         <!-- Dashboard layout — order, width and visibility per card. Bound to the live card list, so
              changes take effect on the dashboard behind this window immediately. -->
         <StackPanel x:Name="DashboardSection" Spacing="8">
