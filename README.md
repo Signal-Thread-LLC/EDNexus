@@ -12,8 +12,8 @@
 
 A single, does-it-all **[Elite Dangerous](https://www.elitedangerous.com/) commander console** — a
 free, open-source tool that replaces the sprawl of separate market, trade route, engineering,
-exobiology, colonisation, and materials tools with one cross-platform desktop app for Windows,
-Linux, and macOS (including Steam Deck).
+exobiology, colonisation, and materials tools with one desktop app for Windows. (Linux and macOS
+are on the roadmap but not yet officially supported.)
 
 **[📖 Homepage & downloads](https://signal-thread-llc.github.io/EDNexus/)** ·
 **[⬇ Latest release](https://github.com/Signal-Thread-LLC/EDNexus/releases/latest)** ·
@@ -119,12 +119,12 @@ Installers are self-contained (no separate .NET install needed).
 - **Windows** — run `EDNexus-<version>-setup.exe`. Installs to
   `C:\Program Files\Signal & Thread\EDNexus\` (path is changeable in the wizard). Built with
   [Inno Setup](https://jrsoftware.org/isinfo.php).
-- **Linux (incl. SteamOS / Steam Deck)** — distributed as a [Flatpak](packaging/flatpak/README.md).
-  The immutable Steam Deck filesystem rules out native package installs, and Flatpak also covers
-  Debian/Ubuntu/Fedora/Arch from a single build. See [`packaging/flatpak/`](packaging/flatpak/).
 
-Preferences are stored in **`%LOCALAPPDATA%\EDNexus`** (Windows) / **`~/.local/share/EDNexus`**
-(Linux), alongside the logs — never in the install directory, so the app folder can stay read-only.
+Linux (including Steam Deck) and macOS are not yet officially supported — see
+[`packaging/flatpak/`](packaging/flatpak/) for in-progress Flatpak packaging.
+
+Preferences are stored in **`%LOCALAPPDATA%\EDNexus`**, alongside the logs — never in the install
+directory, so the app folder can stay read-only.
 They deliberately do **not** live in Documents: that folder is commonly cloud-synced (OneDrive
 Known Folder Move), which would copy the settings — including your Inara API key — off-machine, and
 invite sync conflicts on a file that is rewritten every time you tweak the dashboard. An older
