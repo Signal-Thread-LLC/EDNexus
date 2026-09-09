@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using EDNexus.App.Services;
 using EDNexus.Core.Mining;
 using EDNexus.Core.State;
 
@@ -25,6 +26,7 @@ public sealed partial class MiningCardViewModel : CardViewModel
     private string _signature = "";
     private long _lastLearnedMarketId;
     private DateTimeOffset _lastLearnedMarketUpdate;
+    private DateTimeOffset? _lastSeenProspectTimestamp;
 
     public MiningCardViewModel(DashboardContext context) : base(context, "mining", "MINING", 452)
         => ThresholdText = Context.GetMiningSettings().MinValueThreshold is > 0 and var t ? t.ToString(CultureInfo.InvariantCulture) : "";
@@ -48,17 +50,28 @@ public sealed partial class MiningCardViewModel : CardViewModel
         LearnFromCurrentMarket();
 
         var mining = Context.Host.Mining;
-        var signature = $"{mining.History.Count}|{mining.Latest?.Timestamp:o}|{ThresholdText}";
-        if (signature == _signature) return;
-        _signature = signature;
+        var latestTimestamp = mining.Latest?.Timestamp;
+        var isNewProspect = latestTimestamp is not null && latestTimestamp != _lastSeenProspectTimestamp;
+        _lastSeenProspectTimestamp = latestTimestamp;
 
-        RebuildFromHistory();
+        var signature = $"{mining.History.Count}|{latestTimestamp:o}|{ThresholdText}";
+        if (signature != _signature)
+        {
+            _signature = signature;
+            RebuildFromHistory();
+        }
+
+        // Only a genuinely new find rings the chime — editing the threshold can also flip the latest
+        // row's verdict, but that is a re-evaluation of an old find, not a new one to announce.
+        if (isNewProspect && Prospects.Count > 0 && Prospects[0].AnyWorthMining)
+            MiningAlertSound.Play();
     }
 
     public override void Reset()
     {
         _signature = "";
         _lastLearnedMarketId = 0;
+        _lastSeenProspectTimestamp = null;
         Prospects.Clear();
         LatestSummary = "Prospect a rock to see what it's carrying.";
         LatestWorthMining = false;
@@ -75,6 +88,7 @@ public sealed partial class MiningCardViewModel : CardViewModel
         LatestWorthMining = false;
         SessionSummary = "";
         _signature = "";
+        _lastSeenProspectTimestamp = null;
     }
 
     private void RebuildFromHistory()
