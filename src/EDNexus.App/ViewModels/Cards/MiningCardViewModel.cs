@@ -1,5 +1,4 @@
 using System.Collections.ObjectModel;
-using System.Globalization;
 using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -11,10 +10,10 @@ namespace EDNexus.App.ViewModels;
 
 /// <summary>
 /// Mining session helper: every prospected asteroid this session, with each material — and any
-/// deep-core motherlode — called out when its galactic-average price clears the commander's own
-/// threshold. Learns those average prices passively from every station market visited (Frontier does
-/// not expose the figure anywhere else), so the highlight gets more complete the more the commander
-/// plays rather than depending on a static, drift-prone price table.
+/// deep-core motherlode — called out when its galactic-average price clears the credit threshold set
+/// in Settings → Mining. Learns those average prices passively from every station market visited
+/// (Frontier does not expose the figure anywhere else), so the highlight gets more complete the more
+/// the commander plays rather than depending on a static, drift-prone price table.
 /// </summary>
 /// <remarks>
 /// The journal's <c>ProspectedAsteroid</c> event does not distinguish a laser-minable surface deposit
@@ -27,42 +26,40 @@ public sealed partial class MiningCardViewModel : CardViewModel
     private long _lastLearnedMarketId;
     private DateTimeOffset _lastLearnedMarketUpdate;
     private DateTimeOffset? _lastSeenProspectTimestamp;
+    private int _recordedRefinedCount;
 
-    public MiningCardViewModel(DashboardContext context) : base(context, "mining", "MINING", 452)
-        => ThresholdText = Context.GetMiningSettings().MinValueThreshold is > 0 and var t ? t.ToString(CultureInfo.InvariantCulture) : "";
+    public MiningCardViewModel(DashboardContext context) : base(context, "mining", "MINING", 452) { }
 
-    [ObservableProperty] private string _thresholdText = "";
     [ObservableProperty] private string _latestSummary = "Prospect a rock to see what it's carrying.";
     [ObservableProperty] private bool _latestWorthMining;
     [ObservableProperty] private string _sessionSummary = "";
+    [ObservableProperty] private string _todayValueText = "";
+    [ObservableProperty] private string _lastSessionText = "";
 
     public ObservableCollection<ProspectRow> Prospects { get; } = new();
-
-    partial void OnThresholdTextChanged(string value)
-    {
-        var credits = ParseCredits(value);
-        Context.SaveMiningThreshold(credits);
-        RebuildFromHistory();   // re-flag every row against the new threshold immediately
-    }
 
     public override void Update(CommanderState s)
     {
         LearnFromCurrentMarket();
+        RecordNewlyRefinedUnits();
+        Context.EnsureMiningSessionDate(DateTimeOffset.Now);
+        RefreshSessionValueText();
 
         var mining = Context.Host.Mining;
         var latestTimestamp = mining.Latest?.Timestamp;
         var isNewProspect = latestTimestamp is not null && latestTimestamp != _lastSeenProspectTimestamp;
         _lastSeenProspectTimestamp = latestTimestamp;
 
-        var signature = $"{mining.History.Count}|{latestTimestamp:o}|{ThresholdText}";
+        var threshold = Context.GetMiningSettings().MinValueThreshold;
+        var signature = $"{mining.History.Count}|{latestTimestamp:o}|{threshold}";
         if (signature != _signature)
         {
             _signature = signature;
             RebuildFromHistory();
         }
 
-        // Only a genuinely new find rings the chime — editing the threshold can also flip the latest
-        // row's verdict, but that is a re-evaluation of an old find, not a new one to announce.
+        // Only a genuinely new find rings the chime — a threshold change made in Settings can also
+        // flip the latest row's verdict, but that is a re-evaluation of an old find, not a new one.
         if (isNewProspect && Prospects.Count > 0 && Prospects[0].AnyWorthMining)
             MiningAlertSound.Play();
     }
@@ -72,13 +69,14 @@ public sealed partial class MiningCardViewModel : CardViewModel
         _signature = "";
         _lastLearnedMarketId = 0;
         _lastSeenProspectTimestamp = null;
+        _recordedRefinedCount = 0;
         Prospects.Clear();
         LatestSummary = "Prospect a rock to see what it's carrying.";
         LatestWorthMining = false;
         SessionSummary = "";
     }
 
-    /// <summary>Wipe this session's prospected history — the field data itself, not the learned prices or threshold.</summary>
+    /// <summary>Wipe this session's prospected history — the field data itself, not the learned prices, threshold or daily value.</summary>
     [RelayCommand]
     private void ClearHistory()
     {
@@ -89,12 +87,44 @@ public sealed partial class MiningCardViewModel : CardViewModel
         SessionSummary = "";
         _signature = "";
         _lastSeenProspectTimestamp = null;
+        _recordedRefinedCount = 0;
+    }
+
+    /// <summary>Feed every unit refined since the last tick into the persisted daily total.</summary>
+    private void RecordNewlyRefinedUnits()
+    {
+        var refined = Context.Host.Mining.Refined;
+        if (refined.Count <= _recordedRefinedCount)
+        {
+            // The tracker was cleared (or rebuilt) out from under us — resync rather than replaying
+            // units that are no longer there, or skipping ones a fresh tracker starts counting from 0.
+            if (refined.Count < _recordedRefinedCount) _recordedRefinedCount = 0;
+            return;
+        }
+
+        var known = Context.GetMiningSettings().KnownPrices;
+        for (var i = _recordedRefinedCount; i < refined.Count; i++)
+        {
+            var unit = refined[i];
+            var credits = known.TryGetValue(unit.Symbol, out var price) ? price : 0;
+            Context.RecordMiningRefined(unit.Timestamp, credits);
+        }
+        _recordedRefinedCount = refined.Count;
+    }
+
+    private void RefreshSessionValueText()
+    {
+        var m = Context.GetMiningSettings();
+        TodayValueText = m.SessionUnits > 0 ? $"Today: {m.SessionValue:N0} cr · {m.SessionUnits:N0} t refined" : "";
+        LastSessionText = m.LastSessionDate is { Length: > 0 }
+            ? $"Last session ({m.LastSessionDate}): {m.LastSessionValue:N0} cr · {m.LastSessionUnits:N0} t refined"
+            : "";
     }
 
     private void RebuildFromHistory()
     {
         var known = Context.GetMiningSettings().KnownPrices;
-        var threshold = ParseCredits(ThresholdText);
+        var threshold = Context.GetMiningSettings().MinValueThreshold;
         var history = Context.Host.Mining.History;
 
         Prospects.Clear();
@@ -109,7 +139,7 @@ public sealed partial class MiningCardViewModel : CardViewModel
             LatestSummary = latest.AnyWorthMining
                 ? "Worth mining: " + string.Join(", ", latest.WorthMiningNames)
                 : threshold <= 0
-                    ? "Set a credit threshold below to start highlighting worthwhile finds."
+                    ? "Set a credit threshold in Settings → Mining to start highlighting worthwhile finds."
                     : "Nothing in this rock clears your threshold.";
         }
 
@@ -161,9 +191,6 @@ public sealed partial class MiningCardViewModel : CardViewModel
         _lastLearnedMarketUpdate = market.Updated;
         Context.LearnCommodityPrices(market.Commodities.Where(c => c.MeanPrice > 0).Select(c => (c.Symbol, c.MeanPrice)));
     }
-
-    private static int ParseCredits(string text) =>
-        int.TryParse(text?.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var v) && v > 0 ? v : 0;
 }
 
 /// <summary>One prospected asteroid, as the mining card renders it.</summary>

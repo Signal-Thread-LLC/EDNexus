@@ -1003,12 +1003,14 @@
                           Command="{Binding ToggleCollapseCommand}" />
                 </Grid>
                 <StackPanel IsVisible="{Binding !IsCollapsed}">
-                  <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,10">
-                    <StackPanel Grid.Column="0" Margin="0,0,10,0">
-                      <TextBlock Classes="label" Text="MIN VALUE TO CALL OUT (CR)" />
-                      <TextBox Classes="field" Text="{Binding ThresholdText}" PlaceholderText="e.g. 50000" Margin="0,2,0,0" />
+                  <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,8">
+                    <StackPanel Grid.Column="0">
+                      <TextBlock Classes="value" FontSize="13" Text="{Binding TodayValueText}" TextWrapping="Wrap"
+                                 IsVisible="{Binding TodayValueText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                      <TextBlock Classes="label" Text="{Binding LastSessionText}" TextWrapping="Wrap" Margin="0,2,0,0"
+                                 IsVisible="{Binding LastSessionText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                     </StackPanel>
-                    <Button Grid.Column="1" Classes="mini" Content="Clear" VerticalAlignment="Bottom"
+                    <Button Grid.Column="1" Classes="mini" Content="Clear" VerticalAlignment="Top"
                             Command="{Binding ClearHistoryCommand}" ToolTip.Tip="Clear this session's prospected history" />
                   </Grid>
 

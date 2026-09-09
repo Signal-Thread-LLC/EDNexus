@@ -39,6 +39,9 @@ public partial class SettingsWindow : Window
         InaraToggle.IsChecked = boot.Settings.Reporting.Inara.Enabled;
         InaraApiKey.Text = boot.Settings.Reporting.Inara.ApiKey;
         AutoDownloadToggle.IsChecked = boot.Settings.AutoDownloadUpdates;
+        MiningThresholdBox.Text = boot.Settings.Mining.MinValueThreshold > 0
+            ? boot.Settings.Mining.MinValueThreshold.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            : "";
 
         // The whole section disappears when the dev tools are compiled out / disabled.
         DevSection.IsVisible = boot.Dev.Available;
@@ -141,6 +144,9 @@ public partial class SettingsWindow : Window
                 InaraToggle.IsChecked == true,
                 InaraApiKey.Text ?? string.Empty);
             _boot.ApplyAutoDownloadChoice(AutoDownloadToggle.IsChecked == true);
+            _boot.ApplyMiningThreshold(
+                int.TryParse(MiningThresholdBox.Text?.Trim(), System.Globalization.NumberStyles.Integer,
+                    System.Globalization.CultureInfo.InvariantCulture, out var threshold) ? threshold : 0);
             _boot.Dev.Enabled = DevModeToggle.IsChecked == true; // runtime-only; not persisted
             UpdateStatus();
             UpdateVersionAndUpdateLine();

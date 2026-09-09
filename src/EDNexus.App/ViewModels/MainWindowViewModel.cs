@@ -44,8 +44,9 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             () => _boot.Settings.Route,
             route => _boot.ApplySavedRoute(route),
             () => _boot.Settings.Mining,
-            credits => _boot.ApplyMiningThreshold(credits),
-            prices => _boot.LearnCommodityPrices(prices));
+            prices => _boot.LearnCommodityPrices(prices),
+            now => _boot.EnsureMiningSessionDate(now),
+            (when, credits) => _boot.RecordMiningRefined(when, credits));
         Cards = new ObservableCollection<CardViewModel>
         {
             new LocationCardViewModel(_context),

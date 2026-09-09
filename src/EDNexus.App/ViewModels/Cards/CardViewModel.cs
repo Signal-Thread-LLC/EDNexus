@@ -27,8 +27,9 @@ public sealed class DashboardContext
     private readonly Func<RouteSettings> _getSavedRoute;
     private readonly Action<RouteSettings> _saveRoute;
     private readonly Func<MiningSettings> _getMiningSettings;
-    private readonly Action<int> _saveMiningThreshold;
     private readonly Action<IEnumerable<(string Symbol, int MeanPrice)>> _learnCommodityPrices;
+    private readonly Action<DateTimeOffset> _ensureMiningSessionDate;
+    private readonly Action<DateTimeOffset, long> _recordMiningRefined;
 
     public DashboardContext(
         Func<EngineHost> host,
@@ -41,8 +42,9 @@ public sealed class DashboardContext
         Func<RouteSettings> getSavedRoute,
         Action<RouteSettings> saveRoute,
         Func<MiningSettings> getMiningSettings,
-        Action<int> saveMiningThreshold,
-        Action<IEnumerable<(string Symbol, int MeanPrice)>> learnCommodityPrices)
+        Action<IEnumerable<(string Symbol, int MeanPrice)>> learnCommodityPrices,
+        Action<DateTimeOffset> ensureMiningSessionDate,
+        Action<DateTimeOffset, long> recordMiningRefined)
     {
         _host = host;
         _devEnabled = devEnabled;
@@ -54,8 +56,9 @@ public sealed class DashboardContext
         _getSavedRoute = getSavedRoute;
         _saveRoute = saveRoute;
         _getMiningSettings = getMiningSettings;
-        _saveMiningThreshold = saveMiningThreshold;
         _learnCommodityPrices = learnCommodityPrices;
+        _ensureMiningSessionDate = ensureMiningSessionDate;
+        _recordMiningRefined = recordMiningRefined;
     }
 
     /// <summary>The live engine host — always the current one, even after a reset-to-live rebuild.</summary>
@@ -87,11 +90,14 @@ public sealed class DashboardContext
     /// <summary>Read the mining card's price threshold and learned galactic-average prices.</summary>
     public MiningSettings GetMiningSettings() => _getMiningSettings();
 
-    /// <summary>Persist the mining card's "worth mining" credit threshold.</summary>
-    public void SaveMiningThreshold(int credits) => _saveMiningThreshold(credits);
-
     /// <summary>Fold newly observed galactic-average prices into the learned price book.</summary>
     public void LearnCommodityPrices(IEnumerable<(string Symbol, int MeanPrice)> prices) => _learnCommodityPrices(prices);
+
+    /// <summary>Roll the mining day over if the local date has changed since it was last checked.</summary>
+    public void EnsureMiningSessionDate(DateTimeOffset now) => _ensureMiningSessionDate(now);
+
+    /// <summary>Record one refined unit against today's running mining total.</summary>
+    public void RecordMiningRefined(DateTimeOffset when, long credits) => _recordMiningRefined(when, credits);
 }
 
 /// <summary>
