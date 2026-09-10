@@ -2,6 +2,7 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Reflection;
 using EDNexus.Core.Colonisation;
+using EDNexus.Core.CommunityGoals;
 using EDNexus.Core.Engineering;
 using EDNexus.Core.Exobio;
 using EDNexus.Core.Journal;
@@ -51,6 +52,9 @@ public sealed class EngineHost : IDisposable
     /// <summary>Missions held, the stacks they form against a common target, and pending hand-ins.</summary>
     public MissionTracker Missions { get; }
 
+    /// <summary>Active Community Goals the commander has seen or joined: tier, contribution and time remaining.</summary>
+    public CommunityGoalTracker CommunityGoals { get; }
+
     /// <summary>Pilot rank standing and progress across the five tracked ladders.</summary>
     public RankTracker Ranks { get; }
 
@@ -98,6 +102,9 @@ public sealed class EngineHost : IDisposable
         // Qualified: the property name matches the EDNexus.Core.Missions namespace, which otherwise
         // wins the bare-name lookup from inside EDNexus.Core.
         this.Missions = new MissionTracker(Bus);
+        // Qualified for the same reason: CommunityGoals matches the EDNexus.Core.CommunityGoals
+        // namespace.
+        this.CommunityGoals = new CommunityGoalTracker(Bus);
         Ranks = new RankTracker(Bus);
         Mining = new MiningTracker(Bus);
 

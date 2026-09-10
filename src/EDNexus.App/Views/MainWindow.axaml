@@ -1286,6 +1286,56 @@
             </Border>
           </DataTemplate>
 
+          <!-- Community Goals — every active goal seen nearby: tier reached, contribution vs
+               total, current top-tier bonus, and time remaining. -->
+          <DataTemplate DataType="vm:CommunityGoalsCardViewModel">
+            <Border Classes="card">
+              <StackPanel>
+                <Grid ColumnDefinitions="*,Auto,Auto">
+                  <TextBlock Grid.Column="0" Classes="cardHeader" Text="{Binding Title}" />
+                  <Button Grid.Column="1" Classes="dice" Content="🎲" Margin="0,0,6,0"
+                          IsVisible="{Binding $parent[ItemsControl].((vm:MainWindowViewModel)DataContext).DevMode}"
+                          Command="{Binding $parent[ItemsControl].((vm:MainWindowViewModel)DataContext).RandomizeCardCommand}"
+                          CommandParameter="{Binding Id}" />
+                  <Button Grid.Column="2" Classes="collapse" Content="{Binding CollapseGlyph}"
+                          Command="{Binding ToggleCollapseCommand}" />
+                </Grid>
+                <StackPanel IsVisible="{Binding !IsCollapsed}">
+                  <TextBlock Classes="label" IsVisible="{Binding NoGoals}" TextWrapping="Wrap"
+                             Text="No Community Goals nearby. They show up here once one is active at a system you're near, or as soon as you join one from a station's CG board." />
+
+                  <ScrollViewer MaxHeight="360" VerticalScrollBarVisibility="Auto"
+                                HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding HasGoals}">
+                    <ItemsControl ItemsSource="{Binding Goals}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:CommunityGoalLine">
+                          <Border Background="#0F1114" CornerRadius="4" Padding="12,10" Margin="0,0,0,8">
+                            <StackPanel Spacing="2">
+                              <Grid ColumnDefinitions="*,Auto">
+                                <TextBlock Grid.Column="0" Classes="value" FontSize="14" Text="{Binding Title}"
+                                           TextWrapping="Wrap" />
+                                <TextBlock Grid.Column="1" Classes="value" FontSize="12" Margin="10,0,0,0"
+                                           Foreground="{StaticResource AmberBrush}" Text="{Binding Joined}"
+                                           IsVisible="{Binding HasJoined}" VerticalAlignment="Center" />
+                              </Grid>
+                              <TextBlock Classes="label" Text="{Binding Where}" TextWrapping="Wrap" />
+                              <TextBlock Classes="value" FontSize="13" Margin="0,4,0,0" Text="{Binding Tier}"
+                                         TextWrapping="Wrap" />
+                              <TextBlock Classes="label" Text="{Binding Contribution}" TextWrapping="Wrap" />
+                              <TextBlock Classes="label" Text="{Binding Rank}" IsVisible="{Binding HasRank}" />
+                              <TextBlock Classes="value" FontSize="12" Foreground="{StaticResource Good}"
+                                         Text="{Binding TimeNote}" IsVisible="{Binding HasTimeNote}" />
+                            </StackPanel>
+                          </Border>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </ScrollViewer>
+                </StackPanel>
+              </StackPanel>
+            </Border>
+          </DataTemplate>
+
           <!-- Ranks — one row per pilot ladder: current rank name and progress to the next tier.
                Elite ranks are picked out in amber and drop the bar, which has nothing left to fill. -->
           <DataTemplate DataType="vm:RanksCardViewModel">
