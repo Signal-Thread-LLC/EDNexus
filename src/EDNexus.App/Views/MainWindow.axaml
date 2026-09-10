@@ -1228,7 +1228,13 @@
                              Text="No missions held. Take some from a station's mission board — kill missions against the same faction stack, so one fight can clear several at once." />
 
                   <StackPanel IsVisible="{Binding HasMissions}">
-                    <TextBlock Classes="value" FontSize="13" Text="{Binding MissionSummary}" TextWrapping="Wrap" />
+                    <Grid ColumnDefinitions="*,Auto">
+                      <TextBlock Grid.Column="0" Classes="value" FontSize="13" Text="{Binding MissionSummary}"
+                                 TextWrapping="Wrap" VerticalAlignment="Center" />
+                      <Button Grid.Column="1" Classes="mini" Content="War Board" Margin="10,0,0,0"
+                              Command="{Binding OpenWarBoardCommand}"
+                              ToolTip.Tip="Open every held mission in its own window" />
+                    </Grid>
                     <TextBlock Classes="label" Text="{Binding CapNote}" Margin="0,2,0,0" />
 
                     <ScrollViewer MaxHeight="300" VerticalScrollBarVisibility="Auto"
@@ -1255,6 +1261,12 @@
                                 <TextBlock Classes="label" Text="{Binding Logged}" IsVisible="{Binding HasLogged}" />
                                 <TextBlock Classes="value" FontSize="12" Foreground="{StaticResource Good}"
                                            Text="{Binding ReadyNote}" IsVisible="{Binding HasReady}" />
+                                <TextBlock Classes="value" FontSize="12" Text="{Binding ExpiryNote}"
+                                           IsVisible="{Binding HasExpiryNote}"
+                                           Foreground="{StaticResource InkDim}" />
+                                <TextBlock Classes="value" FontSize="12" Text="{Binding ExpiryNote}"
+                                           IsVisible="{Binding IsUrgent}"
+                                           Foreground="{StaticResource Bad}" FontWeight="SemiBold" />
                               </StackPanel>
                             </Border>
                           </DataTemplate>
@@ -1272,6 +1284,10 @@
                               <StackPanel Grid.Column="0">
                                 <TextBlock Classes="value" FontSize="13" Text="{Binding Where}" TextWrapping="Wrap" />
                                 <TextBlock Classes="label" Text="{Binding Detail}" />
+                                <TextBlock Classes="label" Text="{Binding ExpiryNote}" IsVisible="{Binding HasExpiryNote}"
+                                           Foreground="{StaticResource InkDim}" />
+                                <TextBlock Classes="label" Text="{Binding ExpiryNote}" IsVisible="{Binding IsUrgent}"
+                                           Foreground="{StaticResource Bad}" FontWeight="SemiBold" />
                               </StackPanel>
                               <TextBlock Grid.Column="1" Classes="label" Text="{Binding ReadyNote}"
                                          Margin="10,0,0,0" VerticalAlignment="Center" />

@@ -39,6 +39,7 @@ public sealed class MissionTracker
         bus.Subscribe("MissionRedirected", OnRedirected);
         bus.Subscribe("Missions", OnSnapshot);
         bus.Subscribe("Bounty", OnBounty);
+        bus.Subscribe("FactionKillBond", OnFactionKillBond);
     }
 
     /// <summary>Everything currently held, newest first.</summary>
@@ -229,6 +230,19 @@ public sealed class MissionTracker
     }
 
     private void OnBounty(JournalEntry e)
+    {
+        if (e.GetString("VictimFaction") is not { Length: > 0 } faction) return;
+
+        lock (_gate) _bounties[faction] = _bounties.TryGetValue(faction, out var n) ? n + 1 : 1;
+        Changed?.Invoke();
+    }
+
+    /// <summary>
+    /// A conflict-zone kill paid out as a faction kill bond rather than a bounty — on-foot and space
+    /// CZs report this way instead. Tallied into the same running count as <see cref="OnBounty"/>,
+    /// keyed by the ship destroyed's faction, since that is what a massacre stack cares about.
+    /// </summary>
+    private void OnFactionKillBond(JournalEntry e)
     {
         if (e.GetString("VictimFaction") is not { Length: > 0 } faction) return;
 

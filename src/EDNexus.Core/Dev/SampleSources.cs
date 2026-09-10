@@ -641,14 +641,19 @@ public sealed class MissionsSampleSource : JournalSampleSource
         var lines = new List<string>();
         var missionId = rng.Next(800_000_000, 900_000_000);
 
-        // The stack: several boards, one target. Wing missions, as massacre stacking requires.
+        // The stack: several boards, one target. Wing missions, as massacre stacking requires. The
+        // first mission gets a short deadline so the card's near-expiry highlight is exercisable in
+        // developer mode without waiting a week for a real one to run down.
         var stackSize = rng.Next(3, 7);
         var givers = SamplePools.PickDistinct(rng, FactionSuffixes, stackSize);
         for (var i = 0; i < stackSize; i++)
         {
             var kills = rng.Next(8, 60);
+            var expiry = i == 0
+                ? DateTimeOffset.UtcNow.AddMinutes(rng.Next(20, 110))
+                : DateTimeOffset.UtcNow.AddDays(7);
             lines.Add(Accepted(++missionId, $"{system} {givers[i]}", target, kills,
-                rng.Next(400_000, 3_000_000), system, station));
+                rng.Next(400_000, 3_000_000), system, station, expiry));
         }
 
         // A second, smaller target so the card shows more than one stack.
@@ -678,7 +683,8 @@ public sealed class MissionsSampleSource : JournalSampleSource
     }
 
     private static string Accepted(
-        long id, string giver, string target, int kills, int reward, string system, string station) =>
+        long id, string giver, string target, int kills, int reward, string system, string station,
+        DateTimeOffset? expiry = null) =>
         Event("MissionAccepted", o =>
         {
             o["MissionID"] = id;
@@ -691,7 +697,7 @@ public sealed class MissionsSampleSource : JournalSampleSource
             o["KillCount"] = kills;
             o["DestinationSystem"] = system;
             o["DestinationStation"] = station;
-            o["Expiry"] = DateTimeOffset.UtcNow.AddDays(7).ToString("O");
+            o["Expiry"] = (expiry ?? DateTimeOffset.UtcNow.AddDays(7)).ToString("O");
             o["Wing"] = true;
             o["Influence"] = "++";
             o["Reputation"] = "++";
