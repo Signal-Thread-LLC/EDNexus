@@ -641,14 +641,19 @@ public sealed class MissionsSampleSource : JournalSampleSource
         var lines = new List<string>();
         var missionId = rng.Next(800_000_000, 900_000_000);
 
-        // The stack: several boards, one target. Wing missions, as massacre stacking requires.
+        // The stack: several boards, one target. Wing missions, as massacre stacking requires. The
+        // first mission gets a short deadline so the card's near-expiry highlight is exercisable in
+        // developer mode without waiting a week for a real one to run down.
         var stackSize = rng.Next(3, 7);
         var givers = SamplePools.PickDistinct(rng, FactionSuffixes, stackSize);
         for (var i = 0; i < stackSize; i++)
         {
             var kills = rng.Next(8, 60);
+            var expiry = i == 0
+                ? DateTimeOffset.UtcNow.AddMinutes(rng.Next(20, 110))
+                : DateTimeOffset.UtcNow.AddDays(7);
             lines.Add(Accepted(++missionId, $"{system} {givers[i]}", target, kills,
-                rng.Next(400_000, 3_000_000), system, station));
+                rng.Next(400_000, 3_000_000), system, station, expiry));
         }
 
         // A second, smaller target so the card shows more than one stack.
@@ -678,7 +683,8 @@ public sealed class MissionsSampleSource : JournalSampleSource
     }
 
     private static string Accepted(
-        long id, string giver, string target, int kills, int reward, string system, string station) =>
+        long id, string giver, string target, int kills, int reward, string system, string station,
+        DateTimeOffset? expiry = null) =>
         Event("MissionAccepted", o =>
         {
             o["MissionID"] = id;
@@ -691,7 +697,7 @@ public sealed class MissionsSampleSource : JournalSampleSource
             o["KillCount"] = kills;
             o["DestinationSystem"] = system;
             o["DestinationStation"] = station;
-            o["Expiry"] = DateTimeOffset.UtcNow.AddDays(7).ToString("O");
+            o["Expiry"] = (expiry ?? DateTimeOffset.UtcNow.AddDays(7)).ToString("O");
             o["Wing"] = true;
             o["Influence"] = "++";
             o["Reputation"] = "++";
@@ -817,6 +823,99 @@ public sealed class MiningSampleSource : JournalSampleSource
                 o["Items"] = goods;
             }));
         }
+
+        return lines;
+    }
+}
+
+/// <summary>
+/// Sample source for the Community Goals card. Emits a <c>CommunityGoal</c> snapshot with one or two
+/// active goals, sometimes followed by a <c>CommunityGoalJoin</c> and occasionally a
+/// <c>CommunityGoalReward</c>, so the card's joined/rewarded states get exercised too.
+/// </summary>
+public sealed class CommunityGoalSampleSource : JournalSampleSource
+{
+    public override string CardKey => "community-goals";
+    public override string DisplayName => "Community Goals";
+
+    private static readonly string[] Titles =
+    {
+        "Battle for the Core", "Defence of the Faucett Enterprise", "Helping the Hunt Legion Fight Back",
+        "Bright Sun Imperium Combat Support", "Pirate Massacre at Robigo",
+    };
+
+    private static readonly string[] Tiers = { "Tier 1", "Tier 2", "Tier 3", "Tier 4", "Tier 5" };
+
+    public override IReadOnlyList<string> Sample(Random rng)
+    {
+        var lines = new List<string>();
+        var goals = new JsonArray();
+
+        var primaryId = rng.Next(10_000, 99_999);
+        var system = Pick(rng, SamplePools.Systems);
+        var station = Pick(rng, SamplePools.Stations);
+        var title = Pick(rng, Titles);
+        var total = rng.Next(500_000, 50_000_000);
+        var mine = rng.Next(1_000, 200_000);
+        var tierIndex = rng.Next(0, Tiers.Length);
+
+        goals.Add(new JsonObject
+        {
+            ["CGID"] = primaryId,
+            ["Title"] = title,
+            ["SystemName"] = system,
+            ["MarketName"] = station,
+            ["Expiry"] = DateTimeOffset.UtcNow.AddDays(rng.Next(1, 10)).ToString("O"),
+            ["IsComplete"] = false,
+            ["CurrentTotal"] = total,
+            ["PlayerContribution"] = mine,
+            ["NumContributors"] = rng.Next(200, 8000),
+            ["TopRankSize"] = 10,
+            ["TopTier"] = new JsonObject { ["Name"] = Tiers[^1], ["Bonus"] = (5_000_000).ToString() },
+            ["TierReached"] = Tiers[tierIndex],
+            ["PlayerInTopRank"] = rng.Next(100) < 15,
+            ["PlayerPercentileBand"] = rng.Next(1, 100),
+        });
+
+        // A second, smaller goal so the list shows more than one card.
+        if (rng.Next(100) < 60)
+        {
+            var secondId = primaryId + 1;
+            goals.Add(new JsonObject
+            {
+                ["CGID"] = secondId,
+                ["Title"] = Pick(rng, Titles),
+                ["SystemName"] = Pick(rng, SamplePools.Systems),
+                ["MarketName"] = Pick(rng, SamplePools.Stations),
+                ["Expiry"] = DateTimeOffset.UtcNow.AddDays(rng.Next(1, 14)).ToString("O"),
+                ["IsComplete"] = false,
+                ["CurrentTotal"] = rng.Next(100_000, 5_000_000),
+                ["PlayerContribution"] = 0,
+                ["NumContributors"] = rng.Next(50, 2000),
+            });
+        }
+
+        lines.Add(Event("CommunityGoal", o => o["CurrentGoals"] = goals));
+
+        // Most of the time this commander has actually joined the primary goal.
+        if (rng.Next(100) < 70)
+            lines.Add(Event("CommunityGoalJoin", o =>
+            {
+                o["CGID"] = primaryId;
+                o["Name"] = title;
+                o["System"] = system;
+            }));
+
+        // Occasionally show a completed, rewarded goal too.
+        if (rng.Next(100) < 25)
+            lines.Add(Event("CommunityGoalReward", o =>
+            {
+                o["CGID"] = primaryId;
+                o["Name"] = title;
+                o["System"] = system;
+                o["Reward"] = rng.Next(50_000, 2_000_000);
+                o["Bonus"] = rng.Next(0, 500_000);
+            }));
 
         return lines;
     }

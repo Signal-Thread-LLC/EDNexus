@@ -19,6 +19,7 @@ public sealed class DeveloperMode
         new MarketSampleSource(),
         new ExobiologySampleSource(),
         new MissionsSampleSource(),
+        new CommunityGoalSampleSource(),
         new RanksSampleSource(),
         new MiningSampleSource(),
     };

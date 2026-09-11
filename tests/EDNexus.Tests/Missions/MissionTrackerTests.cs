@@ -236,6 +236,23 @@ public class MissionTrackerTests
     }
 
     [Fact]
+    public void FactionKillBonds_tally_into_the_same_running_count_as_bounties()
+    {
+        var (bus, tracker) = NewTracker();
+
+        for (var i = 0; i < 3; i++)
+            Publish(bus, """
+            { "timestamp": "2026-08-16T16:00:00Z", "event": "FactionKillBond", "Reward": 120000,
+              "AwardingFaction": "Union of Kremata Front", "VictimFaction": "Kremata Blue Society" }
+            """);
+        Publish(bus, """
+        { "timestamp": "2026-08-16T16:05:00Z", "event": "Bounty", "VictimFaction": "Kremata Blue Society" }
+        """);
+
+        Assert.Equal(4, tracker.KillsLoggedFor("Kremata Blue Society"));
+    }
+
+    [Fact]
     public void Clearing_forgets_missions_and_kill_tallies()
     {
         var (bus, tracker) = NewTracker();
