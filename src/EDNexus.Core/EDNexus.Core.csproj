@@ -7,6 +7,14 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Cross-platform managed wrapper around libvlc, used by RadioPlayerService's real audio backend.
+         Only the managed package is referenced here; the native runtime (libvlc itself) ships with
+         EDNexus.App (see its csproj) so this project stays runnable headless (tests, the CLI harness)
+         without it. -->
+    <PackageReference Include="LibVLCSharp" Version="3.9.1" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\EliteDangerous.Eddn\EliteDangerous.Eddn.csproj" />
     <ProjectReference Include="..\EliteDangerous.Edsm\EliteDangerous.Edsm.csproj" />
     <ProjectReference Include="..\EliteDangerous.Galnet\EliteDangerous.Galnet.csproj" />

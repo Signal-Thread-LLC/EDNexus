@@ -38,6 +38,28 @@ public sealed class AppSettings
 
     /// <summary>The mining card's price threshold and learned galactic-average prices.</summary>
     public MiningSettings Mining { get; set; } = new();
+
+    /// <summary>The radio player's last selected station, volume, and mute state.</summary>
+    public RadioSettings Radio { get; set; } = new();
+}
+
+/// <summary>
+/// Persisted state for the background radio player: whether it is turned on at all, which station
+/// it was last tuned to, and the volume/mute the commander left it at.
+/// </summary>
+public sealed class RadioSettings
+{
+    /// <summary>Master on/off switch for the radio feature. Off by default — nothing plays until opted in.</summary>
+    public bool Enabled { get; set; } = false;
+
+    /// <summary>Id (see <c>RadioStationCatalog</c>) of the station last tuned in, or null before the first play.</summary>
+    public string? LastStationId { get; set; }
+
+    /// <summary>Playback volume, 0–100.</summary>
+    public int Volume { get; set; } = 50;
+
+    /// <summary>When true, playback is muted regardless of <see cref="Volume"/>.</summary>
+    public bool Mute { get; set; } = false;
 }
 
 /// <summary>
