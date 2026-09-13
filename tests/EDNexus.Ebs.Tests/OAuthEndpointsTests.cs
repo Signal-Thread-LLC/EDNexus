@@ -38,8 +38,13 @@ public class OAuthEndpointsTests : IClassFixture<OAuthEndpointsTests.Factory>
             {
                 // The default per-channel rate limit (1 request / 2 seconds) is far too tight for a
                 // test class that fires several requests back-to-back against a shared test host.
+                // Twitch:ExtensionSecret must be a valid base64 string — Program.cs validates it at
+                // startup (fail-fast) and the default appsettings.json value is an empty string.
                 config.AddInMemoryCollection(new Dictionary<string, string?>
                 {
+                    ["Twitch:ExtensionSecret"] = "c3VwZXItc2VjcmV0LWV4dGVuc2lvbi1rZXktMTIzNA==",
+                    ["Twitch:ClientId"] = "test-client-id",
+                    ["Twitch:ExtensionId"] = "test-extension-id",
                     ["Ebs:UpdateStateRateLimit"] = "1000",
                     ["Ebs:UpdateStateRateLimitWindowSeconds"] = "1",
                 });
