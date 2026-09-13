@@ -43,6 +43,16 @@ public partial class SettingsWindow : Window
             ? boot.Settings.Mining.MinValueThreshold.ToString(System.Globalization.CultureInfo.InvariantCulture)
             : "";
 
+        OverlayToggle.IsChecked = boot.Settings.Overlay.Enabled;
+
+        VoiceToggle.IsChecked = boot.Settings.Voice.Enabled;
+        VoiceNameCombo.ItemsSource = boot.Voice.AvailableVoices;
+        VoiceNameCombo.SelectedItem = boot.Settings.Voice.VoiceName;
+        VoiceVolumeSlider.Value = boot.Settings.Voice.Volume;
+        FuelLowToggle.IsChecked = !boot.Settings.Voice.DisabledCallouts.Contains(nameof(EDNexus.Core.Voice.VoiceCalloutKind.FuelLow));
+        ScanCompleteToggle.IsChecked = !boot.Settings.Voice.DisabledCallouts.Contains(nameof(EDNexus.Core.Voice.VoiceCalloutKind.ScanComplete));
+        ShoppingListToggle.IsChecked = !boot.Settings.Voice.DisabledCallouts.Contains(nameof(EDNexus.Core.Voice.VoiceCalloutKind.ShoppingListItemAcquired));
+
         // The whole section disappears when the dev tools are compiled out / disabled.
         DevSection.IsVisible = boot.Dev.Available;
         DevModeToggle.IsChecked = boot.Dev.Enabled;
@@ -147,6 +157,12 @@ public partial class SettingsWindow : Window
             _boot.ApplyMiningThreshold(
                 int.TryParse(MiningThresholdBox.Text?.Trim(), System.Globalization.NumberStyles.Integer,
                     System.Globalization.CultureInfo.InvariantCulture, out var threshold) ? threshold : 0);
+            _boot.ApplyOverlayChoice(OverlayToggle.IsChecked == true);
+            _boot.ApplyVoiceChoice(
+                VoiceToggle.IsChecked == true,
+                VoiceNameCombo.SelectedItem as string,
+                (int)VoiceVolumeSlider.Value,
+                DisabledCalloutNames());
             _boot.Dev.Enabled = DevModeToggle.IsChecked == true; // runtime-only; not persisted
             UpdateStatus();
             UpdateVersionAndUpdateLine();
@@ -156,6 +172,27 @@ public partial class SettingsWindow : Window
     }
 
     private void OnClose(object? sender, RoutedEventArgs e) => Close();
+
+    /// <summary>Which callout kinds the checkboxes have turned off, as <c>VoiceCalloutKind</c> names.</summary>
+    private IEnumerable<string> DisabledCalloutNames()
+    {
+        if (FuelLowToggle.IsChecked != true) yield return nameof(EDNexus.Core.Voice.VoiceCalloutKind.FuelLow);
+        if (ScanCompleteToggle.IsChecked != true) yield return nameof(EDNexus.Core.Voice.VoiceCalloutKind.ScanComplete);
+        if (ShoppingListToggle.IsChecked != true) yield return nameof(EDNexus.Core.Voice.VoiceCalloutKind.ShoppingListItemAcquired);
+    }
+
+    /// <summary>Speak a short sample line through the currently selected voice/volume, without saving.</summary>
+    private void OnTestVoice(object? sender, RoutedEventArgs e)
+    {
+        if (_boot is null) return;
+        _boot.Voice.SetVoice(VoiceNameCombo.SelectedItem as string);
+        _boot.Voice.SetVolume((int)VoiceVolumeSlider.Value);
+        _boot.Voice.Speak("EDNexus voice callouts are working.");
+    }
+
+    /// <summary>Fabricate the three callout-triggering events through the real bus, via developer mode.</summary>
+    private void OnSimulateOverlayVoice(object? sender, RoutedEventArgs e)
+        => _dashboard?.SimulateOverlayVoiceCommand.Execute(null);
 
     private void OnRevealApiKeyChanged(object? sender, RoutedEventArgs e)
         => InaraApiKey.RevealPassword = RevealApiKey.IsChecked == true;

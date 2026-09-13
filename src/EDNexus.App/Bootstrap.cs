@@ -1,6 +1,8 @@
 using System.Globalization;
 using EDNexus.App.Telemetry;
 using EDNexus.Core.Settings;
+using IOverlay = EDNexus.Core.Overlay.IOverlay;
+using IVoice = EDNexus.Core.Voice.IVoice;
 
 namespace EDNexus.App;
 
@@ -14,11 +16,21 @@ public sealed class Bootstrap
     /// <summary>Runtime developer-tools state (not persisted; off every launch).</summary>
     public DeveloperOptions Dev { get; } = new();
 
+    /// <summary>The in-game HUD overlay — the Windows implementation, or a no-op elsewhere.</summary>
+    public IOverlay Overlay { get; } = Services.Overlay.OverlayFactory.Create();
+
+    /// <summary>Spoken callouts — Windows SAPI, or a no-op elsewhere.</summary>
+    public IVoice Voice { get; } = Services.Voice.VoiceFactory.Create();
+
     public Bootstrap(SettingsStore store, AppSettings settings, CrashReporting crash)
     {
         Store = store;
         Settings = settings;
         Crash = crash;
+
+        // Apply the saved voice choice up front so the very first callout already uses it.
+        Voice.SetVoice(Settings.Voice.VoiceName);
+        Voice.SetVolume(Settings.Voice.Volume);
     }
 
     /// <summary>Persist the current consent choice and start/stop reporting to match.</summary>
@@ -149,4 +161,28 @@ public sealed class Bootstrap
         Store.Save(Settings);
     }
 
+    /// <summary>Persist the overlay's on/off state and show/hide the live window to match.</summary>
+    public void ApplyOverlayChoice(bool enabled)
+    {
+        Settings.Overlay.Enabled = enabled;
+        Store.Save(Settings);
+        if (enabled) Overlay.Show();
+        else Overlay.Hide();
+    }
+
+    /// <summary>
+    /// Persist the voice-callout choices and apply the voice/volume live, so a change here doesn't
+    /// need a restart to take effect.
+    /// </summary>
+    public void ApplyVoiceChoice(bool enabled, string? voiceName, int volume, IEnumerable<string> disabledCallouts)
+    {
+        Settings.Voice.Enabled = enabled;
+        Settings.Voice.VoiceName = string.IsNullOrWhiteSpace(voiceName) ? null : voiceName;
+        Settings.Voice.Volume = Math.Clamp(volume, 0, 100);
+        Settings.Voice.DisabledCallouts = disabledCallouts.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        Store.Save(Settings);
+
+        Voice.SetVoice(Settings.Voice.VoiceName);
+        Voice.SetVolume(Settings.Voice.Volume);
+    }
 }
