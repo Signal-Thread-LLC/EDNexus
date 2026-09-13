@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Threading.RateLimiting;
+using EDNexus.Ebs.Endpoints;
 using EDNexus.Ebs.Models;
 using EDNexus.Ebs.Options;
 using EDNexus.Ebs.Security;
@@ -19,7 +20,10 @@ builder.Services
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<ITwitchExtensionJwtService, TwitchExtensionJwtService>();
 builder.Services.AddSingleton<IChannelStateStore, InMemoryChannelStateStore>();
+builder.Services.AddSingleton<IBroadcasterTokenStore, InMemoryBroadcasterTokenStore>();
 builder.Services.AddHttpClient<ITwitchPubSubClient, TwitchPubSubClient>();
+builder.Services.AddHttpClient<ITwitchOAuthClient, TwitchOAuthClient>();
+builder.Services.AddHostedService<TwitchTokenRefreshBackgroundService>();
 
 // Rate limiting: throttle state updates and initial-state reads per broadcaster channel, so a
 // misbehaving desktop client (or a burst of viewers) cannot exceed Twitch's own PubSub quota or
@@ -71,52 +75,51 @@ app.UseRateLimiter();
 
 app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
 
+app.MapOAuthEndpoints();
+
 app.MapPost("/api/update-state", async (
         HttpRequest httpRequest,
         UpdateStateRequest body,
-        ITwitchExtensionJwtService jwtService,
+        IBroadcasterTokenStore tokenStore,
         IChannelStateStore stateStore,
         ITwitchPubSubClient pubSubClient,
         IOptions<EbsOptions> ebsOptions,
         ILogger<Program> logger,
         CancellationToken cancellationToken) =>
     {
-        var authResult = TryAuthenticateBroadcaster(httpRequest, jwtService);
-        if (!authResult.IsValid || authResult.Claims is not { } claims)
+        // Authenticated by the long-lived, EBS-issued token minted at POST /oauth/token — not a
+        // Twitch/Extension JWT. The channel id is resolved server-side from the token, never taken
+        // from the request body, so a compromised client cannot spoof another broadcaster's channel.
+        if (!TryAuthenticateBroadcaster(httpRequest, tokenStore, out var channelId, out var failure))
         {
-            return Results.Unauthorized();
+            return failure!;
         }
 
-        if (string.IsNullOrEmpty(claims.ChannelId))
-        {
-            return Results.Problem("Token is missing a channel_id claim.", statusCode: StatusCodes.Status401Unauthorized);
-        }
-
-        httpRequest.HttpContext.Items["ChannelId"] = claims.ChannelId;
+        httpRequest.HttpContext.Items["ChannelId"] = channelId;
 
         PubSubBroadcastRequest pubSubRequest;
         try
         {
-            pubSubRequest = PubSubBroadcastRequest.Create(claims.ChannelId, body.State, ebsOptions.Value.MaxStatePayloadBytes);
+            pubSubRequest = PubSubBroadcastRequest.Create(channelId, body.State, ebsOptions.Value.MaxStatePayloadBytes);
         }
         catch (PubSubPayloadTooLargeException ex)
         {
             return Results.Problem(ex.Message, statusCode: StatusCodes.Status413PayloadTooLarge);
         }
 
-        stateStore.Set(claims.ChannelId, body.State);
+        stateStore.Set(channelId, body.State);
 
-        var published = await pubSubClient.BroadcastAsync(claims.ChannelId, body.State, cancellationToken).ConfigureAwait(false);
+        var published = await pubSubClient.BroadcastAsync(channelId, body.State, cancellationToken).ConfigureAwait(false);
         if (!published)
         {
-            logger.LogWarning("Failed to publish state update for channel {ChannelId} to Twitch PubSub.", claims.ChannelId);
+            logger.LogWarning("Failed to publish state update for channel {ChannelId} to Twitch PubSub.", channelId);
             return Results.Problem("Failed to publish the update to Twitch PubSub.", statusCode: StatusCodes.Status502BadGateway);
         }
 
         return Results.Ok(new
         {
             published = true,
-            channelId = claims.ChannelId,
+            channelId,
             bytes = System.Text.Encoding.UTF8.GetByteCount(pubSubRequest.Message),
         });
     })
@@ -135,27 +138,34 @@ app.MapGet("/api/initial-state/{channelId}", (string channelId, IChannelStateSto
 
 app.Run();
 
-static TwitchJwtValidationResult TryAuthenticateBroadcaster(HttpRequest request, ITwitchExtensionJwtService jwtService)
+static bool TryAuthenticateBroadcaster(HttpRequest request, IBroadcasterTokenStore tokenStore, out string channelId, out IResult? failure)
 {
+    channelId = "";
     var header = request.Headers.Authorization.ToString();
     if (string.IsNullOrWhiteSpace(header) || !header.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
     {
-        return TwitchJwtValidationResult.Failure("Missing or malformed Authorization header.");
+        failure = Results.Unauthorized();
+        return false;
     }
 
     var token = header["Bearer ".Length..].Trim();
-    var result = jwtService.Validate(token);
-    if (!result.IsValid || result.Claims is null)
+    if (!tokenStore.TryGetByToken(token, out var record))
     {
-        return result;
+        failure = Results.Unauthorized();
+        return false;
     }
 
-    if (!result.Claims.IsBroadcaster)
+    if (!record.IsTwitchGrantValid)
     {
-        return TwitchJwtValidationResult.Failure("Only the channel broadcaster may submit state updates.");
+        failure = Results.Problem(
+            "The underlying Twitch grant is no longer valid — please log in again.",
+            statusCode: StatusCodes.Status401Unauthorized);
+        return false;
     }
 
-    return result;
+    channelId = record.ChannelId;
+    failure = null;
+    return true;
 }
 
 /// <summary>Entry point marker used by <c>WebApplicationFactory</c> in integration tests.</summary>

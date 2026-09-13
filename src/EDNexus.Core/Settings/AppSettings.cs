@@ -41,6 +41,29 @@ public sealed class AppSettings
 
     /// <summary>Discord Rich Presence: broadcasts live commander status to the commander's own Discord client.</summary>
     public DiscordSettings Discord { get; set; } = new();
+
+    /// <summary>
+    /// Twitch login session for streaming the commander's state to their extension/overlay via the
+    /// EBS. Empty until the commander completes login via <c>EDNexus.Core.Twitch.TwitchAuthService</c>.
+    /// </summary>
+    public TwitchSettings Twitch { get; set; } = new();
+}
+
+/// <summary>
+/// The persisted result of an EBS-mediated Twitch login: a long-lived opaque token issued by the EBS
+/// (never a raw Twitch token — the desktop app never sees those) and the identified broadcaster.
+/// Treat this the same as the Inara API key: sensitive, machine-local only.
+/// </summary>
+public sealed class TwitchSettings
+{
+    /// <summary>The EBS-issued long-lived bearer token, or null if never logged in / logged out.</summary>
+    public string? Token { get; set; }
+
+    /// <summary>The authenticated broadcaster's Twitch user/channel id, resolved server-side by the EBS.</summary>
+    public string? ChannelId { get; set; }
+
+    /// <summary>The authenticated Twitch display name, for showing "Logged in as ...".</summary>
+    public string? Username { get; set; }
 }
 
 /// <summary>
