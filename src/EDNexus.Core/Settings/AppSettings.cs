@@ -38,6 +38,26 @@ public sealed class AppSettings
 
     /// <summary>The mining card's price threshold and learned galactic-average prices.</summary>
     public MiningSettings Mining { get; set; } = new();
+
+    /// <summary>Discord Rich Presence: broadcasts live commander status to the commander's own Discord client.</summary>
+    public DiscordSettings Discord { get; set; } = new();
+}
+
+/// <summary>
+/// Discord Rich Presence settings. Unlike the EDDN/Inara reporters this defaults on: presence is a
+/// local IPC connection to the commander's own already-running Discord client, not an upload to a
+/// third party, so there is no separate data-sharing consent to gate it behind.
+/// </summary>
+public sealed class DiscordSettings
+{
+    /// <summary>When true, mirror system/ship/activity onto Discord Rich Presence.</summary>
+    public bool Enabled { get; set; } = true;
+
+    /// <summary>
+    /// Discord application (Client) ID presence is registered under. Override only to point at a
+    /// different Discord application (e.g. for local testing); the default is EDNexus's own.
+    /// </summary>
+    public string ApplicationId { get; set; } = global::EDNexus.Core.Discord.DiscordPresenceService.DefaultApplicationId;
 }
 
 /// <summary>
