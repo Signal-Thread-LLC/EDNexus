@@ -981,6 +981,9 @@
                               <TextBlock Grid.Column="4" Text="{Binding VsMean}" FontSize="12"
                                          Foreground="{StaticResource Bad}" IsVisible="{Binding Bad}"
                                          HorizontalAlignment="Right" VerticalAlignment="Center" />
+                              <TextBlock Grid.Column="4" Text="{Binding VsMean}" FontSize="12"
+                                         Foreground="{StaticResource InkDim}" IsVisible="{Binding Unknown}"
+                                         HorizontalAlignment="Right" VerticalAlignment="Center" />
                             </Grid>
                           </DataTemplate>
                         </ItemsControl.ItemTemplate>

@@ -60,6 +60,13 @@ public sealed class EngineHost : IDisposable
     /// <summary>Cross-station "best price nearby" lookups. Backed by Spansh; swappable via <see cref="ITradeSearch"/>.</summary>
     public ITradeSearch Trade { get; }
 
+    /// <summary>
+    /// Galactic-mean-price estimates for commodities the game itself won't quote one for (fleet carrier
+    /// buy/sell orders report <c>MeanPrice: 0</c>). Backed by Spansh station listings, averaged; see
+    /// <see cref="Market.CommodityMeanPriceEstimator"/>.
+    /// </summary>
+    public CommodityMeanPriceEstimator CommodityMeanPrices { get; }
+
     /// <summary>Long-distance route plotting (neutron highway). Backed by Spansh; swappable via <see cref="IRoutePlotter"/>.</summary>
     public IRoutePlotter Routes { get; }
 
@@ -112,6 +119,12 @@ public sealed class EngineHost : IDisposable
         // Market prices go stale quickly (6 h); plotted routes and system positions are effectively
         // static, so they can be cached far longer.
         Trade = new SpanshTradeSearch(spansh, new DiskResponseCache(Path.Combine(cacheRoot, "trade"), TimeSpan.FromHours(6)));
+
+        // A commodity's galactic mean is a fixed constant Frontier never redefines outside a balance
+        // patch, so this cache is deliberately long-lived — it exists to average in a few more real
+        // stations over time, not to track drift the way the trade-finder's live quotes need to.
+        CommodityMeanPrices = new CommodityMeanPriceEstimator(
+            new SpanshTradeSearch(spansh, new DiskResponseCache(Path.Combine(cacheRoot, "commodity-mean"), TimeSpan.FromDays(3))));
         Routes = new SpanshRoutePlotter(spansh, new DiskResponseCache(Path.Combine(cacheRoot, "routes"), TimeSpan.FromDays(30)));
         Navigation = new EdsmSystemLookup(
             new EdsmClient(new EdsmClientOptions { SoftwareName = "EDNexus", SoftwareVersion = version }, _http),

@@ -76,7 +76,7 @@ public sealed class MarketSnapshot
         foreach (var (key, units) in hold)
         {
             if (!index.TryGetValue(key, out var line) || line.SellPrice <= 0) continue;
-            list.Add(new MarketSaleItem(line.Name, units, line.SellPrice, line.MeanPrice));
+            list.Add(new MarketSaleItem(line.Name, line.Symbol, units, line.SellPrice, line.MeanPrice));
         }
 
         return list.OrderByDescending(i => i.Total).ToList();
@@ -108,7 +108,7 @@ public sealed class MarketSnapshot
 /// A hold-valuation row: <see cref="Units"/> tons of a commodity the market will buy at
 /// <see cref="UnitPrice"/> each, and how that unit price compares to the galactic mean.
 /// </summary>
-public sealed record MarketSaleItem(string Name, int Units, int UnitPrice, int MeanPrice)
+public sealed record MarketSaleItem(string Name, string Symbol, int Units, int UnitPrice, int MeanPrice)
 {
     /// <summary>Credits this line fetches if the whole quantity is sold.</summary>
     public long Total => (long)Units * UnitPrice;
