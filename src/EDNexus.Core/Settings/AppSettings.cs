@@ -45,6 +45,9 @@ public sealed class AppSettings
     /// </summary>
     public TwitchSettings Twitch { get; set; } = new();
 
+    /// <summary>The radio player's last selected station, volume, and mute state.</summary>
+    public RadioSettings Radio { get; set; } = new();
+
     /// <summary>Discord Rich Presence: broadcasts live commander status to the commander's own Discord client.</summary>
     public DiscordSettings Discord { get; set; } = new();
 }
@@ -72,6 +75,25 @@ public sealed class TwitchSettings
 
     /// <summary>Scopes actually granted by Twitch (may be a subset of what was requested).</summary>
     public List<string> Scopes { get; set; } = new();
+}
+
+/// <summary>
+/// Persisted state for the background radio player: whether it's turned on, which station was
+/// last tuned, and the volume/mute levels to restore on the next launch.
+/// </summary>
+public sealed class RadioSettings
+{
+    /// <summary>Whether the radio feature is turned on. Default off so a fresh install stays silent.</summary>
+    public bool RadioEnabled { get; set; } = false;
+
+    /// <summary>Id (see <see cref="Radio.RadioStation"/>) of the last station tuned, or null if none yet.</summary>
+    public string? RadioLastStation { get; set; }
+
+    /// <summary>Output volume, 0-100.</summary>
+    public int RadioVolume { get; set; } = 50;
+
+    /// <summary>Whether output is muted.</summary>
+    public bool RadioMute { get; set; } = false;
 }
 
 /// <summary>
