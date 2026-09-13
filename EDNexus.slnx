@@ -3,6 +3,7 @@
     <Project Path="src/EDNexus.App/EDNexus.App.csproj" />
     <Project Path="src/EDNexus.Cli/EDNexus.Cli.csproj" />
     <Project Path="src/EDNexus.Core/EDNexus.Core.csproj" />
+    <Project Path="src/EDNexus.Ebs/EDNexus.Ebs.csproj" />
     <Project Path="src/EliteDangerous.Eddn/EliteDangerous.Eddn.csproj" />
     <Project Path="src/EliteDangerous.Edsm/EliteDangerous.Edsm.csproj" />
     <Project Path="src/EliteDangerous.Galnet/EliteDangerous.Galnet.csproj" />
@@ -12,5 +13,6 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/EDNexus.Tests/EDNexus.Tests.csproj" />
+    <Project Path="tests/EDNexus.Ebs.Tests/EDNexus.Ebs.Tests.csproj" />
   </Folder>
 </Solution>

@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>EDNexus.Ebs</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <UserSecretsId>ednexus-ebs</UserSecretsId>
+  </PropertyGroup>
+
+</Project>
