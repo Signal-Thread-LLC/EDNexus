@@ -1,7 +1,5 @@
 using System.Net;
 using System.Net.Http.Json;
-using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using EDNexus.Ebs.Services;
 using Microsoft.AspNetCore.Hosting;
@@ -14,44 +12,16 @@ namespace EDNexus.Ebs.Tests;
 
 /// <summary>
 /// End-to-end coverage for <c>POST /api/update-state</c> and <c>GET /api/initial-state/{channelId}</c>
-/// via <see cref="WebApplicationFactory{TEntryPoint}"/> — the security-critical properties the unit
-/// tests around <c>TwitchExtensionJwtService</c> alone cannot exercise: the actual auth-failure status
-/// codes, that the channel id used for the broadcast/rate-limit comes only from the verified token,
-/// and the CORS policy on the browser-facing endpoint.
+/// via <see cref="WebApplicationFactory{TEntryPoint}"/> — properties the unit tests around individual
+/// services alone cannot exercise: the actual auth-failure status codes for the EBS-issued
+/// broadcaster-token scheme, that the channel id used for the broadcast/rate-limit comes only from
+/// the verified token (never the request body), and the CORS policy on the browser-facing endpoint.
 /// </summary>
 public class UpdateStateEndpointTests : IClassFixture<UpdateStateEndpointTests.Factory>
 {
-    private const string SecretBase64 = "c3VwZXItc2VjcmV0LWV4dGVuc2lvbi1rZXktMTIzNA=="; // "super-secret-extension-key-1234"
-
     private readonly Factory _factory;
 
     public UpdateStateEndpointTests(Factory factory) => _factory = factory;
-
-    private static string EncodeToken(object payload, byte[] key)
-    {
-        string Segment(object value)
-        {
-            var bytes = JsonSerializer.SerializeToUtf8Bytes(value);
-            return Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
-        }
-
-        var headerSegment = Segment(new { alg = "HS256", typ = "JWT" });
-        var payloadSegment = Segment(payload);
-        var signingInput = Encoding.ASCII.GetBytes($"{headerSegment}.{payloadSegment}");
-        var signature = HMACSHA256.HashData(key, signingInput);
-        var signatureSegment = Convert.ToBase64String(signature).TrimEnd('=').Replace('+', '-').Replace('/', '_');
-        return $"{headerSegment}.{payloadSegment}.{signatureSegment}";
-    }
-
-    private static string Token(string? channelId, byte[] key, string role = "broadcaster") =>
-        EncodeToken(new
-        {
-            exp = DateTimeOffset.UtcNow.AddMinutes(5).ToUnixTimeSeconds(),
-            channel_id = channelId,
-            user_id = channelId,
-            opaque_user_id = channelId is null ? null : $"U{channelId}",
-            role,
-        }, key);
 
     [Fact]
     public async Task UpdateState_without_authorization_header_is_unauthorized()
@@ -64,11 +34,10 @@ public class UpdateStateEndpointTests : IClassFixture<UpdateStateEndpointTests.F
     }
 
     [Fact]
-    public async Task UpdateState_rejects_non_broadcaster_role()
+    public async Task UpdateState_rejects_an_unknown_token()
     {
-        var key = Convert.FromBase64String(SecretBase64);
         var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Authorization = new("Bearer", Token("chan-1", key, role: "viewer"));
+        client.DefaultRequestHeaders.Authorization = new("Bearer", "not-a-real-token");
 
         var response = await client.PostAsJsonAsync("/api/update-state", new { state = new { foo = "bar" } });
 
@@ -76,11 +45,12 @@ public class UpdateStateEndpointTests : IClassFixture<UpdateStateEndpointTests.F
     }
 
     [Fact]
-    public async Task UpdateState_rejects_token_missing_channel_id_claim()
+    public async Task UpdateState_rejects_a_token_whose_underlying_Twitch_grant_was_invalidated()
     {
-        var key = Convert.FromBase64String(SecretBase64);
+        var record = _factory.TokenStore.IssueToken("chan-invalid-grant", "CMDR", "access", "refresh", DateTimeOffset.UtcNow.AddHours(4));
+        _factory.TokenStore.MarkTwitchGrantInvalid("chan-invalid-grant");
         var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Authorization = new("Bearer", Token(channelId: null, key));
+        client.DefaultRequestHeaders.Authorization = new("Bearer", record.Token);
 
         var response = await client.PostAsJsonAsync("/api/update-state", new { state = new { foo = "bar" } });
 
@@ -88,11 +58,11 @@ public class UpdateStateEndpointTests : IClassFixture<UpdateStateEndpointTests.F
     }
 
     [Fact]
-    public async Task UpdateState_accepts_valid_broadcaster_token_and_broadcasts_to_its_own_channel()
+    public async Task UpdateState_accepts_a_valid_broadcaster_token_and_broadcasts_to_its_own_channel()
     {
-        var key = Convert.FromBase64String(SecretBase64);
+        var record = _factory.TokenStore.IssueToken("chan-valid", "CMDR", "access", "refresh", DateTimeOffset.UtcNow.AddHours(4));
         var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Authorization = new("Bearer", Token("chan-valid", key));
+        client.DefaultRequestHeaders.Authorization = new("Bearer", record.Token);
 
         var response = await client.PostAsJsonAsync("/api/update-state", new { state = new { foo = "bar" } });
 
@@ -109,18 +79,20 @@ public class UpdateStateEndpointTests : IClassFixture<UpdateStateEndpointTests.F
         // chance to record the authenticated channel id in HttpContext.Items, so every request fell
         // back to partitioning by RemoteIpAddress — which TestServer reports as null/"unknown" for
         // every in-process request, meaning every channel used to share exactly one bucket.
-        var key = Convert.FromBase64String(SecretBase64);
         using var factory = _factory.WithWebHostBuilder(builder =>
             builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Ebs:UpdateStateRateLimit"] = "1",
                 ["Ebs:UpdateStateRateLimitWindowSeconds"] = "60",
             })));
+        var tokenStore = factory.Services.GetRequiredService<IBroadcasterTokenStore>();
+        var recordA = tokenStore.IssueToken("chan-a", "A", "access", "refresh", DateTimeOffset.UtcNow.AddHours(4));
+        var recordB = tokenStore.IssueToken("chan-b", "B", "access", "refresh", DateTimeOffset.UtcNow.AddHours(4));
 
         var clientA = factory.CreateClient();
-        clientA.DefaultRequestHeaders.Authorization = new("Bearer", Token("chan-a", key));
+        clientA.DefaultRequestHeaders.Authorization = new("Bearer", recordA.Token);
         var clientB = factory.CreateClient();
-        clientB.DefaultRequestHeaders.Authorization = new("Bearer", Token("chan-b", key));
+        clientB.DefaultRequestHeaders.Authorization = new("Bearer", recordB.Token);
 
         var firstA = await clientA.PostAsJsonAsync("/api/update-state", new { state = new { foo = "bar" } });
         var firstB = await clientB.PostAsJsonAsync("/api/update-state", new { state = new { foo = "bar" } });
@@ -159,18 +131,20 @@ public class UpdateStateEndpointTests : IClassFixture<UpdateStateEndpointTests.F
     {
         public FakeTwitchPubSubClient PubSubClient { get; } = new();
 
+        public IBroadcasterTokenStore TokenStore => Services.GetRequiredService<IBroadcasterTokenStore>();
+
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             builder.UseEnvironment("Testing");
             builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Twitch:ExtensionSecret"] = SecretBase64,
+                ["Twitch:ExtensionSecret"] = "c3VwZXItc2VjcmV0LWV4dGVuc2lvbi1rZXktMTIzNA==",
                 ["Twitch:ClientId"] = "test-client-id",
                 ["Twitch:ExtensionId"] = "test-extension-id",
                 // Generous by default so unrelated tests sharing this fixture's single server instance
                 // don't throttle each other (they'd otherwise all share one "unknown" IP bucket for
                 // any request that never reaches a valid channel id). The dedicated rate-limit test
-                // below spins up its own factory with a deliberately tight limit.
+                // above spins up its own factory with a deliberately tight limit.
                 ["Ebs:UpdateStateRateLimit"] = "1000",
                 ["Ebs:UpdateStateRateLimitWindowSeconds"] = "1",
             }));
