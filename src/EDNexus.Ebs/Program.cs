@@ -11,7 +11,13 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services
     .AddOptions<TwitchEbsOptions>()
-    .Bind(builder.Configuration.GetSection(TwitchEbsOptions.SectionName));
+    .Bind(builder.Configuration.GetSection(TwitchEbsOptions.SectionName))
+    // Fail fast at startup rather than throwing a raw FormatException from inside a request handler
+    // (TwitchExtensionJwtService.CreateExternalServiceToken) the first time a state update comes in.
+    .Validate(
+        o => !string.IsNullOrWhiteSpace(o.ExtensionSecret) && IsValidBase64(o.ExtensionSecret),
+        "Twitch:ExtensionSecret must be set to a non-empty, valid base64 string.")
+    .ValidateOnStart();
 builder.Services
     .AddOptions<EbsOptions>()
     .Bind(builder.Configuration.GetSection(EbsOptions.SectionName));
@@ -19,11 +25,34 @@ builder.Services
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<ITwitchExtensionJwtService, TwitchExtensionJwtService>();
 builder.Services.AddSingleton<IChannelStateStore, InMemoryChannelStateStore>();
-builder.Services.AddHttpClient<ITwitchPubSubClient, TwitchPubSubClient>();
+builder.Services.AddHttpClient<ITwitchPubSubClient, TwitchPubSubClient>(client =>
+{
+    // A hanging Helix call shouldn't be able to tie up a request indefinitely (the default
+    // HttpClient timeout is 100s); combined with the per-channel rate limit below, this bounds how
+    // long a single misbehaving/slow call can hold resources.
+    client.Timeout = TimeSpan.FromSeconds(10);
+});
+
+// CORS: only the extension's own Twitch-hosted iframe (https://*.ext-twitch.tv) — plus, for local
+// development, the Twitch Developer Rig or any origin explicitly listed in Ebs:AdditionalAllowedFrontendOrigins
+// — may read GET /api/initial-state/{channelId} from a browser context.
+var additionalFrontendOrigins = new HashSet<string>(
+    builder.Configuration.GetSection(EbsOptions.SectionName).Get<EbsOptions>()?.AdditionalAllowedFrontendOrigins ?? [],
+    StringComparer.OrdinalIgnoreCase);
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("extension-frontend", policy => policy
+        .SetIsOriginAllowed(origin => IsAllowedFrontendOrigin(origin, additionalFrontendOrigins))
+        .WithMethods("GET")
+        .AllowAnyHeader());
+});
 
 // Rate limiting: throttle state updates and initial-state reads per broadcaster channel, so a
 // misbehaving desktop client (or a burst of viewers) cannot exceed Twitch's own PubSub quota or
-// exhaust EBS resources. Falls back to partitioning by remote IP when no channel id is known yet.
+// exhaust EBS resources. The channel id is authenticated by AuthenticateBroadcasterMiddleware, which
+// runs BEFORE UseRateLimiter — the partition-key callback below runs at routing time, before the
+// endpoint delegate's body, so the channel id cannot come from anything set inside the handler
+// itself (that would silently degrade every request to per-IP partitioning instead of per-channel).
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -67,6 +96,29 @@ if (!urlsAlreadyConfigured && !builder.Environment.IsEnvironment("Testing"))
 
 var app = builder.Build();
 
+app.UseCors("extension-frontend");
+
+// Authenticates /api/update-state and stores the verified channel id in HttpContext.Items BEFORE
+// UseRateLimiter runs its partition-key callback (rate-limiting middleware evaluates the policy at
+// routing time — before the endpoint delegate's body executes — so setting Items from inside the
+// handler, as this used to do, was always too late to affect partitioning for that same request).
+app.Use(async (context, next) =>
+{
+    if (HttpMethods.IsPost(context.Request.Method)
+        && context.Request.Path.Equals("/api/update-state", StringComparison.OrdinalIgnoreCase))
+    {
+        var jwtService = context.RequestServices.GetRequiredService<ITwitchExtensionJwtService>();
+        var authResult = TryAuthenticateBroadcaster(context.Request, jwtService);
+        context.Items["BroadcasterAuth"] = authResult;
+        if (authResult is { IsValid: true, Claims.ChannelId: { Length: > 0 } channelId })
+        {
+            context.Items["ChannelId"] = channelId;
+        }
+    }
+
+    await next().ConfigureAwait(false);
+});
+
 app.UseRateLimiter();
 
 app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
@@ -74,14 +126,13 @@ app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
 app.MapPost("/api/update-state", async (
         HttpRequest httpRequest,
         UpdateStateRequest body,
-        ITwitchExtensionJwtService jwtService,
         IChannelStateStore stateStore,
         ITwitchPubSubClient pubSubClient,
         IOptions<EbsOptions> ebsOptions,
         ILogger<Program> logger,
         CancellationToken cancellationToken) =>
     {
-        var authResult = TryAuthenticateBroadcaster(httpRequest, jwtService);
+        var authResult = (TwitchJwtValidationResult)httpRequest.HttpContext.Items["BroadcasterAuth"]!;
         if (!authResult.IsValid || authResult.Claims is not { } claims)
         {
             return Results.Unauthorized();
@@ -91,8 +142,6 @@ app.MapPost("/api/update-state", async (
         {
             return Results.Problem("Token is missing a channel_id claim.", statusCode: StatusCodes.Status401Unauthorized);
         }
-
-        httpRequest.HttpContext.Items["ChannelId"] = claims.ChannelId;
 
         PubSubBroadcastRequest pubSubRequest;
         try
@@ -131,9 +180,39 @@ app.MapGet("/api/initial-state/{channelId}", (string channelId, IChannelStateSto
 
         return Results.Ok(state);
     })
-    .RequireRateLimiting("initial-state");
+    .RequireRateLimiting("initial-state")
+    .RequireCors("extension-frontend");
 
 app.Run();
+
+static bool IsValidBase64(string value)
+{
+    try
+    {
+        Convert.FromBase64String(value);
+        return true;
+    }
+    catch (FormatException)
+    {
+        return false;
+    }
+}
+
+static bool IsAllowedFrontendOrigin(string origin, HashSet<string> additionalOrigins)
+{
+    if (additionalOrigins.Contains(origin))
+    {
+        return true;
+    }
+
+    if (!Uri.TryCreate(origin, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps)
+    {
+        return false;
+    }
+
+    return uri.Host.Equals("ext-twitch.tv", StringComparison.OrdinalIgnoreCase)
+        || uri.Host.EndsWith(".ext-twitch.tv", StringComparison.OrdinalIgnoreCase);
+}
 
 static TwitchJwtValidationResult TryAuthenticateBroadcaster(HttpRequest request, ITwitchExtensionJwtService jwtService)
 {

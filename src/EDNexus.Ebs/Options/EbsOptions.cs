@@ -24,4 +24,11 @@ public sealed class EbsOptions
 
     /// <summary>The rate limit window, in seconds, applied to <see cref="UpdateStateRateLimit"/>.</summary>
     public int UpdateStateRateLimitWindowSeconds { get; set; } = 2;
+
+    /// <summary>
+    /// Extra exact origins (beyond any <c>https://*.ext-twitch.tv</c> host, which is always allowed)
+    /// permitted to call <c>GET /api/initial-state/{channelId}</c> from a browser — e.g. the Twitch
+    /// Developer Rig (typically <c>https://localhost:8080</c>) during local extension development.
+    /// </summary>
+    public string[] AdditionalAllowedFrontendOrigins { get; set; } = [];
 }
