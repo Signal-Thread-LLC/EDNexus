@@ -69,4 +69,25 @@ public class DiskResponseCacheTests : IDisposable
         Assert.Equal("one", cache.Get("a"));
         Assert.Equal("two", cache.Get("b"));
     }
+
+    [Fact]
+    public void GetStale_returns_null_before_anything_is_stored()
+    {
+        var cache = new DiskResponseCache(_dir, TimeSpan.FromMinutes(5));
+        Assert.Null(cache.GetStale("missing"));
+    }
+
+    [Fact]
+    public void GetStale_still_returns_an_entry_whose_ttl_has_expired()
+    {
+        var now = new DateTimeOffset(2026, 7, 6, 0, 0, 0, TimeSpan.Zero);
+        var clock = now;
+        var cache = new DiskResponseCache(_dir, TimeSpan.FromMinutes(10), () => clock);
+
+        cache.Put("k", "last known good");
+        clock = now.AddDays(30);   // long past the ttl — an ordinary Get would miss
+
+        Assert.Null(cache.Get("k"));
+        Assert.Equal("last known good", cache.GetStale("k"));
+    }
 }

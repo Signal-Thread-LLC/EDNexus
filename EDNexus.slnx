@@ -4,6 +4,7 @@
     <Project Path="src/EDNexus.Cli/EDNexus.Cli.csproj" />
     <Project Path="src/EDNexus.Core/EDNexus.Core.csproj" />
     <Project Path="src/EDNexus.Ebs/EDNexus.Ebs.csproj" />
+    <Project Path="src/EDNexus.Plugins.Abstractions/EDNexus.Plugins.Abstractions.csproj" />
     <Project Path="src/EliteDangerous.Eddn/EliteDangerous.Eddn.csproj" />
     <Project Path="src/EliteDangerous.Edsm/EliteDangerous.Edsm.csproj" />
     <Project Path="src/EliteDangerous.Galnet/EliteDangerous.Galnet.csproj" />
@@ -12,6 +13,7 @@
     <Project Path="src/EliteDangerous.Spansh/EliteDangerous.Spansh.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/EDNexus.Plugins.Abstractions.Tests/EDNexus.Plugins.Abstractions.Tests.csproj" />
     <Project Path="tests/EDNexus.Tests/EDNexus.Tests.csproj" />
     <Project Path="tests/EDNexus.Ebs.Tests/EDNexus.Ebs.Tests.csproj" />
   </Folder>
