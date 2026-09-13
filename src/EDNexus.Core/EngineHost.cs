@@ -17,6 +17,7 @@ using EDNexus.Core.Routes;
 using EDNexus.Core.Settings;
 using EDNexus.Core.State;
 using EDNexus.Core.Trade;
+using EDNexus.Core.Voice;
 using EliteDangerous.Edsm;
 using EliteDangerous.Galnet;
 using EliteDangerous.RavenColonial;
@@ -60,6 +61,13 @@ public sealed class EngineHost : IDisposable
 
     /// <summary>Prospected-asteroid history for the current mining session.</summary>
     public MiningTracker Mining { get; }
+
+    /// <summary>
+    /// Turns fuel-low, scan-complete and shopping-list-acquired moments into spoken callouts. Never
+    /// speaks itself — the UI layer (or CLI) listens to <see cref="VoiceCalloutTracker.CalloutRaised"/>
+    /// and hands the text to an <see cref="IVoice"/>.
+    /// </summary>
+    public VoiceCalloutTracker VoiceCallouts { get; }
 
     /// <summary>Cross-station "best price nearby" lookups. Backed by Spansh; swappable via <see cref="ITradeSearch"/>.</summary>
     public ITradeSearch Trade { get; }
@@ -107,6 +115,11 @@ public sealed class EngineHost : IDisposable
         this.CommunityGoals = new CommunityGoalTracker(Bus);
         Ranks = new RankTracker(Bus);
         Mining = new MiningTracker(Bus);
+
+        // Wired after Exobiology/Colonisation so their trackers have already folded the same event
+        // into their own state by the time this one's handler for it runs (see VoiceCalloutTracker's
+        // remarks on ScanOrganic subscription order).
+        VoiceCallouts = new VoiceCalloutTracker(Bus, State, Exobiology, Colonisation);
 
         // Shared client for outbound trade lookups. The EDDN/Inara reporters own their own client
         // inside ReporterHost, so this one is dedicated to the read-side (Spansh) queries.

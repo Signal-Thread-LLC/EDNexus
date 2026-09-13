@@ -920,3 +920,88 @@ public sealed class CommunityGoalSampleSource : JournalSampleSource
         return lines;
     }
 }
+
+/// <summary>
+/// Dev sample source for the overlay and voice-callout feature: fabricates a low-fuel status update,
+/// a completed exobiology three-sample run, and a colonisation cargo delivery that fully covers a
+/// shopping-list commodity — the three moments <see cref="Voice.VoiceCalloutTracker"/> turns into
+/// spoken callouts, and the same state the overlay's content is built from — so both are exercisable
+/// without flying anywhere. Has no dashboard card of its own; it's triggered from Developer Options.
+/// </summary>
+public sealed class OverlayVoiceSampleSource : JournalSampleSource
+{
+    public override string CardKey => "overlay-voice";
+    public override string DisplayName => "Overlay & Voice";
+
+    public override IReadOnlyList<string> Sample(Random rng)
+    {
+        var catalog = Exobio.ExobiologyCatalog.Default;
+        var genus = Pick(rng, catalog.Genera);
+        var species = Pick(rng, genus.Species);
+        var systemAddress = (long)rng.Next(1_000_000, int.MaxValue) * 1000;
+        var bodyId = rng.Next(1, 40);
+        const double capacity = 32.0;
+
+        var (constructionSym, constructionLoc) = Pick(rng, SamplePools.Construction);
+        var marketId = 3_950_000_000L + rng.Next(0, 99_999_999);
+
+        return new[]
+        {
+            // Fuel low enough to cross the callout threshold (well under a quarter of the tank).
+            Event("Loadout", o => o["FuelCapacity"] = new JsonObject { ["Main"] = capacity }),
+            Event("Status", o => o["Fuel"] = new JsonObject { ["FuelMain"] = Math.Round(capacity * 0.1, 1) }),
+
+            // A completed three-sample scan run: Log, Sample, then the closing Analyse.
+            ScanOrganicEvent("Log", species, systemAddress, bodyId),
+            ScanOrganicEvent("Sample", species, systemAddress, bodyId),
+            ScanOrganicEvent("Analyse", species, systemAddress, bodyId),
+
+            // A depot needing one commodity, then a cargo hold that fully covers it.
+            Event("ColonisationConstructionDepot", o =>
+            {
+                o["MarketID"] = marketId;
+                o["ConstructionProgress"] = 0.5;
+                o["ConstructionComplete"] = false;
+                o["ConstructionFailed"] = false;
+                o["ResourcesRequired"] = new JsonArray
+                {
+                    new JsonObject
+                    {
+                        ["Name"] = $"${constructionSym}_name;",
+                        ["Name_Localised"] = constructionLoc,
+                        ["RequiredAmount"] = 50,
+                        ["ProvidedAmount"] = 0,
+                        ["Payment"] = 1000,
+                    },
+                };
+            }),
+            Event("Cargo", o =>
+            {
+                o["Vessel"] = "Ship";
+                o["Count"] = 60;
+                o["Inventory"] = new JsonArray
+                {
+                    new JsonObject
+                    {
+                        ["Name"] = constructionSym,
+                        ["Name_Localised"] = constructionLoc,
+                        ["Count"] = 60,
+                        ["Stolen"] = 0,
+                    },
+                };
+            }),
+        };
+    }
+
+    private static string ScanOrganicEvent(string stage, Exobio.BioSpecies species, long systemAddress, int bodyId) =>
+        Event("ScanOrganic", o =>
+        {
+            o["ScanType"] = stage;
+            o["Genus"] = species.GenusSymbol;
+            o["Genus_Localised"] = species.Genus;
+            o["Species"] = species.Symbol;
+            o["Species_Localised"] = species.Name;
+            o["SystemAddress"] = systemAddress;
+            o["Body"] = bodyId;
+        });
+}
