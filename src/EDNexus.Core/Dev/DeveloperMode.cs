@@ -1,4 +1,5 @@
 using EDNexus.Core.Journal;
+using EDNexus.Core.Twitch;
 
 namespace EDNexus.Core.Dev;
 
@@ -22,6 +23,7 @@ public sealed class DeveloperMode
         new CommunityGoalSampleSource(),
         new RanksSampleSource(),
         new MiningSampleSource(),
+        new TwitchSampleSource(),
     };
 
     /// <summary>
