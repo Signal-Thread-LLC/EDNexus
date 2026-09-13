@@ -36,6 +36,27 @@ public static class RadioStationCatalog
     /// <summary>Looks up a station by its stable id, or null if unknown (e.g. a station retired since it was saved).</summary>
     public static RadioStation? Find(string? id)
         => string.IsNullOrWhiteSpace(id) ? null : Stations.FirstOrDefault(s => s.Id == id);
+
+    /// <summary>The station after <paramref name="currentId"/> in display order, wrapping around. Unknown/null id starts at the first station.</summary>
+    public static RadioStation Next(string? currentId)
+    {
+        var idx = IndexOf(currentId);
+        return Stations[idx < 0 ? 0 : (idx + 1) % Stations.Count];
+    }
+
+    /// <summary>The station before <paramref name="currentId"/> in display order, wrapping around. Unknown/null id starts at the first station.</summary>
+    public static RadioStation Previous(string? currentId)
+    {
+        var idx = IndexOf(currentId);
+        return Stations[idx < 0 ? 0 : (idx - 1 + Stations.Count) % Stations.Count];
+    }
+
+    private static int IndexOf(string? id)
+    {
+        for (var i = 0; i < Stations.Count; i++)
+            if (Stations[i].Id == id) return i;
+        return -1;
+    }
 }
 
 /// <summary>Coarse playback state of the radio player.</summary>

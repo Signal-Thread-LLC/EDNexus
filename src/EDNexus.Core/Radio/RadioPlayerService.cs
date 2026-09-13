@@ -116,6 +116,37 @@ public sealed class RadioPlayerService : IDisposable, IAsyncDisposable
         return station is null ? Task.CompletedTask : Task.Run(() => PlayStationCore(station), ct);
     }
 
+    /// <summary>
+    /// Toggles between playing and paused: pauses if currently playing, otherwise resumes the tuned
+    /// station (or starts the first catalog station if none has been tuned yet). This is the single
+    /// entry point a hardware "Play/Pause" media key should call.
+    /// </summary>
+    public Task TogglePlayPauseAsync(CancellationToken ct = default)
+    {
+        RadioPlaybackStatus status;
+        RadioStation? station;
+        lock (_gate) { status = _status; station = _station; }
+
+        if (status == RadioPlaybackStatus.Playing) return PauseAsync(ct);
+        return PlayAsync(station?.Id ?? RadioStationCatalog.Stations[0].Id, ct);
+    }
+
+    /// <summary>Advances to and plays the next station in the catalog (wrapping). This is what a hardware "Next" media key should call.</summary>
+    public Task NextStationAsync(CancellationToken ct = default)
+    {
+        string? current;
+        lock (_gate) current = _station?.Id;
+        return PlayAsync(RadioStationCatalog.Next(current).Id, ct);
+    }
+
+    /// <summary>Goes back to and plays the previous station in the catalog (wrapping). This is what a hardware "Previous" media key should call.</summary>
+    public Task PreviousStationAsync(CancellationToken ct = default)
+    {
+        string? current;
+        lock (_gate) current = _station?.Id;
+        return PlayAsync(RadioStationCatalog.Previous(current).Id, ct);
+    }
+
     /// <summary>Pauses playback, leaving the current station loaded.</summary>
     public Task PauseAsync(CancellationToken ct = default)
         => Task.Run(() =>
