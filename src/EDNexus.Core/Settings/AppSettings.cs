@@ -38,6 +38,37 @@ public sealed class AppSettings
 
     /// <summary>The mining card's price threshold and learned galactic-average prices.</summary>
     public MiningSettings Mining { get; set; } = new();
+
+    /// <summary>
+    /// Twitch OAuth session for streaming the commander's state to their extension/overlay. Empty
+    /// until the commander completes login via <c>EDNexus.Core.Twitch.TwitchAuthService</c>.
+    /// </summary>
+    public TwitchSettings Twitch { get; set; } = new();
+}
+
+/// <summary>
+/// Persisted Twitch access/refresh tokens and the identified broadcaster. Tokens are opaque bearer
+/// strings from Twitch — treat this the same as the Inara API key: sensitive, machine-local only.
+/// </summary>
+public sealed class TwitchSettings
+{
+    /// <summary>Current Helix bearer token, or null if never logged in / logged out.</summary>
+    public string? AccessToken { get; set; }
+
+    /// <summary>Long-lived token used to silently mint a new access token near/after expiry.</summary>
+    public string? RefreshToken { get; set; }
+
+    /// <summary>When <see cref="AccessToken"/> stops being valid. Default (<c>default(DateTimeOffset)</c>) means "already expired".</summary>
+    public DateTimeOffset ExpiresAtUtc { get; set; }
+
+    /// <summary>The authenticated Twitch user id (stable; survives a display-name change).</summary>
+    public string? UserId { get; set; }
+
+    /// <summary>The authenticated Twitch display name, for showing "Logged in as ...".</summary>
+    public string? Username { get; set; }
+
+    /// <summary>Scopes actually granted by Twitch (may be a subset of what was requested).</summary>
+    public List<string> Scopes { get; set; } = new();
 }
 
 /// <summary>
