@@ -34,28 +34,38 @@ public sealed class GalnetNewsFeed : INewsFeed
 
     public async Task<IReadOnlyList<NewsArticle>> GetLatestAsync(CancellationToken ct = default)
     {
-        if (_cache?.Get(CacheKey) is string cached)
-        {
-            try
-            {
-                if (JsonSerializer.Deserialize<List<NewsArticle>>(cached, Json) is { } articles) return articles;
-            }
-            catch (JsonException)
-            {
-                // A cache file from an older shape — fall through and refetch.
-            }
-        }
+        if (TryDeserialize(_cache?.Get(CacheKey)) is { } cached) return cached;
 
         var result = await _client.GetLatestAsync(ct).ConfigureAwait(false);
-        if (!result.IsOk || result.Value is null) return Array.Empty<NewsArticle>();
+        if (result.IsOk && result.Value is { Count: > 0 } articles)
+        {
+            var mapped = articles
+                .Select(a => new NewsArticle(a.Id, a.Title, a.Body, a.Published))
+                .ToList();
 
-        var mapped = result.Value
-            .Select(a => new NewsArticle(a.Id, a.Title, a.Body, a.Published))
-            .ToList();
+            // Only cache a feed that actually held something: caching an empty result would hide the
+            // news for the whole TTL over one bad fetch.
+            _cache?.Put(CacheKey, JsonSerializer.Serialize(mapped, Json));
+            return mapped;
+        }
 
-        // Only cache a feed that actually held something: caching an empty result would hide the
-        // news for the whole TTL over one bad fetch.
-        if (mapped.Count > 0) _cache?.Put(CacheKey, JsonSerializer.Serialize(mapped, Json));
-        return mapped;
+        // The live fetch failed, or came back empty — fall back to the last-known cache even past its
+        // TTL, so the commander still sees the news while offline rather than a blank card. If there
+        // never was a cache entry (or it can't be read), there is genuinely nothing to show.
+        return TryDeserialize(_cache?.GetStale(CacheKey)) ?? (IReadOnlyList<NewsArticle>)Array.Empty<NewsArticle>();
+    }
+
+    private static List<NewsArticle>? TryDeserialize(string? json)
+    {
+        if (json is null) return null;
+        try
+        {
+            return JsonSerializer.Deserialize<List<NewsArticle>>(json, Json);
+        }
+        catch (JsonException)
+        {
+            // A cache file from an older shape, or a corrupt entry — treat it as no cache at all.
+            return null;
+        }
     }
 }

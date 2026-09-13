@@ -50,6 +50,14 @@ public sealed partial class GalnetCardViewModel : CardViewModel
     [ObservableProperty] private bool _newsBusy;
     [ObservableProperty] private string _newsStatus = "";
 
+    /// <summary>How many loaded headlines have never been opened — shown as a badge on the ticker.</summary>
+    [ObservableProperty] private int _unreadCount;
+
+    /// <summary>Whether the unread badge should show at all — keeps the XAML binding a plain bool.</summary>
+    public bool HasUnread => UnreadCount > 0;
+
+    partial void OnUnreadCountChanged(int value) => OnPropertyChanged(nameof(HasUnread));
+
     // --- Ticker (the dashboard card) ---
 
     /// <summary>The headline currently on the ticker line, or null before anything has loaded.</summary>
@@ -74,6 +82,20 @@ public sealed partial class GalnetCardViewModel : CardViewModel
         ArticleTitle = value?.Title ?? "";
         ArticleBody = value?.Body ?? "";
         ArticleDate = value?.Published is { } p ? p.ToLocalTime().ToString("d MMM yyyy") : "";
+
+        // SelectedHeadline also gets set behind the scenes on every load (to hold the commander's
+        // place), so only treat it as "read" while the reader window is actually up — that's the only
+        // time a selection means the commander is looking at it.
+        if (value is not null && _reader is not null) MarkRead(value);
+    }
+
+    /// <summary>Mark one headline read: flips its badge off and persists it so it stays read across restarts.</summary>
+    private void MarkRead(NewsHeadline headline)
+    {
+        if (!headline.IsUnread) return;
+        headline.IsUnread = false;
+        Context.Host.NewsRead.MarkRead(headline.Id);
+        UnreadCount = Headlines.Count(h => h.IsUnread);
     }
 
     /// <summary>
@@ -105,10 +127,21 @@ public sealed partial class GalnetCardViewModel : CardViewModel
         ShowHeadline(0);
         SelectedHeadline = null;
         NewsStatus = "";
+        UnreadCount = 0;
     }
 
     [RelayCommand]
     private Task Refresh() => LoadAsync();
+
+    /// <summary>Clear every unread badge at once, for a commander catching up after time away.</summary>
+    [RelayCommand]
+    private void MarkAllRead()
+    {
+        if (Headlines.Count == 0) return;
+        Context.Host.NewsRead.MarkAllRead(Headlines.Select(h => h.Id));
+        foreach (var headline in Headlines) headline.IsUnread = false;
+        UnreadCount = 0;
+    }
 
     /// <summary>Step the ticker by hand, for a commander who wants the previous headline back.</summary>
     [RelayCommand]
@@ -132,7 +165,11 @@ public sealed partial class GalnetCardViewModel : CardViewModel
     [RelayCommand]
     private void OpenReader()
     {
-        if (TickerHeadline is { } current) SelectedHeadline = current;
+        if (TickerHeadline is { } current)
+        {
+            SelectedHeadline = current;
+            MarkRead(current);   // the change handler only marks read while the window is already up
+        }
 
         if (_reader is not null)
         {
@@ -185,9 +222,13 @@ public sealed partial class GalnetCardViewModel : CardViewModel
             var previous = SelectedHeadline?.Id;
             var onTicker = TickerHeadline?.Id;
 
+            var readTracker = Context.Host.NewsRead;
             Headlines.Clear();
             foreach (var article in articles)
-                Headlines.Add(new NewsHeadline(article.Id, article.Title, article.Body, article.Published));
+                Headlines.Add(new NewsHeadline(
+                    article.Id, article.Title, article.Body, article.Published, readTracker.IsUnread(article.Id)));
+
+            UnreadCount = Headlines.Count(h => h.IsUnread);
 
             if (Headlines.Count == 0)
             {
@@ -217,9 +258,30 @@ public sealed partial class GalnetCardViewModel : CardViewModel
     }
 }
 
-/// <summary>One headline, carrying its article so opening the reader needs no second fetch.</summary>
-public sealed record NewsHeadline(string Id, string Title, string Body, DateTimeOffset? Published)
+/// <summary>
+/// One headline, carrying its article so opening the reader needs no second fetch. A class rather than
+/// a record because <see cref="IsUnread"/> flips in place once the commander opens it, and the headline
+/// list's bindings need to see that change without the item being replaced.
+/// </summary>
+public sealed partial class NewsHeadline : CommunityToolkit.Mvvm.ComponentModel.ObservableObject
 {
+    public NewsHeadline(string id, string title, string body, DateTimeOffset? published, bool isUnread)
+    {
+        Id = id;
+        Title = title;
+        Body = body;
+        Published = published;
+        _isUnread = isUnread;
+    }
+
+    public string Id { get; }
+    public string Title { get; }
+    public string Body { get; }
+    public DateTimeOffset? Published { get; }
+
+    /// <summary>True until the commander opens this headline in the reader (see <see cref="EDNexus.Core.News.NewsReadTracker"/>).</summary>
+    [ObservableProperty] private bool _isUnread;
+
     /// <summary>Short date for the headline row; empty when the feed gave no date.</summary>
     public string Stamp => Published is { } p ? p.ToLocalTime().ToString("d MMM") : "";
 }

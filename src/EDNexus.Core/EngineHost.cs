@@ -73,6 +73,9 @@ public sealed class EngineHost : IDisposable
     /// <summary>In-universe news. Backed by the Galnet feed; swappable via <see cref="INewsFeed"/>.</summary>
     public INewsFeed News { get; }
 
+    /// <summary>Which Galnet articles this commander has already opened, for the "new since last open" badge.</summary>
+    public NewsReadTracker NewsRead { get; }
+
     /// <summary>
     /// The shared, multi-commander view of a construction project. Backed by Raven Colonial;
     /// swappable via <see cref="ISharedProjectLookup"/>.
@@ -129,6 +132,7 @@ public sealed class EngineHost : IDisposable
         News = new GalnetNewsFeed(
             new GalnetClient(new GalnetClientOptions { SoftwareName = "EDNexus", SoftwareVersion = version }, _http),
             new DiskResponseCache(Path.Combine(cacheRoot, "galnet"), TimeSpan.FromHours(1)));
+        NewsRead = new NewsReadTracker();
 
         // Read-only: squadmates deliver while you fly, so this one is never cached.
         SharedProjects = new RavenColonialProjectLookup(new RavenColonialClient(

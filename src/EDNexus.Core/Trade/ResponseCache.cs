@@ -12,6 +12,16 @@ public interface IResponseCache
 
     /// <summary>Store <paramref name="body"/> under <paramref name="key"/>, stamped at the current time.</summary>
     void Put(string key, string body);
+
+    /// <summary>
+    /// Return the cached body for <paramref name="key"/> even if its TTL has expired, or null when
+    /// there is no entry at all. A last resort for sources that should keep showing something rather
+    /// than nothing when the live fetch fails and the ordinary TTL-bound <see cref="Get"/> has already
+    /// aged the entry out — e.g. Galnet news while offline. Caches that never remember beyond their TTL
+    /// (or that have no on-disk backing, like an in-memory test double) can leave this at the default,
+    /// which simply reports no stale value.
+    /// </summary>
+    string? GetStale(string key) => null;
 }
 
 /// <summary>
@@ -57,6 +67,22 @@ public sealed class DiskResponseCache : IResponseCache
     {
         var envelope = new { at = _now(), body };
         File.WriteAllText(PathFor(key), JsonSerializer.Serialize(envelope));
+    }
+
+    public string? GetStale(string key)
+    {
+        var path = PathFor(key);
+        if (!File.Exists(path)) return null;
+
+        try
+        {
+            using var doc = JsonDocument.Parse(File.ReadAllText(path));
+            return doc.RootElement.TryGetProperty("body", out var body) ? body.GetString() : null;
+        }
+        catch (JsonException)
+        {
+            return null; // a corrupt cache file is just a miss.
+        }
     }
 
     private string PathFor(string key)
