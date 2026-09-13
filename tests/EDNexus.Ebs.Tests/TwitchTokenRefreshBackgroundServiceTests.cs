@@ -141,4 +141,38 @@ public class TwitchTokenRefreshBackgroundServiceTests
         Assert.True(updated.IsTwitchGrantValid);
         Assert.Equal("new-access", updated.TwitchAccessToken);
     }
+
+    [Fact]
+    public async Task RefreshDueTokensAsync_a_transient_transport_failure_on_one_channel_does_not_abort_the_rest_of_the_pass()
+    {
+        // Regression test: only TwitchOAuthException (an explicit Twitch rejection) used to be caught
+        // per-record. Any other exception — HttpRequestException, TaskCanceledException, a socket
+        // reset — propagated out of the foreach entirely, silently skipping every broadcaster later
+        // in enumeration order for that cycle, not just the one that actually failed.
+        var time = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        var store = new InMemoryBroadcasterTokenStore(time);
+        var flakyRecord = store.IssueToken("channel-flaky", "A", "access", "flaky-refresh", time.Now.AddMinutes(1));
+        var laterRecord = store.IssueToken("channel-later", "B", "access", "fine-refresh", time.Now.AddMinutes(1));
+
+        var twitch = new FakeTwitchOAuthClient
+        {
+            OnRefresh = refreshToken => refreshToken == "flaky-refresh"
+                ? throw new HttpRequestException("connection reset")
+                : new TwitchTokenResponse { AccessToken = "new-access", RefreshToken = "new-refresh", ExpiresIn = 3600 },
+        };
+        var options = new EbsOptions { TwitchTokenRefreshBufferMinutes = 60 };
+        var service = CreateService(store, twitch, time, options);
+
+        await service.RefreshDueTokensAsync(CancellationToken.None);
+
+        Assert.Equal(2, twitch.RefreshCalls); // both were attempted — the flaky one didn't abort the loop
+
+        Assert.True(store.TryGetByToken(flakyRecord.Token, out var flaky));
+        Assert.True(flaky.IsTwitchGrantValid); // a transient failure must not be treated as a Twitch rejection
+        Assert.Equal("access", flaky.TwitchAccessToken); // unchanged — will simply retry next cycle
+
+        Assert.True(store.TryGetByToken(laterRecord.Token, out var later));
+        Assert.True(later.IsTwitchGrantValid);
+        Assert.Equal("new-access", later.TwitchAccessToken); // still refreshed despite the earlier failure
+    }
 }

@@ -49,7 +49,7 @@ public class InMemoryBroadcasterTokenStoreTests
     public void CreateAuthorizationCode_TryConsumeAuthorizationCode_round_trips_and_is_single_use()
     {
         var store = new InMemoryBroadcasterTokenStore();
-        var pending = new PendingBroadcasterAuth("channel-1", "CMDR", "twitch-access", "twitch-refresh", DateTimeOffset.UtcNow.AddHours(4), "challenge-abc", default);
+        var pending = new PendingBroadcasterAuth("channel-1", "CMDR", "twitch-access", "twitch-refresh", DateTimeOffset.UtcNow.AddHours(4), "challenge-abc", "http://localhost:59123/callback", default);
         var code = store.CreateAuthorizationCode(pending, TimeSpan.FromSeconds(60));
 
         Assert.True(store.TryConsumeAuthorizationCode(code, out var auth));
@@ -64,7 +64,7 @@ public class InMemoryBroadcasterTokenStoreTests
     {
         var time = new FakeTimeProvider(DateTimeOffset.UtcNow);
         var store = new InMemoryBroadcasterTokenStore(time);
-        var pending = new PendingBroadcasterAuth("channel-1", "CMDR", "a", "r", DateTimeOffset.UtcNow.AddHours(4), "challenge", default);
+        var pending = new PendingBroadcasterAuth("channel-1", "CMDR", "a", "r", DateTimeOffset.UtcNow.AddHours(4), "challenge", "http://localhost:59123/callback", default);
         var code = store.CreateAuthorizationCode(pending, TimeSpan.FromSeconds(30));
 
         time.Now += TimeSpan.FromSeconds(31);

@@ -107,6 +107,7 @@ public static class OAuthEndpoints
                 twitchToken.RefreshToken,
                 twitchExpiresAtUtc,
                 session.CodeChallenge,
+                session.DesktopRedirectUri,
                 default);
 
             var authCode = store.CreateAuthorizationCode(pending, TimeSpan.FromSeconds(Math.Max(10, ebsOptions.Value.OAuthCodeTtlSeconds)));
@@ -125,14 +126,20 @@ public static class OAuthEndpoints
     /// </summary>
     private static IResult HandleTokenAsync(OAuthTokenExchangeRequest body, IBroadcasterTokenStore store)
     {
-        if (string.IsNullOrWhiteSpace(body.Code) || string.IsNullOrWhiteSpace(body.CodeVerifier))
-            return Results.Problem("code and code_verifier are both required.", statusCode: StatusCodes.Status400BadRequest);
+        if (string.IsNullOrWhiteSpace(body.Code) || string.IsNullOrWhiteSpace(body.CodeVerifier) || string.IsNullOrWhiteSpace(body.RedirectUri))
+            return Results.Problem("code, code_verifier, and redirect_uri are all required.", statusCode: StatusCodes.Status400BadRequest);
 
         if (!store.TryConsumeAuthorizationCode(body.Code, out var pending))
             return Results.Problem("invalid_grant: the authorization code is unknown, expired, or already used.", statusCode: StatusCodes.Status400BadRequest);
 
         if (!Pkce.Verify(body.CodeVerifier, pending.CodeChallenge))
             return Results.Problem("invalid_grant: the PKCE code_verifier does not match.", statusCode: StatusCodes.Status400BadRequest);
+
+        // RFC 6749 §4.1.3 / RFC 7636: redirect_uri presented here must match the one bound to the
+        // authorization at /oauth/authorize — otherwise the parameter is decorative and this endpoint
+        // silently drifts from the OAuth flow it claims to implement.
+        if (!string.Equals(body.RedirectUri, pending.RedirectUri, StringComparison.Ordinal))
+            return Results.Problem("invalid_grant: redirect_uri does not match the one used to start this authorization.", statusCode: StatusCodes.Status400BadRequest);
 
         var record = store.IssueToken(pending.ChannelId, pending.Username, pending.TwitchAccessToken, pending.TwitchRefreshToken, pending.TwitchExpiresAtUtc);
         return Results.Ok(new OAuthTokenIssuedResponse(record.Token, record.ChannelId, record.Username));

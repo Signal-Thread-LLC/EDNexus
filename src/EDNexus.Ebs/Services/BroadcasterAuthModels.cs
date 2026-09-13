@@ -23,6 +23,10 @@ public sealed record OAuthPendingSession(string DesktopRedirectUri, string Deskt
 /// <param name="TwitchRefreshToken">The broadcaster's Twitch refresh token, held only server-side.</param>
 /// <param name="TwitchExpiresAtUtc">When <paramref name="TwitchAccessToken"/> expires.</param>
 /// <param name="CodeChallenge">The PKCE code challenge from the originating session, that the exchange must satisfy.</param>
+/// <param name="RedirectUri">
+/// The desktop's loopback redirect URI recorded on the originating <c>/oauth/authorize</c> session
+/// (RFC 6749 §4.1.3 / RFC 7636 requires the value presented at token exchange to match).
+/// </param>
 /// <param name="ExpiresAtUtc">When this authorization code stops being redeemable.</param>
 public sealed record PendingBroadcasterAuth(
     string ChannelId,
@@ -31,6 +35,7 @@ public sealed record PendingBroadcasterAuth(
     string TwitchRefreshToken,
     DateTimeOffset TwitchExpiresAtUtc,
     string CodeChallenge,
+    string RedirectUri,
     DateTimeOffset ExpiresAtUtc);
 
 /// <summary>

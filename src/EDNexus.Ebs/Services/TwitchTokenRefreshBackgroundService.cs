@@ -88,11 +88,28 @@ public sealed class TwitchTokenRefreshBackgroundService : BackgroundService
             }
             catch (TwitchOAuthException ex)
             {
+                // Twitch explicitly rejected the refresh (revoked/expired grant) — it really is gone.
                 _logger.LogWarning(
                     ex,
                     "Failed to refresh the Twitch grant for channel {ChannelId}; marking it invalid until the broadcaster re-authenticates.",
                     record.ChannelId);
                 _store.MarkTwitchGrantInvalid(record.ChannelId);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                throw; // real shutdown — let it propagate, don't swallow it as a per-broadcaster failure.
+            }
+            catch (Exception ex)
+            {
+                // A transient failure (network blip, DNS, timeout, socket reset) refreshing THIS
+                // broadcaster must not abort the foreach and skip every other broadcaster still due
+                // this pass — that previously happened because only TwitchOAuthException was caught
+                // here, so any other exception propagated out of RefreshDueTokensAsync entirely. The
+                // grant is left valid so it's simply retried next cycle rather than marked invalid.
+                _logger.LogWarning(
+                    ex,
+                    "Transient error refreshing the Twitch grant for channel {ChannelId}; will retry next cycle.",
+                    record.ChannelId);
             }
         }
     }

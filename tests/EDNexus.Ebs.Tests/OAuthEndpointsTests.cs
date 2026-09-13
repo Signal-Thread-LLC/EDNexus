@@ -206,6 +206,34 @@ public class OAuthEndpointsTests : IClassFixture<OAuthEndpointsTests.Factory>
     }
 
     [Fact]
+    public async Task Token_exchange_fails_when_redirect_uri_does_not_match_the_one_used_to_authorize()
+    {
+        using var client = NoRedirectClient(_factory);
+        const string verifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
+        var challenge = EDNexus.Ebs.Security.Pkce.ComputeCodeChallenge(verifier);
+
+        var authorizeResponse = await client.GetAsync(
+            "/oauth/authorize?redirect_uri=" + Uri.EscapeDataString("http://localhost:59123/callback") +
+            "&state=s&code_challenge=" + challenge + "&code_challenge_method=S256");
+        var sessionId = ExtractQueryParam(authorizeResponse.Headers.Location!, "state");
+
+        _factory.TwitchClient.OnExchange = _ => new TwitchTokenResponse { AccessToken = "a", RefreshToken = "r", ExpiresIn = 14400 };
+        var callbackResponse = await client.GetAsync($"/oauth/callback?code=twitch-code&state={sessionId}");
+        var authCode = ExtractQueryParam(callbackResponse.Headers.Location!, "code");
+
+        // A different redirect_uri than the one bound at /oauth/authorize — must be rejected even
+        // though the code and verifier are both otherwise correct.
+        var tokenResponse = await client.PostAsJsonAsync("/oauth/token", new
+        {
+            code = authCode,
+            code_verifier = verifier,
+            redirect_uri = "http://localhost:59999/callback",
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, tokenResponse.StatusCode);
+    }
+
+    [Fact]
     public async Task Token_exchange_fails_for_an_unknown_or_already_used_code()
     {
         using var client = NoRedirectClient(_factory);
