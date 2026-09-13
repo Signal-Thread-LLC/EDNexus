@@ -149,6 +149,41 @@
           </Border>
         </StackPanel>
 
+        <!-- Overlay & voice — Phase 6. The overlay is Windows-only; elsewhere the toggle is harmless
+             (IOverlay/IVoice degrade to no-ops) but left visible so the setting still round-trips. -->
+        <StackPanel Spacing="8">
+          <TextBlock Text="OVERLAY &amp; VOICE" Foreground="#F07100" FontSize="12" FontWeight="SemiBold" LetterSpacing="2" />
+          <Border Background="#0F1114" CornerRadius="6" Padding="16">
+            <StackPanel Spacing="10">
+              <CheckBox x:Name="OverlayToggle" Content="Show in-game overlay" Foreground="#E7E9EE" />
+              <TextBlock Foreground="#8A909C" FontSize="12" TextWrapping="Wrap"
+                         Text="A small, click-through, always-on-top panel over the game (borderless/windowed) showing your next jump, fuel, bio signals on the current body, and any colonisation shortfall. Windows only — a no-op on other platforms." />
+            </StackPanel>
+          </Border>
+
+          <Border Background="#0F1114" CornerRadius="6" Padding="16">
+            <StackPanel Spacing="10">
+              <CheckBox x:Name="VoiceToggle" Content="Speak callouts" Foreground="#E7E9EE" />
+              <TextBlock Foreground="#8A909C" FontSize="12" TextWrapping="Wrap"
+                         Text="Announces fuel low, a completed exobiology scan, and a colonisation shopping-list item fully aboard. Windows only (SAPI) — a no-op on other platforms." />
+
+              <TextBlock Text="VOICE" Foreground="#E7E9EE" FontSize="12" />
+              <ComboBox x:Name="VoiceNameCombo" HorizontalAlignment="Stretch" PlaceholderText="System default" />
+
+              <TextBlock Text="VOLUME" Foreground="#E7E9EE" FontSize="12" />
+              <Slider x:Name="VoiceVolumeSlider" Minimum="0" Maximum="100" TickFrequency="10" />
+
+              <TextBlock Text="CALLOUTS" Foreground="#E7E9EE" FontSize="12" />
+              <CheckBox x:Name="FuelLowToggle" Content="Fuel low" Foreground="#E7E9EE" />
+              <CheckBox x:Name="ScanCompleteToggle" Content="Scan complete" Foreground="#E7E9EE" />
+              <CheckBox x:Name="ShoppingListToggle" Content="Shopping-list item acquired" Foreground="#E7E9EE" />
+
+              <Button x:Name="TestVoiceButton" Content="Test voice" Click="OnTestVoice"
+                      Padding="10" HorizontalAlignment="Left" />
+            </StackPanel>
+          </Border>
+        </StackPanel>
+
         <!-- Developer options — hidden entirely when the dev tools are stripped/disabled (FeatureFlags). -->
         <StackPanel x:Name="DevSection" Spacing="8" IsVisible="False">
           <TextBlock Text="DEVELOPER OPTIONS" Foreground="#F07100" FontSize="12" FontWeight="SemiBold" LetterSpacing="2" />
@@ -157,6 +192,9 @@
               <CheckBox x:Name="DevModeToggle" Content="Enable developer mode" Foreground="#E7E9EE" />
               <TextBlock Foreground="#8A909C" FontSize="12" TextWrapping="Wrap"
                          Text="Adds a 🎲 control to each dashboard card to fabricate random-but-valid state, plus &quot;Randomize all&quot; and &quot;Reset to live data&quot;. For testing only — this resets to off every launch and is not saved. While it is on, EDDN/Inara reporting is paused so fabricated data is never sent." />
+              <Button x:Name="SimulateOverlayVoiceButton" Content="Simulate overlay &amp; voice callouts"
+                      Click="OnSimulateOverlayVoice" Padding="10" HorizontalAlignment="Left"
+                      ToolTip.Tip="Fabricates a low-fuel status, a completed exobiology scan, and a colonisation delivery — the three moments that trigger a voice callout — through the real event bus." />
             </StackPanel>
           </Border>
         </StackPanel>

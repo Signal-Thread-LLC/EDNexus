@@ -4,8 +4,10 @@ using EDNexus.Core.Exobio;
 using EDNexus.Core.Journal;
 using EDNexus.Core.Market;
 using EDNexus.Core.Materials;
+using EDNexus.Core.Overlay;
 using EDNexus.Core.Ranks;
 using EDNexus.Core.State;
+using EDNexus.Core.Voice;
 
 // EDNexus.Cli — a headless harness for the journal engine.
 //   (no args)   resolve the journal folder, replay to warm state, then watch live.
@@ -48,14 +50,17 @@ var market = new MarketTracker(bus, state);
 var exobio = new ExobiologyTracker(bus, state);
 var engineering = new EngineeringTracker(bus);
 var ranks = new RankTracker(bus);
+var voiceCallouts = new VoiceCalloutTracker(bus, state, exobio, colonisation);
 
 var liveCounts = new SortedDictionary<string, int>();
+var voiceLog = new List<string>();
 bus.SubscribeAny(e =>
 {
     if (e.IsHistorical) return;
     liveCounts.TryGetValue(e.Event, out var c);
     liveCounts[e.Event] = c + 1;
 });
+voiceCallouts.CalloutRaised += callout => voiceLog.Add($"[{callout.Kind}] {callout.Text}");
 bus.HandlerError += (e, ex) => Console.Error.WriteLine($"  [handler error on {e.Event}] {ex.Message}");
 
 var watcher = new JournalWatcher(dir, bus);
@@ -68,6 +73,7 @@ PrintMaterials(state);
 PrintExobiology(exobio);
 PrintEngineers(engineering);
 PrintRanks(ranks);
+PrintOverlay(state, exobio, colonisation);
 if (planId is not null) PrintEngineeringPlan(planId, planGrade, planRolls, state);
 
 if (args.Contains("--once"))
@@ -91,11 +97,18 @@ PrintMaterials(state);
 PrintExobiology(exobio);
 PrintEngineers(engineering);
 PrintRanks(ranks);
+PrintOverlay(state, exobio, colonisation);
 if (liveCounts.Count > 0)
 {
     Console.WriteLine("\nLive events this session:");
     foreach (var kv in liveCounts.OrderByDescending(k => k.Value))
         Console.WriteLine($"  {kv.Value,4}  {kv.Key}");
+}
+if (voiceLog.Count > 0)
+{
+    Console.WriteLine("\nVoice callouts this session:");
+    foreach (var line in voiceLog)
+        Console.WriteLine($"  {line}");
 }
 return 0;
 
@@ -323,6 +336,30 @@ static void PrintEngineers(EngineeringTracker tracker)
         Console.WriteLine($"             {s.NextStep}");
     }
     if (todo.Count > 12) Console.WriteLine($"    … and {todo.Count - 12} more.");
+}
+
+/// <summary>
+/// A preview of exactly what the in-game overlay would show right now, computed the same way the
+/// app does (<see cref="OverlayContentBuilder"/>) — the fastest way to check the overlay's content
+/// against real journal data without launching the desktop app.
+/// </summary>
+static void PrintOverlay(CommanderState s, ExobiologyTracker exobio, ColonisationTracker colonisation)
+{
+    var content = OverlayContentBuilder.Build(s, exobio.CurrentBody, colonisation.ActiveSite, route: null);
+
+    Console.WriteLine("\n======== Overlay preview ========");
+    Console.WriteLine($"  System    : {content.StarSystem ?? "(unknown)"}");
+    Console.WriteLine($"  Next jump : {content.NextJumpSystem ?? "(no route plotted)"}");
+    Console.WriteLine($"  Fuel      : {content.FuelMain:0.0}{(content.FuelCapacity > 0 ? $" / {content.FuelCapacity:0.0}" : "")} t"
+                      + (content.FuelLow ? "  ⚠ LOW" : ""));
+    if (content.HasBioSignals)
+        Console.WriteLine($"  Bio       : {content.BioSignalCount} signal(s) on {content.BioSignalBody}");
+    if (content.HasColonisationShortfall)
+    {
+        Console.WriteLine("  Shortfall :");
+        foreach (var line in content.ColonisationShortfalls)
+            Console.WriteLine($"      {line.Remaining,6:N0}  {line.Name}");
+    }
 }
 
 /// <summary>

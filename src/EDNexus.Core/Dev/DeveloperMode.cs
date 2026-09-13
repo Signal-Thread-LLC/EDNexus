@@ -22,6 +22,7 @@ public sealed class DeveloperMode
         new CommunityGoalSampleSource(),
         new RanksSampleSource(),
         new MiningSampleSource(),
+        new OverlayVoiceSampleSource(),
     };
 
     /// <summary>
