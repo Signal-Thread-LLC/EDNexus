@@ -24,6 +24,7 @@ public sealed class DeveloperMode
         new RanksSampleSource(),
         new MiningSampleSource(),
         new TwitchSampleSource(),
+        new OverlayVoiceSampleSource(),
     };
 
     /// <summary>

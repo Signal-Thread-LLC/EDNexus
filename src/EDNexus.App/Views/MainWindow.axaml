@@ -129,6 +129,29 @@
 
         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="14"
                     HorizontalAlignment="Right" VerticalAlignment="Center">
+
+          <!-- Compact radio transport: previous / play-pause / next, with the tuned station name
+               underneath. Deliberately not a dashboard card — this is meant to stay reachable from
+               anywhere, the same way the physical media keys it'll eventually wire up to (#124) do. -->
+          <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center"
+                      ToolTip.Tip="{Binding RadioTooltip}">
+            <Button Command="{Binding RadioPreviousCommand}" Content="⏮" FontSize="13"
+                    Width="28" Height="28" Padding="0" VerticalAlignment="Center"
+                    HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                    Background="#1B1E24" Foreground="{StaticResource Ink}" ToolTip.Tip="Previous station" />
+            <Button Command="{Binding RadioPlayPauseCommand}" Content="{Binding RadioPlayPauseGlyph}" FontSize="13"
+                    Width="28" Height="28" Padding="0" VerticalAlignment="Center"
+                    HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                    Background="#1B1E24" Foreground="{StaticResource AmberBrush}" />
+            <Button Command="{Binding RadioNextCommand}" Content="⏭" FontSize="13"
+                    Width="28" Height="28" Padding="0" VerticalAlignment="Center"
+                    HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                    Background="#1B1E24" Foreground="{StaticResource Ink}" ToolTip.Tip="Next station" />
+            <TextBlock Text="{Binding RadioStationName}" Foreground="{StaticResource InkDim}"
+                       FontSize="11" VerticalAlignment="Center" MaxWidth="120"
+                       TextTrimming="CharacterEllipsis" Margin="6,0,0,0" />
+          </StackPanel>
+
           <StackPanel VerticalAlignment="Center">
             <TextBlock Text="{Binding CommanderName}" Foreground="{StaticResource Ink}"
                        FontSize="16" FontWeight="SemiBold" HorizontalAlignment="Right" />
@@ -1408,9 +1431,15 @@
           <DataTemplate DataType="vm:GalnetCardViewModel">
             <Border Classes="card">
               <StackPanel>
-                <Grid ColumnDefinitions="*,Auto">
+                <Grid ColumnDefinitions="*,Auto,Auto">
                   <TextBlock Grid.Column="0" Classes="cardHeader" Text="{Binding Title}" />
-                  <Button Grid.Column="1" Classes="collapse" Content="{Binding CollapseGlyph}"
+                  <!-- New-since-last-open count; hidden once every loaded headline has been opened. -->
+                  <Border Grid.Column="1" IsVisible="{Binding HasUnread}" Background="#FFF07100"
+                          CornerRadius="8" Padding="6,1" Margin="0,0,8,0" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding UnreadCount}" FontSize="11" FontWeight="Bold"
+                               Foreground="#0A0A0C" />
+                  </Border>
+                  <Button Grid.Column="2" Classes="collapse" Content="{Binding CollapseGlyph}"
                           Command="{Binding ToggleCollapseCommand}" />
                 </Grid>
                 <StackPanel IsVisible="{Binding !IsCollapsed}">

@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Reflection;
 using EDNexus.Core.Colonisation;
 using EDNexus.Core.CommunityGoals;
+using EDNexus.Core.Discord;
 using EDNexus.Core.Engineering;
 using EDNexus.Core.Exobio;
 using EDNexus.Core.Journal;
@@ -12,11 +13,13 @@ using EDNexus.Core.Missions;
 using EDNexus.Core.Navigation;
 using EDNexus.Core.Ranks;
 using EDNexus.Core.News;
+using EDNexus.Core.Radio;
 using EDNexus.Core.Reporting;
 using EDNexus.Core.Routes;
 using EDNexus.Core.Settings;
 using EDNexus.Core.State;
 using EDNexus.Core.Trade;
+using EDNexus.Core.Voice;
 using EliteDangerous.Edsm;
 using EliteDangerous.Galnet;
 using EliteDangerous.RavenColonial;
@@ -35,6 +38,7 @@ public sealed class EngineHost : IDisposable
     private readonly StateTracker _tracker;
     private readonly JournalWatcher? _watcher;
     private readonly ReporterHost? _reporters;
+    private readonly DiscordPresenceService? _discordPresence;
     private readonly HttpClient _http;
     private Task? _runTask;
 
@@ -42,6 +46,12 @@ public sealed class EngineHost : IDisposable
     public CommanderState State { get; } = new();
     public ColonisationTracker Colonisation { get; }
     public MarketTracker Market { get; }
+
+    /// <summary>
+    /// Background radio player for the built-in simulation/space stations. Persists the last
+    /// selected station, volume, and mute state via the settings passed to this host, when supplied.
+    /// </summary>
+    public RadioPlayerService Radio { get; }
 
     /// <summary>Engineering planner: pinned-blueprint material/engineer guidance. Reads static reference data.</summary>
     public EngineeringTracker Engineering { get; }
@@ -61,6 +71,13 @@ public sealed class EngineHost : IDisposable
     /// <summary>Prospected-asteroid history for the current mining session.</summary>
     public MiningTracker Mining { get; }
 
+    /// <summary>
+    /// Turns fuel-low, scan-complete and shopping-list-acquired moments into spoken callouts. Never
+    /// speaks itself — the UI layer (or CLI) listens to <see cref="VoiceCalloutTracker.CalloutRaised"/>
+    /// and hands the text to an <see cref="IVoice"/>.
+    /// </summary>
+    public VoiceCalloutTracker VoiceCallouts { get; }
+
     /// <summary>Cross-station "best price nearby" lookups. Backed by Spansh; swappable via <see cref="ITradeSearch"/>.</summary>
     public ITradeSearch Trade { get; }
 
@@ -72,6 +89,9 @@ public sealed class EngineHost : IDisposable
 
     /// <summary>In-universe news. Backed by the Galnet feed; swappable via <see cref="INewsFeed"/>.</summary>
     public INewsFeed News { get; }
+
+    /// <summary>Which Galnet articles this commander has already opened, for the "new since last open" badge.</summary>
+    public NewsReadTracker NewsRead { get; }
 
     /// <summary>
     /// The shared, multi-commander view of a construction project. Backed by Raven Colonial;
@@ -91,7 +111,15 @@ public sealed class EngineHost : IDisposable
     /// Optional live predicate; while it returns true the reporters go silent. The app wires this to
     /// developer mode so fabricated events never reach EDDN or Inara.
     /// </param>
-    public EngineHost(string? journalDir = null, AppSettings? settings = null, Func<bool>? reportingSuppressed = null)
+    /// <param name="settingsStore">
+    /// Used by <see cref="Radio"/> to persist station/volume/mute changes. Only meaningful alongside
+    /// <paramref name="settings"/>; the CLI passes neither, so the radio player never touches disk.
+    /// </param>
+    public EngineHost(
+        string? journalDir = null,
+        AppSettings? settings = null,
+        Func<bool>? reportingSuppressed = null,
+        SettingsStore? settingsStore = null)
     {
         JournalDirectory = journalDir ?? JournalPaths.Resolve();
         _tracker = new StateTracker(Bus, State);
@@ -107,6 +135,15 @@ public sealed class EngineHost : IDisposable
         this.CommunityGoals = new CommunityGoalTracker(Bus);
         Ranks = new RankTracker(Bus);
         Mining = new MiningTracker(Bus);
+
+        // Wired after Exobiology/Colonisation so their trackers have already folded the same event
+        // into their own state by the time this one's handler for it runs (see VoiceCalloutTracker's
+        // remarks on ScanOrganic subscription order).
+        VoiceCallouts = new VoiceCalloutTracker(Bus, State, Exobiology, Colonisation);
+
+        // Not journal-driven: reads/persists its own settings section directly, same as the
+        // EDDN/Inara reporters below. The CLI passes neither, so it never touches storage.
+        Radio = new RadioPlayerService(settings, settingsStore);
 
         // Shared client for outbound trade lookups. The EDDN/Inara reporters own their own client
         // inside ReporterHost, so this one is dedicated to the read-side (Spansh) queries.
@@ -129,6 +166,7 @@ public sealed class EngineHost : IDisposable
         News = new GalnetNewsFeed(
             new GalnetClient(new GalnetClientOptions { SoftwareName = "EDNexus", SoftwareVersion = version }, _http),
             new DiskResponseCache(Path.Combine(cacheRoot, "galnet"), TimeSpan.FromHours(1)));
+        NewsRead = new NewsReadTracker();
 
         // Read-only: squadmates deliver while you fly, so this one is never cached.
         SharedProjects = new RavenColonialProjectLookup(new RavenColonialClient(
@@ -141,6 +179,18 @@ public sealed class EngineHost : IDisposable
                 Path.GetDirectoryName(SettingsStore.DefaultPath())!, "logs", "reporting.log"));
             _reporters = new ReporterHost(Bus, settings, ResolveVersion(), IsDevelopmentBuild, reportingSuppressed, log);
         }
+
+        // Discord Rich Presence: a local IPC integration to the commander's own Discord client, not a
+        // third-party upload. Like the reporters above it's still opt-out via AppSettings, and — same
+        // as EDDN/Inara — the CLI's replay-only runs (settings: null) never activate it.
+        if (settings?.Discord.Enabled == true)
+        {
+            IDiscordRpcClient discordClient;
+            try { discordClient = new DiscordRpcClientAdapter(settings.Discord.ApplicationId); }
+            catch { discordClient = NoOpDiscordRpcClient.Instance; }   // unsupported platform, etc.
+            _discordPresence = new DiscordPresenceService(State, discordClient, reportingSuppressed);
+        }
+
         if (JournalDirectory is not null)
             _watcher = new JournalWatcher(JournalDirectory, Bus);
     }
@@ -161,6 +211,8 @@ public sealed class EngineHost : IDisposable
         // Flush any queued reports before tearing down the shared HttpClient.
         try { _reporters?.DisposeAsync().AsTask().Wait(TimeSpan.FromSeconds(3)); }
         catch (AggregateException) { /* best effort */ }
+        Radio.Dispose();
+        _discordPresence?.Dispose();
         _cts.Dispose();
         _http.Dispose();
     }

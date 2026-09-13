@@ -7,6 +7,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Cross-platform audio playback backend for the radio player (RadioPlayerService). -->
+    <PackageReference Include="LibVLCSharp" Version="3.10.1" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\EliteDangerous.Eddn\EliteDangerous.Eddn.csproj" />
     <ProjectReference Include="..\EliteDangerous.Edsm\EliteDangerous.Edsm.csproj" />
     <ProjectReference Include="..\EliteDangerous.Galnet\EliteDangerous.Galnet.csproj" />
@@ -23,6 +28,10 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="EDNexus.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="DiscordRichPresence" Version="1.6.1.70" />
   </ItemGroup>
 
 </Project>
