@@ -202,7 +202,10 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     {
         // Passing settings wires the EDDN/Inara reporters (still gated on their per-service opt-in).
         // While developer mode is on, reporting is paused so fabricated events never reach EDDN/Inara.
-        var host = new EngineHost(settings: _boot.Settings, reportingSuppressed: () => _boot.Dev.Enabled);
+        var host = new EngineHost(
+            settings: _boot.Settings,
+            reportingSuppressed: () => _boot.Dev.Enabled,
+            settingsStore: _boot.Store);
         _boot.Crash.Attach(host.Bus); // report journal handler errors
         return host;
     }
@@ -210,6 +213,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     public void Start()
     {
         _host.Start();
+        _ = _host.Radio.RestoreAsync(); // fire-and-forget: resumes the last station off the UI thread
         _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
         _timer.Tick += (_, _) => Refresh();
         _timer.Start();
