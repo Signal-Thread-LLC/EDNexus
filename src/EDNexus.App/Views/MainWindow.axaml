@@ -1408,9 +1408,15 @@
           <DataTemplate DataType="vm:GalnetCardViewModel">
             <Border Classes="card">
               <StackPanel>
-                <Grid ColumnDefinitions="*,Auto">
+                <Grid ColumnDefinitions="*,Auto,Auto">
                   <TextBlock Grid.Column="0" Classes="cardHeader" Text="{Binding Title}" />
-                  <Button Grid.Column="1" Classes="collapse" Content="{Binding CollapseGlyph}"
+                  <!-- New-since-last-open count; hidden once every loaded headline has been opened. -->
+                  <Border Grid.Column="1" IsVisible="{Binding HasUnread}" Background="#FFF07100"
+                          CornerRadius="8" Padding="6,1" Margin="0,0,8,0" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding UnreadCount}" FontSize="11" FontWeight="Bold"
+                               Foreground="#0A0A0C" />
+                  </Border>
+                  <Button Grid.Column="2" Classes="collapse" Content="{Binding CollapseGlyph}"
                           Command="{Binding ToggleCollapseCommand}" />
                 </Grid>
                 <StackPanel IsVisible="{Binding !IsCollapsed}">

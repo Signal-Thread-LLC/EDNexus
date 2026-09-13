@@ -97,10 +97,40 @@ public class GalnetNewsFeedTests
         Assert.Equal(1, handler.CallCount);
     }
 
+    [Fact]
+    public async Task Serves_the_last_known_cache_when_the_ttl_has_expired_and_the_live_fetch_fails()
+    {
+        // Simulates going offline after the cache's TTL has already lapsed (Get would miss): the
+        // commander should still see the last-known headlines rather than an empty card.
+        var cache = new InMemoryCache();
+        var live = await NewFeed(new RecordingHandler(body: Feed), cache).GetLatestAsync();
+        Assert.Single(live);
+
+        cache.ExpireEverything();   // ordinary Get now misses, as if the TTL had lapsed
+        var offline = await NewFeed(new RecordingHandler(HttpStatusCode.ServiceUnavailable, "down"), cache)
+            .GetLatestAsync();
+
+        Assert.Equal("a1", Assert.Single(offline).Id);
+    }
+
+    [Fact]
+    public async Task An_unreachable_feed_with_no_cache_at_all_still_yields_no_articles()
+    {
+        var feed = NewFeed(new RecordingHandler(HttpStatusCode.ServiceUnavailable, "down"), new InMemoryCache());
+
+        Assert.Empty(await feed.GetLatestAsync());
+    }
+
     private sealed class InMemoryCache : IResponseCache
     {
         private readonly Dictionary<string, string> _store = new();
-        public string? Get(string key) => _store.TryGetValue(key, out var v) ? v : null;
+        private bool _expired;
+
+        public string? Get(string key) => !_expired && _store.TryGetValue(key, out var v) ? v : null;
         public void Put(string key, string body) => _store[key] = body;
+        public string? GetStale(string key) => _store.TryGetValue(key, out var v) ? v : null;
+
+        /// <summary>Simulate every entry ageing past its TTL without dropping it from stale storage.</summary>
+        public void ExpireEverything() => _expired = true;
     }
 }
