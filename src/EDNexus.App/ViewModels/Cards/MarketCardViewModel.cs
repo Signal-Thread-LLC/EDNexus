@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
+using EDNexus.Core.Market;
 using EDNexus.Core.State;
 
 namespace EDNexus.App.ViewModels;
@@ -44,28 +45,55 @@ public sealed partial class MarketCardViewModel : CardViewModel
         var valuation = snap.ValuateHold(s.Cargo);
         MarketHoldValue = valuation.Count > 0 ? $"{snap.HoldValue(s.Cargo):N0} cr" : "—";
 
-        // Prefer valuing the hold; when nothing aboard sells here, fall back to the station's best sells.
-        var signature = valuation.Count > 0
-            ? "hold|" + snap.MarketId + "|" + string.Join("|", valuation.Select(i => $"{i.Name}:{i.Units}:{i.UnitPrice}"))
-            : "sells|" + snap.MarketId + "|" + string.Join("|", snap.Sellable.Take(12).Select(c => $"{c.Name}:{c.SellPrice}:{c.Demand}"));
+        // Fleet carriers don't get a real galactic-average price from the game (Market.json reports
+        // MeanPrice as 0 for carrier orders), so fall back to whatever a real station has taught us
+        // for that commodity, then to a Spansh-derived estimate, rather than showing the raw price as
+        // if it were the delta.
+        var known = Context.GetMiningSettings().KnownPrices;
+        var estimator = Context.DevEnabled ? null : Context.Host.CommodityMeanPrices;
+
+        var rows = valuation.Count > 0
+            ? valuation.Select(i =>
+              {
+                  var (text, good) = ResolveVsMean(i.UnitPrice, i.MeanPrice, i.Symbol, i.Name, known, estimator);
+                  return new MarketLine(i.Name, $"{i.Units:N0} t", $"{i.UnitPrice:N0} cr", $"{i.Total:N0} cr", text, good);
+              }).ToList()
+            : snap.Sellable.Take(12).Select(c =>
+              {
+                  var (text, good) = ResolveVsMean(c.SellPrice, c.MeanPrice, c.Symbol, c.Name, known, estimator);
+                  return new MarketLine(c.Name, $"{c.Demand:N0} dmd", $"{c.SellPrice:N0} cr", "", text, good);
+              }).ToList();
+
+        // The resolved VsMean text is folded into the signature (not just price/units) so a background
+        // estimate landing after this tick still invalidates the cache and refreshes the row.
+        var signature = (valuation.Count > 0 ? "hold|" : "sells|") + snap.MarketId + "|" +
+            string.Join("|", rows.Select(r => $"{r.Name}:{r.Qty}:{r.Unit}:{r.Total}:{r.VsMean}"));
         if (signature == _signature) return;
         _signature = signature;
 
+        MarketListHeader = valuation.Count > 0 ? "YOUR HOLD, SOLD HERE" : "BEST SELLS HERE";
         MarketRows.Clear();
-        if (valuation.Count > 0)
+        foreach (var row in rows) MarketRows.Add(row);
+    }
+
+    /// <summary>No known galactic mean (typically a carrier order this build hasn't seen at a real
+    /// station or resolved via Spansh yet) renders as a plain dash rather than a misleading "delta"
+    /// that's really the full price. <paramref name="estimator"/> is null in developer mode, where
+    /// sample data always carries a real mean anyway and nothing should ever hit the network.</summary>
+    private static (string Text, bool? Good) ResolveVsMean(
+        int price, int meanPrice, string symbol, string displayName,
+        IReadOnlyDictionary<string, int> known, CommodityMeanPriceEstimator? estimator)
+    {
+        if (meanPrice > 0) return FormatVsMean(price, meanPrice);
+        if (known.TryGetValue(symbol, out var kp) && kp > 0) return FormatVsMean(price, kp);
+
+        if (estimator is not null)
         {
-            MarketListHeader = "YOUR HOLD, SOLD HERE";
-            foreach (var i in valuation)
-                MarketRows.Add(new MarketLine(
-                    i.Name, $"{i.Units:N0} t", $"{i.UnitPrice:N0} cr", $"{i.Total:N0} cr", FormatVsMean(i.VsMean), i.VsMean >= 0));
+            if (estimator.TryGet(symbol) is { } estimate) return FormatVsMean(price, estimate);
+            estimator.RequestEstimate(symbol, displayName);
         }
-        else
-        {
-            MarketListHeader = "BEST SELLS HERE";
-            foreach (var c in snap.Sellable.Take(12))
-                MarketRows.Add(new MarketLine(
-                    c.Name, $"{c.Demand:N0} dmd", $"{c.SellPrice:N0} cr", "", FormatVsMean(c.SellVsMean), c.SellVsMean >= 0));
-        }
+
+        return ("—", null);
     }
 
     /// <summary>
@@ -94,17 +122,29 @@ public sealed partial class MarketCardViewModel : CardViewModel
         MarketRows.Clear();
     }
 
-    private static string FormatVsMean(int vsMean) => vsMean >= 0 ? $"+{vsMean:N0}" : $"−{Math.Abs(vsMean):N0}";
+    private static (string Text, bool? Good) FormatVsMean(int price, int meanPrice)
+    {
+        if (meanPrice <= 0) return ("—", null);
+        var diff = price - meanPrice;
+        return (diff >= 0 ? $"+{diff:N0}" : $"−{Math.Abs(diff):N0}", diff >= 0);
+    }
 }
 
 /// <summary>
 /// One row on the market card: a commodity with a <see cref="Qty"/> (tons in hold, or station
 /// demand), the station's <see cref="Unit"/> price, an optional line <see cref="Total"/>, and how
-/// the price compares to the galactic mean (<see cref="VsMean"/>, coloured by <see cref="Good"/>).
+/// the price compares to the galactic mean (<see cref="VsMean"/>, coloured by <see cref="Good"/> —
+/// null when no galactic mean is known at all, e.g. an unseen carrier commodity).
 /// </summary>
 public sealed record MarketLine(
-    string Name, string Qty, string Unit, string Total, string VsMean, bool Good)
+    string Name, string Qty, string Unit, string Total, string VsMean, bool? IsGood)
 {
-    /// <summary>Inverse of <see cref="Good"/>, so the XAML can colour a below-mean price without a converter.</summary>
-    public bool Bad => !Good;
+    /// <summary>Above the galactic mean — colour it favourably.</summary>
+    public bool Good => IsGood == true;
+
+    /// <summary>Below the galactic mean.</summary>
+    public bool Bad => IsGood == false;
+
+    /// <summary>No galactic mean known for this commodity yet (e.g. an unseen carrier order).</summary>
+    public bool Unknown => IsGood is null;
 }
