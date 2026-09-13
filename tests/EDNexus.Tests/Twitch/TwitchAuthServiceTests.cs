@@ -29,7 +29,7 @@ public class TwitchAuthServiceTests : IDisposable
     public async Task LoginAsync_persists_tokens_and_user_on_success()
     {
         var (settings, store) = NewStore();
-        var browser = new NoOpBrowserLauncher();
+        var browser = new RecordingBrowserLauncher();
         var api = new FakeTwitchApiClient
         {
             OnExchange = (clientId, code, verifier, redirect) =>
@@ -49,7 +49,7 @@ public class TwitchAuthServiceTests : IDisposable
         {
             ["code"] = "auth-code-123",
             ["state"] = ExtractState(browser.LastUrl ?? ""),
-        });
+        }, browser.Opened);
 
         var service = new TwitchAuthService(settings, store, Options, api, browser, listener);
         var result = await service.LoginAsync();
@@ -75,7 +75,7 @@ public class TwitchAuthServiceTests : IDisposable
     public async Task LoginAsync_opens_the_authorize_url_with_pkce_and_scope_params()
     {
         var (settings, store) = NewStore();
-        var browser = new NoOpBrowserLauncher();
+        var browser = new RecordingBrowserLauncher();
         var api = new FakeTwitchApiClient
         {
             OnExchange = (_, _, _, _) => new TwitchTokenResponse { AccessToken = "a", RefreshToken = "r", ExpiresIn = 100 },
@@ -85,7 +85,7 @@ public class TwitchAuthServiceTests : IDisposable
         {
             ["code"] = "code",
             ["state"] = ExtractState(browser.LastUrl ?? ""),
-        });
+        }, browser.Opened);
 
         var service = new TwitchAuthService(settings, store, Options, api, browser, listener);
         await service.LoginAsync();
