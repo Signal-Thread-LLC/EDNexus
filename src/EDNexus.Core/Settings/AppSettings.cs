@@ -45,6 +45,12 @@ public sealed class AppSettings
     /// </summary>
     public TwitchSettings Twitch { get; set; } = new();
 
+    /// <summary>The in-game HUD overlay's on/off state.</summary>
+    public OverlaySettings Overlay { get; set; } = new();
+
+    /// <summary>Spoken-callout on/off state, chosen voice, volume and which callouts fire.</summary>
+    public VoiceSettings Voice { get; set; } = new();
+
     /// <summary>The radio player's last selected station, volume, and mute state.</summary>
     public RadioSettings Radio { get; set; } = new();
 
@@ -75,6 +81,38 @@ public sealed class TwitchSettings
 
     /// <summary>Scopes actually granted by Twitch (may be a subset of what was requested).</summary>
     public List<string> Scopes { get; set; } = new();
+}
+
+/// <summary>
+/// Settings for the in-game HUD overlay (a transparent, click-through, always-on-top window drawn
+/// over the game). Windows-only today; a no-op elsewhere regardless of this flag.
+/// </summary>
+public sealed class OverlaySettings
+{
+    /// <summary>When true, the overlay window is shown over the game. Default off.</summary>
+    public bool Enabled { get; set; }
+}
+
+/// <summary>
+/// Settings for spoken callouts (fuel low, scan complete, shopping-list item acquired). Backed by
+/// the platform's TTS engine (SAPI on Windows); a no-op elsewhere regardless of this flag.
+/// </summary>
+public sealed class VoiceSettings
+{
+    /// <summary>When true, callouts are spoken through the platform's TTS engine. Default off.</summary>
+    public bool Enabled { get; set; }
+
+    /// <summary>Chosen voice name (as reported by <c>IVoice.AvailableVoices</c>), or null for the engine's default.</summary>
+    public string? VoiceName { get; set; }
+
+    /// <summary>Playback volume, 0-100.</summary>
+    public int Volume { get; set; } = 100;
+
+    /// <summary>
+    /// Names of <c>VoiceCalloutKind</c> members that are turned off. Empty (the default) means every
+    /// callout kind is enabled; a name present here is silenced.
+    /// </summary>
+    public HashSet<string> DisabledCallouts { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 }
 
 /// <summary>
