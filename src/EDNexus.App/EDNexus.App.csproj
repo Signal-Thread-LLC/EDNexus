@@ -31,6 +31,21 @@
     <PackageReference Include="Avalonia.Themes.Fluent" Version="12.0.5" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="Sentry" Version="6.6.0" />
+    <PackageReference Include="LibVLCSharp" Version="3.9.1" />
+  </ItemGroup>
+
+  <!--
+    Native libvlc runtime for the radio player (see EDNexus.Core.Radio). Windows and macOS ship it as
+    NuGet-packaged native binaries; Linux has no such package (distros package libvlc themselves), so
+    there RadioPlayerService's LibVLC backend construction fails fast and EngineHost falls back to
+    NullRadioAudioBackend — the commander loses radio, nothing else. Installing the distro's `vlc` (or
+    `libvlc`) package restores it.
+  -->
+  <ItemGroup Condition="'$(OS)' == 'Windows_NT'">
+    <PackageReference Include="VideoLAN.LibVLC.Windows" Version="3.0.23.1" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(OS)' != 'Windows_NT' AND Exists('/System/Library/CoreServices/SystemVersion.plist')">
+    <PackageReference Include="VideoLAN.LibVLC.Mac" Version="3.1.3.1" />
   </ItemGroup>
 
   <!--

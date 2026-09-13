@@ -4,6 +4,7 @@ using EDNexus.Core.Exobio;
 using EDNexus.Core.Journal;
 using EDNexus.Core.Market;
 using EDNexus.Core.Materials;
+using EDNexus.Core.Radio;
 using EDNexus.Core.Ranks;
 using EDNexus.Core.State;
 
@@ -49,6 +50,11 @@ var exobio = new ExobiologyTracker(bus, state);
 var engineering = new EngineeringTracker(bus);
 var ranks = new RankTracker(bus);
 
+// The CLI harness ships no native libvlc runtime, so this always falls back to the no-op backend —
+// which is exactly the point: it validates RadioPlayerService's state machine and station registry
+// without a real stream, the same way developer mode / unit tests do.
+var radio = new RadioPlayerService(new NullRadioAudioBackend());
+
 var liveCounts = new SortedDictionary<string, int>();
 bus.SubscribeAny(e =>
 {
@@ -68,6 +74,7 @@ PrintMaterials(state);
 PrintExobiology(exobio);
 PrintEngineers(engineering);
 PrintRanks(ranks);
+PrintRadio(radio);
 if (planId is not null) PrintEngineeringPlan(planId, planGrade, planRolls, state);
 
 if (args.Contains("--once"))
@@ -91,6 +98,7 @@ PrintMaterials(state);
 PrintExobiology(exobio);
 PrintEngineers(engineering);
 PrintRanks(ranks);
+PrintRadio(radio);
 if (liveCounts.Count > 0)
 {
     Console.WriteLine("\nLive events this session:");
@@ -323,6 +331,24 @@ static void PrintEngineers(EngineeringTracker tracker)
         Console.WriteLine($"             {s.NextStep}");
     }
     if (todo.Count > 12) Console.WriteLine($"    … and {todo.Count - 12} more.");
+}
+
+/// <summary>
+/// Radio player smoke test: tunes to the first station, prints every shipped station, then stops —
+/// exercising the play/state-transition path (via the no-op backend, see above) without ever opening
+/// a socket.
+/// </summary>
+static void PrintRadio(RadioPlayerService radio)
+{
+    Console.WriteLine("\n======== Radio ========");
+    Console.WriteLine("  --- stations ---");
+    foreach (var s in radio.Stations)
+        Console.WriteLine($"      {s.Id,-28} {s.Name}");
+
+    radio.Play(radio.Stations[0].Id);
+    var snap = radio.Snapshot;
+    Console.WriteLine($"  Tuned     : {snap.Station?.Name} — {snap.State} (volume {snap.Volume}{(snap.Mute ? ", muted" : "")})");
+    radio.Stop();
 }
 
 /// <summary>

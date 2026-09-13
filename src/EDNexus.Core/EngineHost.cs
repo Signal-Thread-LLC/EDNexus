@@ -12,6 +12,7 @@ using EDNexus.Core.Missions;
 using EDNexus.Core.Navigation;
 using EDNexus.Core.Ranks;
 using EDNexus.Core.News;
+using EDNexus.Core.Radio;
 using EDNexus.Core.Reporting;
 using EDNexus.Core.Routes;
 using EDNexus.Core.Settings;
@@ -79,6 +80,13 @@ public sealed class EngineHost : IDisposable
     /// </summary>
     public ISharedProjectLookup SharedProjects { get; }
 
+    /// <summary>
+    /// Background internet radio player. Drives a real LibVLC engine when the native runtime is
+    /// available, and silently falls back to a no-op backend otherwise (headless environments, a
+    /// Linux box without libvlc installed) — see <see cref="CreateRadioBackend"/>.
+    /// </summary>
+    public RadioPlayerService Radio { get; }
+
     public string? JournalDirectory { get; }
     public bool JournalFound => JournalDirectory is not null;
 
@@ -107,6 +115,7 @@ public sealed class EngineHost : IDisposable
         this.CommunityGoals = new CommunityGoalTracker(Bus);
         Ranks = new RankTracker(Bus);
         Mining = new MiningTracker(Bus);
+        Radio = new RadioPlayerService(CreateRadioBackend(), settings, settings is not null ? new SettingsStore() : null);
 
         // Shared client for outbound trade lookups. The EDDN/Inara reporters own their own client
         // inside ReporterHost, so this one is dedicated to the read-side (Spansh) queries.
@@ -161,8 +170,27 @@ public sealed class EngineHost : IDisposable
         // Flush any queued reports before tearing down the shared HttpClient.
         try { _reporters?.DisposeAsync().AsTask().Wait(TimeSpan.FromSeconds(3)); }
         catch (AggregateException) { /* best effort */ }
+        Radio.Dispose();
         _cts.Dispose();
         _http.Dispose();
+    }
+
+    /// <summary>
+    /// Best-effort construction of the real LibVLC-backed audio engine. Falls back to
+    /// <see cref="NullRadioAudioBackend"/> when the native libvlc runtime can't be loaded — missing on
+    /// this platform, not deployed (the CLI harness ships no native runtime at all), or otherwise
+    /// broken. Radio then simply does nothing rather than crashing the host.
+    /// </summary>
+    private static IRadioAudioBackend CreateRadioBackend()
+    {
+        try
+        {
+            return new LibVlcRadioAudioBackend();
+        }
+        catch
+        {
+            return new NullRadioAudioBackend();
+        }
     }
 
     private static string ResolveVersion()
