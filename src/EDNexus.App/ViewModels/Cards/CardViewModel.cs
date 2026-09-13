@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -231,5 +232,11 @@ public abstract partial class CardViewModel : CommunityToolkit.Mvvm.ComponentMod
         var window = (Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.MainWindow;
         if (window?.Clipboard is { } clipboard)
             await clipboard.SetTextAsync(text);
+    }
+
+    /// <summary>Open a URL in the OS's default browser.</summary>
+    protected static void OpenUrl(string url)
+    {
+        Process.Start(new ProcessStartInfo(url) { UseShellExecute = true })?.Dispose();
     }
 }

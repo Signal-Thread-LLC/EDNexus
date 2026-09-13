@@ -67,6 +67,10 @@ public sealed class StateTracker
 
         // Derive the FSD profile so the no-boost route plot can model this ship's jumps.
         if (Ship.ShipFsdProfile.FromLoadout(e) is { } fsd) _state.Fsd = fsd;
+
+        // Keep the raw event verbatim for the Coriolis/EDSY share link, which needs every module's
+        // engineering detail, not just the fields we extract above.
+        _state.LastLoadoutJson = e.Raw.GetRawText();
     }
 
     /// <summary>

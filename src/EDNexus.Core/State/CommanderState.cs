@@ -111,6 +111,14 @@ public sealed class CommanderState : ObservableObject
     /// <summary>The current ship's Frame Shift Drive, derived from the last <c>Loadout</c>. Null until one is seen. Drives no-boost route plots.</summary>
     public Ship.ShipFsdProfile? Fsd { get => _fsd; set => Set(ref _fsd, value); }
 
+    private string? _lastLoadoutJson;
+    /// <summary>
+    /// The raw text of the last <c>Loadout</c> event, kept verbatim (not just the fields we parse) so it
+    /// can be handed to <see cref="Ship.CoriolisShareLink"/> for a "share my build" link. Null until one
+    /// is seen this session.
+    /// </summary>
+    public string? LastLoadoutJson { get => _lastLoadoutJson; set => Set(ref _lastLoadoutJson, value); }
+
     private DateTimeOffset _lastUpdated;
     public DateTimeOffset LastUpdated { get => _lastUpdated; set => Set(ref _lastUpdated, value); }
 
