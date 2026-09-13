@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Reflection;
 using EDNexus.Core.Colonisation;
 using EDNexus.Core.CommunityGoals;
+using EDNexus.Core.Discord;
 using EDNexus.Core.Engineering;
 using EDNexus.Core.Exobio;
 using EDNexus.Core.Journal;
@@ -36,6 +37,7 @@ public sealed class EngineHost : IDisposable
     private readonly StateTracker _tracker;
     private readonly JournalWatcher? _watcher;
     private readonly ReporterHost? _reporters;
+    private readonly DiscordPresenceService? _discordPresence;
     private readonly HttpClient _http;
     private Task? _runTask;
 
@@ -80,6 +82,9 @@ public sealed class EngineHost : IDisposable
 
     /// <summary>In-universe news. Backed by the Galnet feed; swappable via <see cref="INewsFeed"/>.</summary>
     public INewsFeed News { get; }
+
+    /// <summary>Which Galnet articles this commander has already opened, for the "new since last open" badge.</summary>
+    public NewsReadTracker NewsRead { get; }
 
     /// <summary>
     /// The shared, multi-commander view of a construction project. Backed by Raven Colonial;
@@ -142,6 +147,7 @@ public sealed class EngineHost : IDisposable
         News = new GalnetNewsFeed(
             new GalnetClient(new GalnetClientOptions { SoftwareName = "EDNexus", SoftwareVersion = version }, _http),
             new DiskResponseCache(Path.Combine(cacheRoot, "galnet"), TimeSpan.FromHours(1)));
+        NewsRead = new NewsReadTracker();
 
         // Read-only: squadmates deliver while you fly, so this one is never cached.
         SharedProjects = new RavenColonialProjectLookup(new RavenColonialClient(
@@ -154,6 +160,18 @@ public sealed class EngineHost : IDisposable
                 Path.GetDirectoryName(SettingsStore.DefaultPath())!, "logs", "reporting.log"));
             _reporters = new ReporterHost(Bus, settings, ResolveVersion(), IsDevelopmentBuild, reportingSuppressed, log);
         }
+
+        // Discord Rich Presence: a local IPC integration to the commander's own Discord client, not a
+        // third-party upload. Like the reporters above it's still opt-out via AppSettings, and — same
+        // as EDDN/Inara — the CLI's replay-only runs (settings: null) never activate it.
+        if (settings?.Discord.Enabled == true)
+        {
+            IDiscordRpcClient discordClient;
+            try { discordClient = new DiscordRpcClientAdapter(settings.Discord.ApplicationId); }
+            catch { discordClient = NoOpDiscordRpcClient.Instance; }   // unsupported platform, etc.
+            _discordPresence = new DiscordPresenceService(State, discordClient, reportingSuppressed);
+        }
+
         if (JournalDirectory is not null)
             _watcher = new JournalWatcher(JournalDirectory, Bus);
     }
@@ -174,6 +192,7 @@ public sealed class EngineHost : IDisposable
         // Flush any queued reports before tearing down the shared HttpClient.
         try { _reporters?.DisposeAsync().AsTask().Wait(TimeSpan.FromSeconds(3)); }
         catch (AggregateException) { /* best effort */ }
+        _discordPresence?.Dispose();
         _cts.Dispose();
         _http.Dispose();
     }

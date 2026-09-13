@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      Deliberately the ONLY project reference: this proves EDNexus.Plugins.Abstractions
+      compiles and is usable completely standalone, with no transitive dependency on
+      EDNexus.Core (see issue #52's acceptance criteria).
+    -->
+    <ProjectReference Include="..\..\src\EDNexus.Plugins.Abstractions\EDNexus.Plugins.Abstractions.csproj" />
+  </ItemGroup>
+
+</Project>
