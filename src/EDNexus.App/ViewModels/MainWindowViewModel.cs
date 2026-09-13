@@ -10,6 +10,7 @@ using EDNexus.App.Views;
 using EDNexus.Core;
 using EDNexus.Core.Dev;
 using EDNexus.Core.Overlay;
+using EDNexus.Core.Radio;
 using EDNexus.Core.Settings;
 using EDNexus.Core.Voice;
 
@@ -204,9 +205,19 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     {
         // Passing settings wires the EDDN/Inara reporters (still gated on their per-service opt-in).
         // While developer mode is on, reporting is paused so fabricated events never reach EDDN/Inara.
-        var host = new EngineHost(settings: _boot.Settings, reportingSuppressed: () => _boot.Dev.Enabled);
+        var host = new EngineHost(
+            settings: _boot.Settings,
+            reportingSuppressed: () => _boot.Dev.Enabled,
+            settingsStore: _boot.Store);
         _boot.Crash.Attach(host.Bus); // report journal handler errors
         host.VoiceCallouts.CalloutRaised += OnVoiceCalloutRaised;
+
+        // The radio plays in the background independent of the 250ms state-refresh tick, so it gets
+        // its own event → UI-thread hop instead of waiting to be picked up by Refresh(). Captures
+        // `host` (rather than reading the `_host` field) so a stale handler from a host that
+        // ResetToLive() has since replaced can't clobber the current one's state.
+        host.Radio.Changed += () => Dispatcher.UIThread.Post(() => RefreshRadio(host.Radio.Snapshot));
+        RefreshRadio(host.Radio.Snapshot);
         return host;
     }
 
@@ -223,6 +234,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     {
         _host.Start();
         if (_boot.Settings.Overlay.Enabled) _boot.Overlay.Show();
+        _ = _host.Radio.RestoreAsync(); // fire-and-forget: resumes the last station off the UI thread
         _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
         _timer.Tick += (_, _) => Refresh();
         _timer.Start();
@@ -245,6 +257,37 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     // Update bar: set when a background updater has downloaded a new build.
     [ObservableProperty] private bool _updateAvailable;
     [ObservableProperty] private string _updatePath = "";
+
+    // --- Radio: a compact title-bar transport (play/pause, next, previous). Stations and their
+    // stream URLs live in RadioStationCatalog; the actual streaming happens in EngineHost.Radio. ---
+
+    [ObservableProperty] private string _radioStationName = "Radio off";
+    [ObservableProperty] private string _radioPlayPauseGlyph = "▶";
+    [ObservableProperty] private string _radioTooltip = "Play the radio";
+
+    /// <summary>Mirror a <see cref="RadioPlayerSnapshot"/> onto the bindable properties above.</summary>
+    private void RefreshRadio(RadioPlayerSnapshot s)
+    {
+        RadioStationName = s.Station?.Name ?? "No station tuned";
+        RadioPlayPauseGlyph = s.Status == RadioPlaybackStatus.Playing ? "⏸" : "▶";
+        RadioTooltip = s.Status switch
+        {
+            RadioPlaybackStatus.Error => s.LastError ?? "Radio error",
+            RadioPlaybackStatus.Buffering => $"Buffering {s.Station?.Name}…",
+            RadioPlaybackStatus.Playing => $"Playing {s.Station?.Name}",
+            RadioPlaybackStatus.Paused => $"Paused — {s.Station?.Name}",
+            _ => s.Station is null ? "Play the radio" : $"Play {s.Station.Name}",
+        };
+    }
+
+    [RelayCommand]
+    private Task RadioPlayPause() => _host.Radio.TogglePlayPauseAsync();
+
+    [RelayCommand]
+    private Task RadioNext() => _host.Radio.NextStationAsync();
+
+    [RelayCommand]
+    private Task RadioPrevious() => _host.Radio.PreviousStationAsync();
 
     [RelayCommand]
     private async Task OpenSettings()

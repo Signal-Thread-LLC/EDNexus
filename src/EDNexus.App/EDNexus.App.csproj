@@ -31,6 +31,20 @@
     <PackageReference Include="Avalonia.Themes.Fluent" Version="12.0.5" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="Sentry" Version="6.6.0" />
+    <PackageReference Include="LibVLCSharp" Version="3.10.1" />
+  </ItemGroup>
+
+  <!--
+    Native LibVLC runtime for the radio player. Windows/macOS ship the engine via these NuGet
+    packages (harmless to reference from either build host — each only contributes its own
+    runtimes/<rid> assets, which are filtered by target RID at publish time). Linux has no
+    equivalent package and instead loads the system-installed libvlc (e.g. `apt install vlc` /
+    `libvlc-dev`) at runtime — RadioPlayerService degrades to a reported error state rather than
+    crashing when it's missing.
+  -->
+  <ItemGroup>
+    <PackageReference Include="VideoLAN.LibVLC.Windows" Version="3.0.23.1" />
+    <PackageReference Include="VideoLAN.LibVLC.Mac" Version="3.1.3.1" />
   </ItemGroup>
 
   <!--
