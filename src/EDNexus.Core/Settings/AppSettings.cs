@@ -181,6 +181,47 @@ public sealed class MiningSettings
     public string? LastSessionDate { get; set; }
     public long LastSessionValue { get; set; }
     public int LastSessionUnits { get; set; }
+
+    /// <summary>
+    /// When true, arriving in a system with <see cref="KnownSpots"/> worth mining (at or above
+    /// <see cref="MinValueThreshold"/>) raises a spoken callout. Default on; still needs voice callouts enabled.
+    /// </summary>
+    public bool AnnounceKnownSpots { get; set; } = true;
+
+    /// <summary>
+    /// Planetary (SRV) mining spots where a commodity at or above <see cref="MinValueThreshold"/> was
+    /// refined. Replaced wholesale, never mutated in place, whenever a spot is recorded, so the journal
+    /// thread can safely read the current list while the UI thread records a new one.
+    /// </summary>
+    public List<KnownMiningSpot> KnownSpots { get; set; } = new();
+}
+
+/// <summary>
+/// One recorded planetary mining spot: a commodity refined from an SRV at a surface position. Units
+/// refined close to an existing spot for the same commodity fold into it (see <c>MiningSpotBook</c>).
+/// </summary>
+public sealed class KnownMiningSpot
+{
+    public long? SystemAddress { get; set; }
+    public string StarSystem { get; set; } = "";
+    public string Body { get; set; } = "";
+    public double Latitude { get; set; }
+    public double Longitude { get; set; }
+
+    /// <summary>Canonical commodity symbol (see <c>CommodityName</c>).</summary>
+    public string Symbol { get; set; } = "";
+
+    /// <summary>Display name of the commodity.</summary>
+    public string Name { get; set; } = "";
+
+    /// <summary>The commodity's galactic-average price when last recorded (a fixed per-commodity constant).</summary>
+    public int AveragePrice { get; set; }
+
+    /// <summary>Tonnes refined at this spot so far.</summary>
+    public int Tonnes { get; set; }
+
+    public DateTimeOffset FirstMined { get; set; }
+    public DateTimeOffset LastMined { get; set; }
 }
 
 /// <summary>

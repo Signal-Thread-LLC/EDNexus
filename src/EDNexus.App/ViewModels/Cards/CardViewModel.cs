@@ -6,6 +6,7 @@ using Avalonia.Input.Platform;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using EDNexus.Core;
+using EDNexus.Core.Mining;
 using EDNexus.Core.Settings;
 using EDNexus.Core.State;
 
@@ -31,6 +32,7 @@ public sealed class DashboardContext
     private readonly Action<IEnumerable<(string Symbol, int MeanPrice)>> _learnCommodityPrices;
     private readonly Action<DateTimeOffset> _ensureMiningSessionDate;
     private readonly Action<DateTimeOffset, long> _recordMiningRefined;
+    private readonly Action<RefinedUnit, int> _recordMiningSpot;
 
     public DashboardContext(
         Func<EngineHost> host,
@@ -45,7 +47,8 @@ public sealed class DashboardContext
         Func<MiningSettings> getMiningSettings,
         Action<IEnumerable<(string Symbol, int MeanPrice)>> learnCommodityPrices,
         Action<DateTimeOffset> ensureMiningSessionDate,
-        Action<DateTimeOffset, long> recordMiningRefined)
+        Action<DateTimeOffset, long> recordMiningRefined,
+        Action<RefinedUnit, int> recordMiningSpot)
     {
         _host = host;
         _devEnabled = devEnabled;
@@ -60,6 +63,7 @@ public sealed class DashboardContext
         _learnCommodityPrices = learnCommodityPrices;
         _ensureMiningSessionDate = ensureMiningSessionDate;
         _recordMiningRefined = recordMiningRefined;
+        _recordMiningSpot = recordMiningSpot;
     }
 
     /// <summary>The live engine host — always the current one, even after a reset-to-live rebuild.</summary>
@@ -99,6 +103,9 @@ public sealed class DashboardContext
 
     /// <summary>Record one refined unit against today's running mining total.</summary>
     public void RecordMiningRefined(DateTimeOffset when, long credits) => _recordMiningRefined(when, credits);
+
+    /// <summary>Record a unit refined from an SRV as a planetary mining spot worth returning to.</summary>
+    public void RecordMiningSpot(RefinedUnit unit, int averagePrice) => _recordMiningSpot(unit, averagePrice);
 }
 
 /// <summary>

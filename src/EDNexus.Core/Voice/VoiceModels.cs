@@ -11,6 +11,9 @@ public enum VoiceCalloutKind
 
     /// <summary>A colonisation shopping-list commodity is now fully covered by the cargo hold.</summary>
     ShoppingListItemAcquired,
+
+    /// <summary>Arrived in a system with recorded planetary mining spots worth mining.</summary>
+    KnownMiningSpots,
 }
 
 /// <summary>One spoken callout: which kind of moment it was, and the text to speak.</summary>

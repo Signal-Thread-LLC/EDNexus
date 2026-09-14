@@ -1,14 +1,16 @@
 using EDNexus.Core.Colonisation;
 using EDNexus.Core.Exobio;
 using EDNexus.Core.Journal;
+using EDNexus.Core.Mining;
+using EDNexus.Core.Settings;
 using EDNexus.Core.State;
 
 namespace EDNexus.Core.Voice;
 
 /// <summary>
 /// Feature service that turns key journal moments into spoken callouts: low fuel, a completed
-/// exobiology sample run, and a colonisation shopping-list commodity fully covered by the cargo
-/// hold. It never speaks itself — it only decides *when* a callout should fire and hands the text to
+/// exobiology sample run, a colonisation shopping-list commodity fully covered by the cargo
+/// hold, and arriving in a system with recorded planetary mining spots worth mining. It never speaks itself — it only decides *when* a callout should fire and hands the text to
 /// whoever is listening (an <see cref="IVoice"/> in the UI layer, or a unit test). It reads
 /// <see cref="CommanderState"/>, <see cref="ExobiologyTracker"/> and <see cref="ColonisationTracker"/>
 /// but never mutates any of them.
@@ -23,9 +25,16 @@ public sealed class VoiceCalloutTracker
     private bool _fuelLow;
     private readonly HashSet<string> _announcedScans = new();
     private readonly Dictionary<string, bool> _shoppingCovered = new();
+    private long? _lastArrivalSystem;
 
     /// <summary>Fraction of fuel capacity at/below which a low-fuel callout fires. Default 25%.</summary>
     public double FuelLowThreshold { get; set; } = 0.25;
+
+    /// <summary>
+    /// Recorded planetary mining spots worth mining in a system (address, name), or an empty list when
+    /// there are none or the Mining option is off. Null (the default) turns the arrival callout off.
+    /// </summary>
+    public Func<long?, string?, IReadOnlyList<KnownMiningSpot>>? KnownMiningSpotsIn { get; set; }
 
     /// <summary>
     /// Raised whenever a callout fires. Never raised for events replayed at startup
@@ -43,6 +52,9 @@ public sealed class VoiceCalloutTracker
         bus.Subscribe("Status", OnStatus);
         bus.Subscribe("ScanOrganic", OnScanOrganic);
         bus.Subscribe("Cargo", OnCargo);
+        bus.Subscribe("FSDJump", OnArrival);
+        bus.Subscribe("CarrierJump", OnArrival);
+        bus.Subscribe("Location", OnArrival);
     }
 
     /// <summary>
@@ -129,6 +141,32 @@ public sealed class VoiceCalloutTracker
             if (justCovered && !e.IsHistorical)
                 Raise(VoiceCalloutKind.ShoppingListItemAcquired, $"{item.Name} acquired — enough aboard for the build.");
         }
+    }
+
+    /// <summary>
+    /// Arriving in (or loading the game into) a system with recorded mining spots worth mining. Only
+    /// live arrivals count, and a repeat <c>Location</c> in the system just announced (a respawn, say)
+    /// stays quiet; arriving anywhere else re-arms it.
+    /// </summary>
+    private void OnArrival(JournalEntry e)
+    {
+        if (e.IsHistorical || KnownMiningSpotsIn is null) return;
+
+        var address = e.GetInt64("SystemAddress");
+        var name = e.GetString("StarSystem");
+
+        bool repeat;
+        lock (_gate)
+        {
+            repeat = address is not null && address == _lastArrivalSystem;
+            _lastArrivalSystem = address;
+        }
+        if (repeat) return;
+
+        var spots = KnownMiningSpotsIn(address, name);
+        if (spots.Count == 0) return;
+
+        Raise(VoiceCalloutKind.KnownMiningSpots, MiningSpotBook.DescribeForCallout(name ?? spots[0].StarSystem, spots));
     }
 
     private void Raise(VoiceCalloutKind kind, string text) => CalloutRaised?.Invoke(new VoiceCallout(kind, text));

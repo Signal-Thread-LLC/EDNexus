@@ -72,7 +72,7 @@ public sealed class EngineHost : IDisposable
     public MiningTracker Mining { get; }
 
     /// <summary>
-    /// Turns fuel-low, scan-complete and shopping-list-acquired moments into spoken callouts. Never
+    /// Turns fuel-low, scan-complete, shopping-list-acquired and known-mining-spot moments into spoken callouts. Never
     /// speaks itself — the UI layer (or CLI) listens to <see cref="VoiceCalloutTracker.CalloutRaised"/>
     /// and hands the text to an <see cref="IVoice"/>.
     /// </summary>
@@ -140,6 +140,13 @@ public sealed class EngineHost : IDisposable
         // into their own state by the time this one's handler for it runs (see VoiceCalloutTracker's
         // remarks on ScanOrganic subscription order).
         VoiceCallouts = new VoiceCalloutTracker(Bus, State, Exobiology, Colonisation);
+        if (settings is not null)
+        {
+            // Reads the spot list by reference: the UI thread replaces it wholesale when recording.
+            VoiceCallouts.KnownMiningSpotsIn = (address, name) => settings.Mining.AnnounceKnownSpots
+                ? MiningSpotBook.WorthMiningIn(settings.Mining.KnownSpots, address, name, settings.Mining.MinValueThreshold)
+                : Array.Empty<KnownMiningSpot>();
+        }
 
         // Not journal-driven: reads/persists its own settings section directly, same as the
         // EDDN/Inara reporters below. The CLI passes neither, so it never touches storage.

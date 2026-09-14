@@ -43,6 +43,10 @@ public partial class SettingsWindow : Window
             ? boot.Settings.Mining.MinValueThreshold.ToString(System.Globalization.CultureInfo.InvariantCulture)
             : "";
 
+        MiningSpotAnnounceToggle.IsChecked = boot.Settings.Mining.AnnounceKnownSpots;
+        if (boot.Settings.Mining.KnownSpots.Count > 0)
+            MiningSpotsSummary.Text += $" {boot.Settings.Mining.KnownSpots.Count:N0} spots recorded so far.";
+
         OverlayToggle.IsChecked = boot.Settings.Overlay.Enabled;
 
         VoiceToggle.IsChecked = boot.Settings.Voice.Enabled;
@@ -157,6 +161,7 @@ public partial class SettingsWindow : Window
             _boot.ApplyMiningThreshold(
                 int.TryParse(MiningThresholdBox.Text?.Trim(), System.Globalization.NumberStyles.Integer,
                     System.Globalization.CultureInfo.InvariantCulture, out var threshold) ? threshold : 0);
+            _boot.ApplyMiningSpotAnnouncements(MiningSpotAnnounceToggle.IsChecked == true);
             _boot.ApplyOverlayChoice(OverlayToggle.IsChecked == true);
             _boot.ApplyVoiceChoice(
                 VoiceToggle.IsChecked == true,
