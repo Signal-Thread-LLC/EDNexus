@@ -60,6 +60,52 @@ public sealed class ExobiologyCatalog
     public IEnumerable<BioSpecies> MostValuable(int limit = 10)
         => Species.OrderByDescending(s => s.Value).Take(limit);
 
+    /// <summary>
+    /// Predict the species that can grow on a body from its planetary physics, richest first —
+    /// fully offline, from <see cref="ExobiologyPredictionRules"/>.
+    /// </summary>
+    /// <param name="env">The body's physics, from its journal <c>Scan</c>.</param>
+    /// <param name="confirmedGenera">
+    /// Genera a DSS pass named. The DSS is authoritative, so these replace the genus-level guess and
+    /// only the species within them are filtered; a confirmed genus the rules can't place still lists
+    /// every species rather than vanishing.
+    /// </param>
+    public IReadOnlyList<BioPrediction> Predict(BodyEnvironment env, IReadOnlyList<BioGenus>? confirmedGenera = null)
+    {
+        var confirmed = confirmedGenera is { Count: > 0 };
+        if (!confirmed && !env.Landable)
+            return Array.Empty<BioPrediction>();
+
+        var conditions = ExobiologyPredictionRules.Classify(env);
+        var isFirstDiscovery = !env.WasDiscovered;
+
+        var genera = confirmed
+            ? confirmedGenera!.DistinctBy(g => g.Symbol, StringComparer.OrdinalIgnoreCase)
+            : Genera.Where(g => ExobiologyPredictionRules.GenusMatches(g, conditions));
+
+        var predictions = new List<BioPrediction>();
+        foreach (var genus in genera)
+        {
+            var species = genus.Species.Where(s => ExobiologyPredictionRules.SpeciesMatches(s, conditions)).ToList();
+            if (species.Count == 0 && confirmed)
+                species = genus.Species.ToList();
+
+            foreach (var s in species)
+                predictions.Add(new BioPrediction(
+                    s,
+                    genus,
+                    genus.SampleDistanceMeters,
+                    s.Value,
+                    isFirstDiscovery ? s.FirstLoggedValue : s.Value,
+                    isFirstDiscovery));
+        }
+
+        return predictions
+            .OrderByDescending(p => p.EstimatedValue)
+            .ThenBy(p => p.Species.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true,
@@ -69,10 +115,14 @@ public sealed class ExobiologyCatalog
     private static ExobiologyCatalog Load()
     {
         var genera = ReadResource<List<GenusDto>>("exobiology-species.json")
-            .Select(g => new BioGenus(
-                g.GenusSymbol,
-                g.Genus,
-                (g.Species ?? new()).Select(s => new BioSpecies(g.GenusSymbol, g.Genus, s.Symbol, s.Name, s.Value)).ToList()))
+            .Select(g =>
+            {
+                var distance = g.SampleDistance.GetValueOrDefault();
+                var species = (g.Species ?? new())
+                    .Select(s => new BioSpecies(g.GenusSymbol, g.Genus, s.Symbol, s.Name, s.Value, distance))
+                    .ToList();
+                return new BioGenus(g.GenusSymbol, g.Genus, distance, species);
+            })
             .ToList();
         return new ExobiologyCatalog(genera);
     }
@@ -88,6 +138,6 @@ public sealed class ExobiologyCatalog
     }
 
     // DTOs decouple the JSON shape from the public records.
-    private sealed record GenusDto(string GenusSymbol, string Genus, List<SpeciesDto>? Species);
+    private sealed record GenusDto(string GenusSymbol, string Genus, int? SampleDistance, List<SpeciesDto>? Species);
     private sealed record SpeciesDto(string Symbol, string Name, long Value);
 }

@@ -18,6 +18,10 @@ public sealed record OverlayShortfallLine(string Name, int Remaining);
 /// <param name="BioSignalBody">Name of the body the commander is currently at, if it carries biological signals.</param>
 /// <param name="BioSignalCount">Biological signal count for <paramref name="BioSignalBody"/>. 0 when none/unknown.</param>
 /// <param name="ColonisationShortfalls">Worst-shortfall-first outstanding commodities for the active construction site.</param>
+/// <param name="BioSignalDetail">
+/// One exobiology hint: the sample run in progress and how far to move before the next sample, or
+/// the richest predicted species here with its sample distance. Null when there is nothing to add.
+/// </param>
 public sealed record OverlayContent(
     string? StarSystem,
     string? NextJumpSystem,
@@ -25,11 +29,12 @@ public sealed record OverlayContent(
     double FuelCapacity,
     string? BioSignalBody,
     int BioSignalCount,
-    IReadOnlyList<OverlayShortfallLine> ColonisationShortfalls)
+    IReadOnlyList<OverlayShortfallLine> ColonisationShortfalls,
+    string? BioSignalDetail = null)
 {
     /// <summary>An empty snapshot — nothing known yet, shown before the engine has any state.</summary>
     public static OverlayContent Empty { get; } =
-        new(null, null, 0, 0, null, 0, Array.Empty<OverlayShortfallLine>());
+        new(null, null, 0, 0, null, 0, Array.Empty<OverlayShortfallLine>(), null);
 
     /// <summary>Fuel remaining as a 0..1 fraction of capacity. 0 when capacity is unknown.</summary>
     public double FuelPercent => FuelCapacity > 0 ? Math.Clamp(FuelMain / FuelCapacity, 0, 1) : 0;

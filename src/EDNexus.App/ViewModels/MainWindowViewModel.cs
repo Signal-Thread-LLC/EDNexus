@@ -396,7 +396,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         if (_boot.Settings.Overlay.Enabled)
         {
             var content = OverlayContentBuilder.Build(
-                s, _host.Exobiology.CurrentBody, _host.Colonisation.ActiveSite, _boot.Settings.Route);
+                s, _host.Exobiology.CurrentBody, _host.Colonisation.ActiveSite, _boot.Settings.Route,
+                _host.Exobiology.ActiveScan);
             _boot.Overlay.Update(content);
         }
     }

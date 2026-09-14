@@ -45,6 +45,18 @@ public class ExobiologyTrackerTests
       "SystemAddress":2871051298217, "Body":12 }
     """;
 
+    private const string PlanetScan = """
+    { "timestamp":"2026-08-01T08:30:00Z", "event":"Scan", "BodyName":"Nervi 2 a",
+      "SystemAddress":2871051298217, "BodyID":12,
+      "PlanetClass":"High metal content body",
+      "Atmosphere":"carbon dioxide atmosphere",
+      "AtmosphereType":"CarbonDioxide",
+      "SurfaceGravity":2.94,
+      "SurfaceTemperature":220.0,
+      "Landable":true,
+      "WasDiscovered":false }
+    """;
+
     // --- Scanners. ---
 
     [Fact]
@@ -293,5 +305,110 @@ public class ExobiologyTrackerTests
         Assert.Empty(tracker.Scans);
         Assert.Empty(tracker.Bodies);
         Assert.Equal(0, tracker.Session.SoldValue);
+    }
+
+    [Fact]
+    public void A_planetary_scan_populates_environment_and_enables_prediction_on_fss_signals()
+    {
+        var (bus, _, tracker) = NewTracker();
+        Publish(bus, PlanetScan);
+        Publish(bus, Fss);
+
+        var body = Assert.Single(tracker.Bodies);
+        Assert.NotNull(body.Environment);
+        Assert.Equal("High metal content body", body.Environment!.PlanetClass);
+        Assert.True(body.IsUndiscovered);
+        Assert.NotEmpty(body.Predictions);
+
+        // At 0.3 g only Stratum and Bacterium clear the gravity cap, so the three signals can be at most
+        // those two genera: cheapest is Stratum Limaxus + Bacterium Aurasus, richest Stratum Tectonicas
+        // + Bacterium Scopulum — all at the 5× first-logged rate on this undiscovered body.
+        Assert.Equal(((1362000L + 1000000L) * 5, (19010800L + 4934500L) * 5), body.ValueRange);
+
+        // Stratum Tectonicas predicted on this CO2 HMC planet with 5x first discovery bonus
+        var tectonicas = body.Predictions.FirstOrDefault(p => p.Species.Name == "Stratum Tectonicas");
+        Assert.NotNull(tectonicas);
+        Assert.Equal(500, tectonicas!.SampleDistanceMeters);
+        Assert.Equal(95054000, tectonicas.EstimatedValue);
+    }
+
+    [Fact]
+    public void A_DSS_pass_narrows_predictions_to_confirmed_genera()
+    {
+        var (bus, _, tracker) = NewTracker();
+        Publish(bus, PlanetScan);
+        Publish(bus, Dss); // Confirms Stratum and Bacterium
+
+        var body = Assert.Single(tracker.Bodies);
+        Assert.True(body.Mapped);
+        Assert.NotEmpty(body.Predictions);
+        Assert.All(body.Predictions, p => Assert.True(p.Genus.Name is "Stratum" or "Bacterium"));
+    }
+
+    [Fact]
+    public void A_mapped_body_with_known_physics_values_only_its_predicted_species()
+    {
+        var (bus, _, tracker) = NewTracker();
+        Publish(bus, PlanetScan);
+        Publish(bus, Dss);
+
+        // The DSS range narrows each genus to the species this CO2 world can grow, at the 5× rate.
+        Assert.Equal(((1362000L + 1000000L) * 5, (19010800L + 4934500L) * 5), tracker.Bodies.Single().ValueRange);
+    }
+
+    [Fact]
+    public void A_scan_logged_after_the_signals_still_fills_in_the_predictions()
+    {
+        var (bus, _, tracker) = NewTracker();
+        Publish(bus, Fss);
+        Assert.Empty(tracker.Bodies.Single().Predictions);
+
+        Publish(bus, PlanetScan);
+
+        var body = tracker.Bodies.Single();
+        Assert.NotNull(body.Environment);
+        Assert.NotEmpty(body.Predictions);
+        Assert.Equal(3, body.SignalCount);
+    }
+
+    [Fact]
+    public void Scanning_a_planet_without_bio_signals_does_not_raise_changed()
+    {
+        var (bus, _, tracker) = NewTracker();
+        var raised = 0;
+        tracker.Changed += () => raised++;
+
+        Publish(bus, PlanetScan);
+        Publish(bus, """
+        { "timestamp":"2026-08-01T08:00:00Z", "event":"Scan", "BodyName":"Nervi A",
+          "SystemAddress":2871051298217, "BodyID":0, "StarType":"K" }
+        """);
+
+        Assert.Equal(0, raised);
+        Assert.Empty(tracker.Bodies);
+    }
+
+    [Fact]
+    public void A_scan_organic_tracks_minimum_sample_distance()
+    {
+        var (bus, _, tracker) = NewTracker();
+        Publish(bus, Scan("Log"));
+
+        var scan = Assert.Single(tracker.Scans);
+        Assert.Equal("Stratum Tectonicas", scan.SpeciesName);
+        Assert.Equal(500, scan.SampleDistanceMeters);
+    }
+
+    [Fact]
+    public void An_unknown_genus_has_no_sample_distance_rather_than_a_guess()
+    {
+        var (bus, _, tracker) = NewTracker();
+        Publish(bus, """
+        { "timestamp":"2026-08-01T11:00:00Z", "event":"ScanOrganic", "ScanType":"Log",
+          "Genus":"$Codex_Ent_Newthing_Genus_Name;", "Species":"$Codex_Ent_Newthing_01_Name;",
+          "SystemAddress":2871051298217, "Body":12 }
+        """);
+
+        Assert.Equal(0, Assert.Single(tracker.Scans).SampleDistanceMeters);
     }
 }

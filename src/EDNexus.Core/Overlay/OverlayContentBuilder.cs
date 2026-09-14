@@ -19,11 +19,13 @@ public static class OverlayContentBuilder
     /// <param name="currentBodySignals">The body the commander is currently at, from <see cref="ExobiologyTracker.CurrentBody"/>, or null.</param>
     /// <param name="activeSite">The most recently touched colonisation site, from <see cref="ColonisationTracker.ActiveSite"/>, or null.</param>
     /// <param name="route">The last saved/plotted route, or null when nothing has been plotted.</param>
+    /// <param name="activeScan">The sample run in progress, from <see cref="ExobiologyTracker.ActiveScan"/>, or null.</param>
     public static OverlayContent Build(
         CommanderState state,
         BodyBioSignals? currentBodySignals,
         ColonisationSite? activeSite,
-        RouteSettings? route)
+        RouteSettings? route,
+        OrganicScan? activeScan = null)
     {
         IReadOnlyList<OverlayShortfallLine> shortfalls = activeSite is null
             ? Array.Empty<OverlayShortfallLine>()
@@ -41,8 +43,41 @@ public static class OverlayContentBuilder
             FuelCapacity: state.FuelCapacity,
             BioSignalBody: currentBodySignals is { SignalCount: > 0 } ? currentBodySignals.BodyName : null,
             BioSignalCount: currentBodySignals?.SignalCount ?? 0,
-            ColonisationShortfalls: shortfalls);
+            ColonisationShortfalls: shortfalls,
+            BioSignalDetail: BioDetail(currentBodySignals, activeScan));
     }
+
+    /// <summary>
+    /// The one bio line worth a glance on foot. Mid-run, that is how far to walk before the next
+    /// sample counts; otherwise the richest candidate here and its sample distance.
+    /// </summary>
+    private static string? BioDetail(BodyBioSignals? body, OrganicScan? scan)
+    {
+        if (scan is { Complete: false })
+            return scan.SampleDistanceMeters > 0
+                ? $"Sampling {scan.SpeciesName} {scan.Progress} · move {scan.SampleDistanceMeters} m"
+                : $"Sampling {scan.SpeciesName} {scan.Progress}";
+
+        if (body is not { SignalCount: > 0 }) return null;
+
+        if (body.Predictions.Count > 0)
+        {
+            var top = body.Predictions[0];
+            return $"Top candidate: {top.Species.Name} · {top.SampleDistanceMeters} m · ~{Money(top.EstimatedValue)}";
+        }
+
+        if (body.Genera.Count > 0)
+        {
+            var richest = body.Genera.OrderByDescending(g => g.MaxValue).First();
+            return $"Richest genus: {richest.Name} · {richest.SampleDistanceMeters} m";
+        }
+
+        return null;
+    }
+
+    private static string Money(long credits) => credits >= 1_000_000
+        ? $"{credits / 1_000_000.0:0.#}M cr"
+        : $"{credits:N0} cr";
 
     /// <summary>
     /// Mirrors the route card's "next system" pointer: the saved route's hop at

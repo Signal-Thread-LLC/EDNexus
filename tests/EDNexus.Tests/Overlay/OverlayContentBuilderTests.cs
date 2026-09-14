@@ -130,4 +130,55 @@ public class OverlayContentBuilderTests
         Assert.Null(OverlayContentBuilder.Build(state, null, null, null).NextJumpSystem);
         Assert.Null(OverlayContentBuilder.Build(state, null, null, new RouteSettings()).NextJumpSystem);
     }
+
+    // --- Exobiology hint. ---
+
+    private static BioSpecies Tectonicas => ExobiologyCatalog.Default.SpeciesByName("Stratum Tectonicas")!;
+
+    [Fact]
+    public void A_sample_run_in_progress_shows_how_far_to_move()
+    {
+        var scan = new OrganicScan(new BodyKey(1, 2), "Some Body", Tectonicas, "Stratum Tectonicas", "Stratum",
+            Samples: 2, System.DateTimeOffset.UtcNow, SampleDistanceMeters: 500);
+
+        var content = OverlayContentBuilder.Build(new CommanderState(), null, null, null, scan);
+
+        Assert.Equal("Sampling Stratum Tectonicas 2/3 · move 500 m", content.BioSignalDetail);
+        Assert.False(content.HasBioSignals);   // the hint stands on its own
+    }
+
+    [Fact]
+    public void A_finished_run_gives_way_to_the_top_candidate_on_the_body()
+    {
+        var stratum = ExobiologyCatalog.Default.Genera.First(g => g.Name == "Stratum");
+        var prediction = new BioPrediction(Tectonicas, stratum, 500, Tectonicas.Value, Tectonicas.FirstLoggedValue, IsFirstDiscovery: true);
+        var body = new BodyBioSignals(new BodyKey(1, 2), "Some Body", 2, System.Array.Empty<BioGenus>(), false,
+            new[] { prediction });
+        var done = new OrganicScan(new BodyKey(1, 2), "Some Body", Tectonicas, "Stratum Tectonicas", "Stratum",
+            Samples: 3, System.DateTimeOffset.UtcNow, SampleDistanceMeters: 500);
+
+        var content = OverlayContentBuilder.Build(new CommanderState(), body, null, null, done);
+
+        Assert.Equal("Top candidate: Stratum Tectonicas · 500 m · ~95.1M cr", content.BioSignalDetail);
+    }
+
+    [Fact]
+    public void A_mapped_body_without_physics_names_its_richest_genus()
+    {
+        var genera = ExobiologyCatalog.Default.Genera.Where(g => g.Name is "Bacterium" or "Tubus").ToList();
+        var body = new BodyBioSignals(new BodyKey(1, 2), "Some Body", 2, genera, true);
+
+        var content = OverlayContentBuilder.Build(new CommanderState(), body, null, null);
+
+        Assert.Equal("Richest genus: Tubus · 800 m", content.BioSignalDetail);
+    }
+
+    [Fact]
+    public void No_hint_without_a_run_or_anything_known_about_the_body()
+    {
+        var body = new BodyBioSignals(new BodyKey(1, 2), "Some Body", 3, System.Array.Empty<BioGenus>(), false);
+
+        Assert.Null(OverlayContentBuilder.Build(new CommanderState(), body, null, null).BioSignalDetail);
+        Assert.Null(OverlayContentBuilder.Build(new CommanderState(), null, null, null).BioSignalDetail);
+    }
 }
