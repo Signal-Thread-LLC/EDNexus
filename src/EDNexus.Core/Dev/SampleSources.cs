@@ -313,12 +313,34 @@ public sealed class ExobiologySampleSource : JournalSampleSource
         var bodyId = rng.Next(1, 40);
         var bodyName = system + Pick(rng, SamplePools.BodySuffixes);
 
-        // Genera the DSS reveals, and the species actually being sampled from one of them.
-        var genera = SamplePools.PickDistinct(rng, catalog.Genera, rng.Next(1, 4));
+        // A landable world whose physics the prediction engine can work with, and genera the DSS
+        // reveals drawn from what those physics can grow — so the predicted and mapped views agree.
+        var world = Pick(rng, Worlds);
+        var environment = new Exobio.BodyEnvironment(
+            world.PlanetClass, world.Atmosphere, world.AtmosphereType,
+            world.GravityMs2 / 9.80665, world.TemperatureK, Landable: true, WasDiscovered: true, world.Volcanism);
+        var growable = catalog.Predict(environment).Select(p => p.Genus).DistinctBy(g => g.Symbol).ToList();
+        var pool = growable.Count > 0 ? growable : catalog.Genera.ToList();
+        var genera = SamplePools.PickDistinct(rng, pool, rng.Next(1, Math.Min(3, pool.Count) + 1));
         var species = Pick(rng, genera[0].Species);
 
         var lines = new List<string>
         {
+            Event("Scan", o =>
+            {
+                o["ScanType"] = "Detailed";
+                o["BodyName"] = bodyName;
+                o["SystemAddress"] = systemAddress;
+                o["BodyID"] = bodyId;
+                o["PlanetClass"] = world.PlanetClass;
+                o["Atmosphere"] = world.Atmosphere;
+                o["AtmosphereType"] = world.AtmosphereType;
+                o["Volcanism"] = world.Volcanism;
+                o["SurfaceGravity"] = world.GravityMs2;
+                o["SurfaceTemperature"] = world.TemperatureK;
+                o["Landable"] = true;
+                o["WasDiscovered"] = rng.Next(3) != 0;
+            }),
             Event("SAASignalsFound", o =>
             {
                 o["BodyName"] = bodyName;
@@ -385,6 +407,20 @@ public sealed class ExobiologySampleSource : JournalSampleSource
 
         return lines;
     }
+
+    private sealed record World(string PlanetClass, string Atmosphere, string AtmosphereType,
+        double GravityMs2, double TemperatureK, string Volcanism = "");
+
+    /// <summary>Typical bio-bearing worlds, one per major atmosphere, so reshuffles exercise different rules.</summary>
+    private static readonly World[] Worlds =
+    {
+        new("High metal content body", "thin carbon dioxide atmosphere", "CarbonDioxide", 0.78, 182),
+        new("Rocky body", "thin ammonia atmosphere", "Ammonia", 1.18, 171),
+        new("Rocky body", "thin sulphur dioxide atmosphere", "SulphurDioxide", 2.35, 205),
+        new("Icy body", "thin neon-rich atmosphere", "NeonRich", 1.47, 68),
+        new("Rocky ice body", "thin argon atmosphere", "Argon", 0.98, 118, "minor water magma volcanism"),
+        new("High metal content body", "thin water atmosphere", "Water", 1.96, 395),
+    };
 }
 
 /// <summary>A random cargo hold for the Cargo card.</summary>

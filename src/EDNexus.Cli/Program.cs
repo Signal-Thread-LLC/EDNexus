@@ -231,14 +231,23 @@ static void PrintExobiology(ExobiologyTracker tracker)
 
     if (tracker.CurrentBody is { } here)
     {
-        var genera = here.Genera.Count > 0 ? string.Join(", ", here.Genera.Select(g => g.Name)) : "(not mapped)";
-        Console.WriteLine($"  Here      : {here.BodyName} — {here.SignalCount} bio signal(s): {genera}");
+        var genera = here.Genera.Count > 0
+            ? string.Join(", ", here.Genera.Select(g => $"{g.Name} ({g.SampleDistanceMeters} m)"))
+            : "(not mapped)";
+        Console.WriteLine($"  Here      : {here.BodyName} — {here.SignalCount} bio signal(s): {genera}"
+                          + (here.IsUndiscovered ? "  [undiscovered — 5× first-logged]" : ""));
         if (here.ValueRange is { } r)
             Console.WriteLine($"  Estimate  : {r.Min:N0} – {r.Max:N0} cr");
+        if (here.Environment is { } env)
+            Console.WriteLine($"  Physics   : {env.PlanetClass}, {(env.Atmosphere.Length > 0 ? env.Atmosphere : "no atmosphere")}, "
+                              + $"{env.SurfaceTemperatureK:0} K, {env.SurfaceGravityG:0.00} g");
+        foreach (var p in here.Predictions.Take(8))
+            Console.WriteLine($"    candidate {p.EstimatedValue,12:N0} cr  {p.SampleDistanceMeters,4} m  {p.Species.Name}");
     }
 
     if (tracker.ActiveScan is { } scan)
-        Console.WriteLine($"  Sampling  : {scan.SpeciesName} {scan.Progress} on {scan.BodyName}");
+        Console.WriteLine($"  Sampling  : {scan.SpeciesName} {scan.Progress} on {scan.BodyName}"
+                          + (scan.SampleDistanceMeters > 0 ? $" — {scan.SampleDistanceMeters} m between samples" : ""));
 
     Console.WriteLine($"  Pending   : {session.PendingValue:N0} cr across {session.Pending.Count} sample(s)");
     Console.WriteLine($"  Sold      : {session.SoldValue:N0} cr from {session.SoldCount} sample(s)"
@@ -345,7 +354,7 @@ static void PrintEngineers(EngineeringTracker tracker)
 /// </summary>
 static void PrintOverlay(CommanderState s, ExobiologyTracker exobio, ColonisationTracker colonisation)
 {
-    var content = OverlayContentBuilder.Build(s, exobio.CurrentBody, colonisation.ActiveSite, route: null);
+    var content = OverlayContentBuilder.Build(s, exobio.CurrentBody, colonisation.ActiveSite, route: null, exobio.ActiveScan);
 
     Console.WriteLine("\n======== Overlay preview ========");
     Console.WriteLine($"  System    : {content.StarSystem ?? "(unknown)"}");
@@ -354,6 +363,8 @@ static void PrintOverlay(CommanderState s, ExobiologyTracker exobio, Colonisatio
                       + (content.FuelLow ? "  ⚠ LOW" : ""));
     if (content.HasBioSignals)
         Console.WriteLine($"  Bio       : {content.BioSignalCount} signal(s) on {content.BioSignalBody}");
+    if (content.BioSignalDetail is { } bioDetail)
+        Console.WriteLine($"  Bio hint  : {bioDetail}");
     if (content.HasColonisationShortfall)
     {
         Console.WriteLine("  Shortfall :");

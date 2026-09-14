@@ -38,15 +38,14 @@ public partial class OverlayWindow : Window
             ? Avalonia.Media.Brush.Parse("#F0453B")
             : Avalonia.Media.Brush.Parse("#E7E9EE");
 
+        // A sample run can be under way on a body the FSS never flagged, so the detail stands alone.
+        var bioLines = new List<string>(2);
         if (content.HasBioSignals)
-        {
-            BioLine.Text = $"Bio signals: {content.BioSignalCount} — {content.BioSignalBody}";
-            BioLine.IsVisible = true;
-        }
-        else
-        {
-            BioLine.IsVisible = false;
-        }
+            bioLines.Add($"Bio signals: {content.BioSignalCount} — {content.BioSignalBody}");
+        if (content.BioSignalDetail is { Length: > 0 } detail)
+            bioLines.Add(detail);
+        BioLine.Text = string.Join("\n", bioLines);
+        BioLine.IsVisible = bioLines.Count > 0;
 
         if (content.HasColonisationShortfall)
         {

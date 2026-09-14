@@ -19,6 +19,7 @@ public sealed class ExobiologyTracker
     private readonly Dictionary<BodyKey, BodyBioSignals> _signals = new();
     private readonly Dictionary<(BodyKey Body, string Species), OrganicScan> _scans = new();
     private readonly Dictionary<BodyKey, string> _bodyNames = new();
+    private readonly Dictionary<BodyKey, BodyEnvironment> _environments = new();
 
     private BodyKey? _currentBody;
     private long _soldValue;
@@ -33,6 +34,7 @@ public sealed class ExobiologyTracker
         _state = state;
         _catalog = catalog ?? ExobiologyCatalog.Default;
 
+        bus.Subscribe("Scan", OnScan);
         bus.Subscribe("SAASignalsFound", OnSaaSignals);
         bus.Subscribe("FSSBodySignals", OnFssSignals);
         bus.Subscribe("ScanOrganic", OnScanOrganic);
@@ -104,6 +106,50 @@ public sealed class ExobiologyTracker
     // --- Scanners: which bodies carry signals. ---
 
     /// <summary>
+    /// A body scan. For planets it records the physics — class, atmosphere, gravity, temperature,
+    /// volcanism and whether anyone discovered it first — so the catalog can predict what grows
+    /// there. The FSS usually logs a body's signals just before its scan, so a body already carrying
+    /// signals has its predictions filled in here.
+    /// </summary>
+    private void OnScan(JournalEntry e)
+    {
+        if (KeyOf(e) is not BodyKey key) return;
+        if (e.GetString("PlanetClass") is not { Length: > 0 } planetClass) return;   // stars, belts
+
+        var env = new BodyEnvironment(
+            PlanetClass: planetClass,
+            Atmosphere: e.GetString("Atmosphere") ?? "",
+            AtmosphereType: e.GetString("AtmosphereType"),
+            SurfaceGravityG: (e.GetDouble("SurfaceGravity") ?? 0) / StandardGravity,
+            SurfaceTemperatureK: e.GetDouble("SurfaceTemperature") ?? 0,
+            Landable: e.GetBool("Landable") ?? false,
+            // Absent on pre-3.3 journals; assume discovered rather than promise a bonus.
+            WasDiscovered: e.GetBool("WasDiscovered") ?? true,
+            Volcanism: e.GetString("Volcanism"));
+
+        bool changed;
+        lock (_gate)
+        {
+            _environments[key] = env;
+            if (e.GetString("BodyName") is { Length: > 0 } name)
+                _bodyNames[key] = name;
+
+            // Most scanned planets carry no biology; only redraw when one that does gains its physics.
+            changed = _signals.TryGetValue(key, out var existing);
+            if (changed)
+                _signals[key] = existing! with
+                {
+                    Environment = env,
+                    Predictions = _catalog.Predict(env, existing.Genera),
+                };
+        }
+        if (changed) Changed?.Invoke();
+    }
+
+    /// <summary>The journal reports surface gravity in m/s²; the spawn rules are written in g.</summary>
+    private const double StandardGravity = 9.80665;
+
+    /// <summary>
     /// A surface (DSS) mapping. Unlike the FSS pass this names the genera present, which is the
     /// first point at which the body's biology can be valued.
     /// </summary>
@@ -142,7 +188,11 @@ public sealed class ExobiologyTracker
         lock (_gate)
         {
             _bodyNames[key] = name;
-            _signals[key] = new BodyBioSignals(key, name, count, genera, mapped);
+            // With the physics known, predict — narrowed to the genera when a DSS pass named them.
+            var env = _environments.GetValueOrDefault(key);
+            var predictions = env is null ? Array.Empty<BioPrediction>() : _catalog.Predict(env, genera);
+
+            _signals[key] = new BodyBioSignals(key, name, count, genera, mapped, predictions, env);
         }
         Changed?.Invoke();
     }
@@ -177,6 +227,10 @@ public sealed class ExobiologyTracker
         var speciesName = e.GetLocalised("Species") ?? speciesSymbol ?? "Unknown species";
         var species = _catalog.Resolve(speciesSymbol, e.GetLocalised("Species"));
         var genusName = e.GetLocalised("Genus") ?? species?.Genus ?? "";
+        // How far to walk before the next sample counts. Unknown (0) rather than a guess for a new genus.
+        var sampleDistance = _catalog.Genus(e.GetString("Genus"))?.SampleDistanceMeters
+            ?? species?.SampleDistanceMeters
+            ?? 0;
 
         var samples = e.GetString("ScanType")?.ToLowerInvariant() switch
         {
@@ -200,7 +254,8 @@ public sealed class ExobiologyTracker
                 species?.Name ?? speciesName,
                 genusName,
                 reached,
-                e.Timestamp);
+                e.Timestamp,
+                sampleDistance);
         }
         Changed?.Invoke();
     }

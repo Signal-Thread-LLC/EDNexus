@@ -1125,11 +1125,38 @@
                   <!-- What is on this body. -->
                   <StackPanel IsVisible="{Binding HasBody}">
                     <TextBlock Classes="big" Text="{Binding BodyName}" TextWrapping="Wrap" />
-                    <TextBlock Classes="value" FontSize="13" Margin="0,4,0,0"
-                               Foreground="{StaticResource AmberBrush}" Text="{Binding BodySignals}" />
+                    <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
+                      <TextBlock Classes="value" FontSize="13" VerticalAlignment="Center"
+                                 Foreground="{StaticResource AmberBrush}" Text="{Binding BodySignals}" />
+                      <Border IsVisible="{Binding IsFirstDiscovery}" BorderBrush="{StaticResource AmberBrush}"
+                              BorderThickness="1" CornerRadius="3" Padding="5,1" VerticalAlignment="Center"
+                              ToolTip.Tip="Nobody had scanned this body — first-logged samples pay five times the base">
+                        <TextBlock Text="UNDISCOVERED · ×5" FontSize="10" FontWeight="SemiBold" LetterSpacing="1"
+                                   Foreground="{StaticResource AmberBrush}" />
+                      </Border>
+                    </StackPanel>
                     <TextBlock Classes="label" Text="{Binding BodyGenera}" TextWrapping="Wrap" Margin="0,2,0,0" />
                     <TextBlock Classes="value" FontSize="13" Margin="0,4,0,0" Text="{Binding BodyValue}"
                                IsVisible="{Binding BodyValue, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+                    <!-- Species the body's physics can grow, predicted offline, with their sample distances. -->
+                    <StackPanel IsVisible="{Binding HasPredictions}" Margin="0,8,0,0">
+                      <TextBlock Classes="label" FontSize="10" FontWeight="SemiBold" LetterSpacing="1"
+                                 Text="{Binding PredictionsHeader}" />
+                      <ItemsControl ItemsSource="{Binding PredictedSpecies}" Margin="0,3,0,0">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:PredictedBioLine">
+                            <Grid ColumnDefinitions="*,Auto,Auto" Margin="0,2">
+                              <TextBlock Grid.Column="0" Classes="value" FontSize="12" Text="{Binding Name}"
+                                         TextTrimming="CharacterEllipsis" />
+                              <TextBlock Grid.Column="1" Classes="label" Text="{Binding Distance}" Margin="8,0" />
+                              <TextBlock Grid.Column="2" Text="{Binding Payout}" Foreground="{StaticResource AmberBrush}"
+                                         FontSize="12" FontWeight="SemiBold" ToolTip.Tip="{Binding PayoutTip}" />
+                            </Grid>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </StackPanel>
                   </StackPanel>
 
                   <!-- The three-sample run in progress. -->
@@ -1143,7 +1170,12 @@
                     </Grid>
                     <ProgressBar Minimum="0" Maximum="1" Value="{Binding ScanFraction}" Height="8"
                                  Foreground="{StaticResource AmberBrush}" Background="#22262E" Margin="0,6,0,0" />
-                    <TextBlock Classes="label" Text="{Binding ScanValue}" Margin="0,4,0,0" />
+                    <Grid ColumnDefinitions="*,Auto" Margin="0,4,0,0">
+                      <TextBlock Grid.Column="0" Classes="label" Text="{Binding ScanValue}" />
+                      <TextBlock Grid.Column="1" Classes="label" Margin="10,0,0,0" Text="{Binding ScanDistance}"
+                                 Foreground="{StaticResource AmberBrush}"
+                                 ToolTip.Tip="Move at least this far from the last sample before taking the next" />
+                    </Grid>
                   </StackPanel>
 
                   <!-- Session tally. -->

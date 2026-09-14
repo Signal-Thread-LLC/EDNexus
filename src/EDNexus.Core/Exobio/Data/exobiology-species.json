@@ -28,7 +28,8 @@
         "name": "Aleoida Spica",
         "value": 3385200
       }
-    ]
+    ],
+    "sampleDistance": 150
   },
   {
     "genusSymbol": "$Codex_Ent_Vents_Name;",
@@ -39,7 +40,8 @@
         "name": "Amphora Plant",
         "value": 1628800
       }
-    ]
+    ],
+    "sampleDistance": 100
   },
   {
     "genusSymbol": "$Codex_Ent_Sphere_Name;",
@@ -85,7 +87,8 @@
         "name": "Rubeum Bioluminescent Anemone",
         "value": 1499900
       }
-    ]
+    ],
+    "sampleDistance": 100
   },
   {
     "genusSymbol": "$Codex_Ent_Bacterial_Genus_Name;",
@@ -156,7 +159,8 @@
         "name": "Bacterium Volu",
         "value": 7774700
       }
-    ]
+    ],
+    "sampleDistance": 500
   },
   {
     "genusSymbol": "$Codex_Ent_Cone_Name;",
@@ -167,7 +171,8 @@
         "name": "Bark Mound",
         "value": 1471900
       }
-    ]
+    ],
+    "sampleDistance": 100
   },
   {
     "genusSymbol": "$Codex_Ent_Brancae_Name;",
@@ -213,7 +218,8 @@
         "name": "Viride Brain Tree",
         "value": 1593700
       }
-    ]
+    ],
+    "sampleDistance": 100
   },
   {
     "genusSymbol": "$Codex_Ent_Cactoid_Genus_Name;",
@@ -244,7 +250,8 @@
         "name": "Cactoida Vermis",
         "value": 16202800
       }
-    ]
+    ],
+    "sampleDistance": 300
   },
   {
     "genusSymbol": "$Codex_Ent_Clypeus_Genus_Name;",
@@ -265,7 +272,8 @@
         "name": "Clypeus Speculumi",
         "value": 16202800
       }
-    ]
+    ],
+    "sampleDistance": 150
   },
   {
     "genusSymbol": "$Codex_Ent_Conchas_Genus_Name;",
@@ -291,7 +299,8 @@
         "name": "Concha Renibus",
         "value": 4572400
       }
-    ]
+    ],
+    "sampleDistance": 150
   },
   {
     "genusSymbol": "$Codex_Ent_Ground_Struct_Ice_Name;",
@@ -302,7 +311,8 @@
         "name": "Crystalline Shards",
         "value": 1628800
       }
-    ]
+    ],
+    "sampleDistance": 100
   },
   {
     "genusSymbol": "$Codex_Ent_Electricae_Genus_Name;",
@@ -318,7 +328,8 @@
         "name": "Electricae Radialem",
         "value": 6284600
       }
-    ]
+    ],
+    "sampleDistance": 1000
   },
   {
     "genusSymbol": "$Codex_Ent_Fonticulus_Genus_Name;",
@@ -354,7 +365,8 @@
         "name": "Fonticulua Upupam",
         "value": 5727600
       }
-    ]
+    ],
+    "sampleDistance": 500
   },
   {
     "genusSymbol": "$Codex_Ent_Shrubs_Genus_Name;",
@@ -395,7 +407,8 @@
         "name": "Frutexa Sponsae",
         "value": 5988000
       }
-    ]
+    ],
+    "sampleDistance": 150
   },
   {
     "genusSymbol": "$Codex_Ent_Fumerolas_Genus_Name;",
@@ -421,7 +434,8 @@
         "name": "Fumerola Nitris",
         "value": 7500900
       }
-    ]
+    ],
+    "sampleDistance": 100
   },
   {
     "genusSymbol": "$Codex_Ent_Fungoids_Genus_Name;",
@@ -447,7 +461,8 @@
         "name": "Fungoida Stabitis",
         "value": 2680300
       }
-    ]
+    ],
+    "sampleDistance": 300
   },
   {
     "genusSymbol": "$Codex_Ent_Osseus_Genus_Name;",
@@ -483,7 +498,8 @@
         "name": "Osseus Spiralis",
         "value": 2404700
       }
-    ]
+    ],
+    "sampleDistance": 800
   },
   {
     "genusSymbol": "$Codex_Ent_Ingensradices_Genus_Name;",
@@ -494,7 +510,8 @@
         "name": "Radicoida Unicus",
         "value": 119037
       }
-    ]
+    ],
+    "sampleDistance": 100
   },
   {
     "genusSymbol": "$Codex_Ent_Recepta_Genus_Name;",
@@ -515,7 +532,8 @@
         "name": "Recepta Umbrux",
         "value": 12934900
       }
-    ]
+    ],
+    "sampleDistance": 150
   },
   {
     "genusSymbol": "$Codex_Ent_Tube_Name;",
@@ -561,7 +579,8 @@
         "name": "Viride Sinuous Tubers",
         "value": 1514500
       }
-    ]
+    ],
+    "sampleDistance": 100
   },
   {
     "genusSymbol": "$Codex_Ent_Stratum_Genus_Name;",
@@ -607,7 +626,8 @@
         "name": "Stratum Tectonicas",
         "value": 19010800
       }
-    ]
+    ],
+    "sampleDistance": 500
   },
   {
     "genusSymbol": "$Codex_Ent_Tubus_Genus_Name;",
@@ -638,7 +658,8 @@
         "name": "Tubus Sororibus",
         "value": 5727600
       }
-    ]
+    ],
+    "sampleDistance": 800
   },
   {
     "genusSymbol": "$Codex_Ent_Tussocks_Genus_Name;",
@@ -719,6 +740,7 @@
         "name": "Tussock Virgam",
         "value": 14313700
       }
-    ]
+    ],
+    "sampleDistance": 200
   }
 ]
