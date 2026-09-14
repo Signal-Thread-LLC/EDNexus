@@ -1,5 +1,6 @@
 using System.Globalization;
 using EDNexus.App.Telemetry;
+using EDNexus.Core.Mining;
 using EDNexus.Core.Settings;
 using IOverlay = EDNexus.Core.Overlay.IOverlay;
 using IVoice = EDNexus.Core.Voice.IVoice;
@@ -158,6 +159,23 @@ public sealed class Bootstrap
         EnsureMiningSessionDate(when);
         Settings.Mining.SessionValue += Math.Max(0, credits);
         Settings.Mining.SessionUnits += 1;
+        Store.Save(Settings);
+    }
+
+    /// <summary>
+    /// Record a unit refined from an SRV into the known planetary mining spots. The list is swapped for
+    /// a new one rather than edited, since the engine reads it from the journal thread on arrival.
+    /// </summary>
+    public void RecordMiningSpot(RefinedUnit unit, int averagePrice)
+    {
+        Settings.Mining.KnownSpots = MiningSpotBook.Record(Settings.Mining.KnownSpots, unit, averagePrice);
+        Store.Save(Settings);
+    }
+
+    /// <summary>Persist the Mining option that announces known spots on arriving in a system.</summary>
+    public void ApplyMiningSpotAnnouncements(bool enabled)
+    {
+        Settings.Mining.AnnounceKnownSpots = enabled;
         Store.Save(Settings);
     }
 

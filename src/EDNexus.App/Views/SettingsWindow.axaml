@@ -99,6 +99,10 @@
               <TextBox x:Name="MiningThresholdBox" PlaceholderText="e.g. 50000" />
               <TextBlock Foreground="#8A909C" FontSize="12" TextWrapping="Wrap"
                          Text="A prospected material — or deep-core motherlode — at or above this galactic-average price is called out on the mining card and rings a chime. Leave blank to turn the highlight off." />
+
+              <CheckBox x:Name="MiningSpotAnnounceToggle" Content="Call out known planetary mining spots on arrival" Foreground="#E7E9EE" />
+              <TextBlock x:Name="MiningSpotsSummary" Foreground="#8A909C" FontSize="12" TextWrapping="Wrap"
+                         Text="Whenever you refine a commodity at or above the value above from an SRV, EDNexus records where on the planet you mined it. Arriving in that system again speaks the spots worth mining. Needs voice callouts turned on under Overlay &amp; Voice." />
             </StackPanel>
           </Border>
         </StackPanel>

@@ -22,6 +22,15 @@ public sealed class MiningTracker
     // worth of refined units — at most a full cargo hold, a few hundred — costs nothing to keep.
     private readonly List<RefinedUnit> _refined = new();
 
+    /// <summary>Status.json <c>Flags</c> bit set while the commander is driving an SRV.</summary>
+    private const long StatusFlagInSrv = 0x0400_0000;
+
+    // The system the commander is in (from arrival events) and the SRV's latest surface fix (from
+    // Status.json), so a unit refined in an SRV can be pinned to where it was mined.
+    private long? _systemAddress;
+    private string? _starSystem;
+    private SurfacePosition? _srvPosition;
+
     /// <summary>Raised after a new prospect is recorded or the history is cleared.</summary>
     public event Action? Changed;
 
@@ -29,6 +38,10 @@ public sealed class MiningTracker
     {
         bus.Subscribe("ProspectedAsteroid", OnProspected);
         bus.Subscribe("MiningRefined", OnRefined);
+        bus.Subscribe("Status", OnStatus);
+        bus.Subscribe("Location", OnArrival);
+        bus.Subscribe("FSDJump", OnArrival);
+        bus.Subscribe("CarrierJump", OnArrival);
     }
 
     /// <summary>Every prospect this session, oldest first.</summary>
@@ -71,8 +84,39 @@ public sealed class MiningTracker
         var symbol = CommodityName.Canonicalize(raw ?? localised);
         if (symbol.Length == 0) return;
 
-        lock (_gate) _refined.Add(new RefinedUnit(e.Timestamp, symbol, localised ?? raw ?? symbol));
+        lock (_gate) _refined.Add(new RefinedUnit(e.Timestamp, symbol, localised ?? raw ?? symbol, _srvPosition));
         Changed?.Invoke();
+    }
+
+    private void OnArrival(JournalEntry e)
+    {
+        lock (_gate)
+        {
+            _systemAddress = e.GetInt64("SystemAddress") ?? _systemAddress;
+            _starSystem = e.GetString("StarSystem") ?? _starSystem;
+            _srvPosition = null;
+        }
+    }
+
+    /// <summary>
+    /// Keep the SRV's latest surface fix. Status.json is rewritten as the commander drives, so the fix
+    /// in hand when a <c>MiningRefined</c> arrives is within metres of the deposit. Any update that
+    /// isn't in an SRV with a position (back aboard the ship, in space) clears it, so ship refining is
+    /// never pinned to a stale planetary position.
+    /// </summary>
+    private void OnStatus(JournalEntry e)
+    {
+        var inSrv = e.GetInt64("Flags") is long flags && (flags & StatusFlagInSrv) != 0;
+        var lat = e.GetDouble("Latitude");
+        var lon = e.GetDouble("Longitude");
+        var body = e.GetString("BodyName");
+
+        lock (_gate)
+        {
+            _srvPosition = inSrv && lat is double la && lon is double lo && !string.IsNullOrEmpty(body)
+                ? new SurfacePosition(_systemAddress, _starSystem, body, la, lo, e.GetDouble("PlanetRadius"))
+                : null;
+        }
     }
 
     private void OnProspected(JournalEntry e)

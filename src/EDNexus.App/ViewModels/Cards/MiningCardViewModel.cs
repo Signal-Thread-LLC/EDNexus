@@ -103,11 +103,17 @@ public sealed partial class MiningCardViewModel : CardViewModel
         }
 
         var known = Context.GetMiningSettings().KnownPrices;
+        var threshold = Context.GetMiningSettings().MinValueThreshold;
         for (var i = _recordedRefinedCount; i < refined.Count; i++)
         {
             var unit = refined[i];
             var credits = known.TryGetValue(unit.Symbol, out var price) ? price : 0;
             Context.RecordMiningRefined(unit.Timestamp, credits);
+
+            // A unit refined from an SRV that clears the "worth mining" threshold marks a planetary
+            // spot worth coming back to.
+            if (unit.Position is not null && threshold > 0 && credits >= threshold)
+                Context.RecordMiningSpot(unit, (int)credits);
         }
         _recordedRefinedCount = refined.Count;
     }
