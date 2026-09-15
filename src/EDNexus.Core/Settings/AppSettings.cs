@@ -127,14 +127,18 @@ public sealed class RadioSettings
 }
 
 /// <summary>
-/// Discord Rich Presence settings. Unlike the EDDN/Inara reporters this defaults on: presence is a
-/// local IPC connection to the commander's own already-running Discord client, not an upload to a
-/// third party, so there is no separate data-sharing consent to gate it behind.
+/// Discord Rich Presence settings. Off by default, like the EDDN/Inara reporters: presence travels
+/// over a local IPC connection, but the commander's Discord client then shows it on their profile —
+/// system, body or station, ship, cargo, and an Inara link carrying the commander name — so it
+/// shares data beyond this machine and waits for the commander to opt in.
 /// </summary>
 public sealed class DiscordSettings
 {
-    /// <summary>When true, mirror system/ship/activity onto Discord Rich Presence.</summary>
-    public bool Enabled { get; set; } = true;
+    /// <summary>
+    /// When true, mirror system/ship/activity onto Discord Rich Presence. Default off; a settings file
+    /// that already saved <c>true</c> keeps it.
+    /// </summary>
+    public bool Enabled { get; set; }
 
     /// <summary>
     /// Discord application (Client) ID presence is registered under. Override only to point at a

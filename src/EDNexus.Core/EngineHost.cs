@@ -200,9 +200,10 @@ public sealed class EngineHost : IDisposable
             _reporters = new ReporterHost(Bus, settings, ResolveVersion(), IsDevelopmentBuild, reportingSuppressed, log);
         }
 
-        // Discord Rich Presence: a local IPC integration to the commander's own Discord client, not a
-        // third-party upload. Like the reporters above it's still opt-out via AppSettings, and — same
-        // as EDDN/Inara — the CLI's replay-only runs (settings: null) never activate it.
+        // Discord Rich Presence: a local IPC integration to the commander's own Discord client, which
+        // then shows it on their profile. Like the reporters above it's opt-in via AppSettings (off by
+        // default), and — same as EDDN/Inara — the CLI's replay-only runs (settings: null) never
+        // activate it.
         if (settings?.Discord.Enabled == true)
         {
             IDiscordRpcClient discordClient;
