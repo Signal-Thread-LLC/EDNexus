@@ -12,6 +12,9 @@ handshake on the broadcaster's behalf, and issues its own long-lived opaque toke
 desktop client. The desktop app never talks to `*.twitch.tv` directly and never sees a raw Twitch
 access/refresh token — see "OAuth login flow" below.
 
+The extension frontend that consumes these updates lives in [`extension/`](../../extension/README.md),
+along with the payload contract it expects.
+
 ## Running locally
 
 ```sh

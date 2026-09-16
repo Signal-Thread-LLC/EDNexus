@@ -96,6 +96,13 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     /// <summary>The dashboard cards, in display order.</summary>
     public ObservableCollection<CardViewModel> Cards { get; }
 
+    /// <summary>
+    /// The live Twitch stream-card publisher of the current host, for the settings dialog's preview
+    /// and publish-status line. Read through the field rather than cached, since
+    /// <see cref="ResetToLive"/> replaces the host.
+    /// </summary>
+    public EDNexus.Core.Twitch.TwitchStreamCardService? TwitchCard => _host.TwitchCard;
+
     // --- Dashboard layout: order, visibility, width and collapse, persisted per card. ---
 
     private IEnumerable<CardDefaults> CardDefaults() => Cards.Select(c => new CardDefaults(c.Id, c.DefaultWidth));

@@ -46,6 +46,8 @@ Journal.*.log + *.json  ──►  JournalWatcher  ──►  JournalEventBus  �
 | `src/EDNexus.Core` | Engine + feature services. No UI dependencies. |
 | `src/EDNexus.App` | Avalonia 12 desktop UI (MVVM via CommunityToolkit.Mvvm). |
 | `src/EDNexus.Cli` | Headless harness for validation. |
+| `src/EDNexus.Ebs` | Twitch Extension Backend Service: relays commander state to viewers. |
+| `extension/` | The Twitch extension frontend (vanilla HTML/CSS/JS, no build step). |
 
 Key types live in `src/EDNexus.Core`: `JournalWatcher`, `JournalEntry`, `JournalEventBus`,
 `StateTracker`, `CommanderState`, `EngineHost`.

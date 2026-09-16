@@ -1,0 +1,78 @@
+{
+  "v": 1,
+  "at": "2026-09-15T18:20:00Z",
+  "headline": "Nervi / Nervi 2 a",
+  "subline": "Flying Krait Phantom (PH-01)",
+  "cmdr": {
+    "name": "Hadfield",
+    "credits": 1842900311,
+    "ranks": [
+      { "label": "Combat", "name": "Deadly", "pct": 62 },
+      { "label": "Trade", "name": "Tycoon", "pct": 18 },
+      { "label": "Explorer", "name": "Elite II", "pct": 47, "elite": true },
+      { "label": "Exobiologist", "name": "Ecologist", "pct": 81 },
+      { "label": "Mercenary", "name": "Gunslinger", "pct": 9 }
+    ]
+  },
+  "ship": {
+    "type": "Krait Phantom",
+    "name": "Wandering Albatross",
+    "ident": "PH-01",
+    "fuel": 9.4,
+    "fuelMax": 32,
+    "cargo": 24,
+    "jump": 58.21
+  },
+  "loc": {
+    "system": "Nervi",
+    "body": "Nervi 2 a",
+    "docked": false
+  },
+  "carrier": {
+    "name": "Gone Sampling",
+    "callsign": "K7Q-B3L",
+    "fuel": 812,
+    "jump": 500,
+    "pendingSystem": "Colonia",
+    "departsAt": "2026-09-15T18:35:00Z"
+  },
+  "exo": {
+    "pendingValue": 47230400,
+    "pendingCount": 6,
+    "soldValue": 12980000,
+    "soldCount": 3,
+    "firsts": 2,
+    "genus": "Stratum",
+    "species": "Stratum Tectonicas",
+    "samples": 2,
+    "body": "Nervi 2 a",
+    "signals": 4
+  },
+  "mining": {
+    "content": "High",
+    "motherlode": "Painite",
+    "remaining": 71.4,
+    "materials": [
+      { "name": "Painite", "pct": 34.2 },
+      { "name": "Bertrandite", "pct": 12.9 },
+      { "name": "Rutile", "pct": 8.1 }
+    ],
+    "prospected": 18,
+    "refined": 96
+  },
+  "missions": {
+    "active": 12,
+    "cap": 20,
+    "reward": 184500000,
+    "stacks": [
+      { "target": "Pirates", "faction": "Nervi Blue Mafia", "count": 7, "kills": 42, "reward": 121000000 },
+      { "target": "Skimmers", "faction": "Nervi Gold Society", "count": 3, "kills": 18, "reward": 38000000 }
+    ]
+  },
+  "cargo": [
+    { "name": "Painite", "t": 96 },
+    { "name": "Tritium", "t": 64 },
+    { "name": "Low Temperature Diamonds", "t": 24 },
+    { "name": "Limpet", "t": 12 }
+  ]
+}

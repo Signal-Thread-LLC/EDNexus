@@ -30,4 +30,11 @@ public sealed class TwitchOAuthOptions
 
     /// <summary>The EBS's best-effort logout/revoke endpoint, derived from <see cref="EbsBaseUrl"/>.</summary>
     public string RevokeEndpoint => $"{EbsBaseUrl.TrimEnd('/')}/oauth/revoke";
+
+    /// <summary>
+    /// The EBS's state-publish endpoint, derived from <see cref="EbsBaseUrl"/>. Where
+    /// <see cref="TwitchStreamCardService"/> POSTs each <see cref="StreamCardSnapshot"/> for relay to
+    /// viewers over Twitch Extensions PubSub.
+    /// </summary>
+    public string UpdateStateEndpoint => $"{EbsBaseUrl.TrimEnd('/')}/api/update-state";
 }

@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EDNexus — Extension settings</title>
+  <link rel="stylesheet" href="css/config.css">
+</head>
+<!--
+  Broadcaster configuration page. Deliberately minimal: *what* viewers see is chosen in the EDNexus
+  desktop app (Settings → Twitch), because that is where the data originates and where a section
+  left switched off is never published in the first place. The only thing that belongs here is which
+  EBS this channel's extension should read from.
+-->
+<body>
+  <main class="wrap">
+    <h1>EDNexus commander card</h1>
+    <p class="lede">
+      Shows your live Elite Dangerous session to viewers as a card they can pull out over the stream
+      and hide again.
+    </p>
+
+    <section class="panel">
+      <h2>Backend service</h2>
+      <p class="hint">
+        Leave this alone unless you run your own EBS. It must match the <code>EbsBaseUrl</code> set in
+        the desktop app under Settings → Twitch.
+      </p>
+      <label class="field">
+        <span class="field__label">EBS base URL</span>
+        <input type="url" id="ebs" name="ebs" placeholder="https://ebs.ednexus.app" spellcheck="false">
+      </label>
+      <div class="actions">
+        <button type="button" id="save" class="button">Save</button>
+        <span class="status" id="status" role="status"></span>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>What viewers see</h2>
+      <p class="hint">
+        Choose this in the desktop app: <strong>Settings → Twitch → Stream card</strong>. Each section
+        — commander, credits, ship, location, fleet carrier, exobiology, mining, missions, cargo — is
+        opt-in, and anything switched off is never sent off your machine at all.
+      </p>
+    </section>
+  </main>
+
+  <script src="js/config.js"></script>
+</body>
+</html>

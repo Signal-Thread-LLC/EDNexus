@@ -188,6 +188,78 @@
           </Border>
         </StackPanel>
 
+        <!-- Twitch — what viewers of the commander's stream can pull up over the video. Each section
+             is opt-in: anything left unchecked is never put into the published payload at all, so it
+             does not leave this machine. See extension/README.md for the viewer side. -->
+        <StackPanel Spacing="8">
+          <TextBlock Text="TWITCH" Foreground="#F07100" FontSize="12" FontWeight="SemiBold" LetterSpacing="2" />
+
+          <Border Background="#0F1114" CornerRadius="6" Padding="16">
+            <StackPanel Spacing="10">
+              <TextBlock x:Name="TwitchAccountLine" Foreground="#E7E9EE" FontSize="13" TextWrapping="Wrap"
+                         Text="Not signed in." />
+              <TextBlock Foreground="#8A909C" FontSize="12" TextWrapping="Wrap"
+                         Text="Signing in opens your browser. EDNexus never sees your Twitch password or token — the backend service performs the handshake and hands back its own credential for this machine." />
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button x:Name="TwitchLoginButton" Content="Sign in with Twitch" Click="OnTwitchLogin" Padding="12,7" />
+                <Button x:Name="TwitchLogoutButton" Content="Sign out" Click="OnTwitchLogout" Padding="12,7" IsVisible="False" />
+              </StackPanel>
+              <TextBlock x:Name="TwitchAuthLine" Foreground="#8A909C" FontSize="12" TextWrapping="Wrap" IsVisible="False" />
+            </StackPanel>
+          </Border>
+
+          <Border Background="#0F1114" CornerRadius="6" Padding="16">
+            <StackPanel Spacing="10">
+              <CheckBox x:Name="TwitchCardToggle" Content="Show my session to viewers" Foreground="#E7E9EE"
+                        IsCheckedChanged="OnTwitchCardToggled" />
+              <TextBlock Foreground="#8A909C" FontSize="12" TextWrapping="Wrap"
+                         Text="Publishes the sections below to your channel's EDNexus extension, where viewers can pull out a card over the stream and hide it again. Off while developer mode is on, so fabricated data never reaches your audience." />
+
+              <TextBlock Text="WHAT VIEWERS CAN SEE" Foreground="#E7E9EE" FontSize="12" Margin="0,4,0,0" />
+              <CheckBox x:Name="TwitchCommanderToggle" Content="Commander name &amp; ranks" Foreground="#E7E9EE" IsCheckedChanged="OnTwitchSectionToggled" />
+              <CheckBox x:Name="TwitchCreditsToggle" Content="Credit balance" Foreground="#E7E9EE" IsCheckedChanged="OnTwitchSectionToggled" />
+              <CheckBox x:Name="TwitchShipToggle" Content="Ship, fuel &amp; hold" Foreground="#E7E9EE" IsCheckedChanged="OnTwitchSectionToggled" />
+              <CheckBox x:Name="TwitchLocationToggle" Content="System, body &amp; station" Foreground="#E7E9EE" IsCheckedChanged="OnTwitchSectionToggled" />
+              <CheckBox x:Name="TwitchCarrierToggle" Content="Fleet carrier &amp; booked jumps" Foreground="#E7E9EE" IsCheckedChanged="OnTwitchSectionToggled" />
+              <CheckBox x:Name="TwitchExobioToggle" Content="Exobiology progress" Foreground="#E7E9EE" IsCheckedChanged="OnTwitchSectionToggled" />
+              <CheckBox x:Name="TwitchMiningToggle" Content="Mining" Foreground="#E7E9EE" IsCheckedChanged="OnTwitchSectionToggled" />
+              <CheckBox x:Name="TwitchMissionsToggle" Content="Missions" Foreground="#E7E9EE" IsCheckedChanged="OnTwitchSectionToggled" />
+              <CheckBox x:Name="TwitchCargoToggle" Content="Cargo manifest" Foreground="#E7E9EE" IsCheckedChanged="OnTwitchSectionToggled" />
+
+              <TextBlock Foreground="#8A909C" FontSize="12" TextWrapping="Wrap"
+                         Text="Anything unchecked is never sent — it is left out of the payload entirely, not hidden after the fact." />
+            </StackPanel>
+          </Border>
+
+          <!-- The preview answers the only question that really matters before going live: what
+               exactly is about to be on screen. Built from the same mapper the publisher uses. -->
+          <Border Background="#0F1114" CornerRadius="6" Padding="16">
+            <StackPanel Spacing="10">
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Grid.Column="0" Text="WHAT VIEWERS WILL SEE NOW" Foreground="#E7E9EE" FontSize="12"
+                           VerticalAlignment="Center" />
+                <Button Grid.Column="1" x:Name="TwitchPreviewRefresh" Content="Refresh" Click="OnTwitchRefreshPreview"
+                        Padding="10,4" FontSize="12" />
+              </Grid>
+              <Border Background="#14161A" CornerRadius="4" Padding="12">
+                <SelectableTextBlock x:Name="TwitchPreview" Foreground="#8A909C" FontSize="12"
+                                     FontFamily="Consolas,Menlo,monospace" TextWrapping="Wrap"
+                                     Text="Start the app with the game running to see a preview." />
+              </Border>
+              <TextBlock x:Name="TwitchPublishStatus" Foreground="#8A909C" FontSize="11" TextWrapping="Wrap" />
+            </StackPanel>
+          </Border>
+
+          <Border Background="#0F1114" CornerRadius="6" Padding="16">
+            <StackPanel Spacing="10">
+              <TextBlock Text="BACKEND SERVICE (EBS)" Foreground="#E7E9EE" FontSize="12" />
+              <TextBox x:Name="TwitchEbsBox" PlaceholderText="https://ebs.ednexus.app" Foreground="#E7E9EE" Background="#14161A" />
+              <TextBlock Foreground="#8A909C" FontSize="12" TextWrapping="Wrap"
+                         Text="Leave blank for the hosted service. Change it only if you run your own — it must match the EBS base URL configured on the extension in your Twitch dashboard. Changing this signs you out." />
+            </StackPanel>
+          </Border>
+        </StackPanel>
+
         <!-- Developer options — hidden entirely when the dev tools are stripped/disabled (FeatureFlags). -->
         <StackPanel x:Name="DevSection" Spacing="8" IsVisible="False">
           <TextBlock Text="DEVELOPER OPTIONS" Foreground="#F07100" FontSize="12" FontWeight="SemiBold" LetterSpacing="2" />
