@@ -1,0 +1,86 @@
+# EDNexus EBS — a starting point for hosting the service at https://ednexus.signal-and-thread.com.
+#
+#   cd src/EDNexus.Ebs
+#   cp .env.example .env        # then fill in the two secrets
+#   docker compose up -d
+#   curl http://localhost:8787/healthz
+#
+# TLS is deliberately not handled here. The service speaks plain HTTP and expects a reverse proxy in
+# front of it holding the certificate — see the commented caddy service below. Twitch requires the
+# OAuth redirect URI to be https and to match Twitch__OAuthRedirectUri exactly, so the proxy's
+# public hostname is what has to be registered, not this container's port.
+
+services:
+  ebs:
+    # Published by the "EBS container" workflow. Pin a digest or a version tag in production so a
+    # restart cannot silently pick up a different build.
+    image: ghcr.io/signal-thread-llc/ednexus-ebs:latest
+
+    # To run the code in this checkout instead of the published image, comment out `image:` above
+    # and uncomment this. The context is the repository root because the Dockerfile copies from
+    # src/EDNexus.Ebs/.
+    # build:
+    #   context: ../..
+    #   dockerfile: src/EDNexus.Ebs/Dockerfile
+
+    container_name: ednexus-ebs
+    restart: unless-stopped
+
+    # Holds the Twitch client secret and extension secret. Git-ignored — see .env.example.
+    env_file: .env
+
+    environment:
+      ASPNETCORE_URLS: http://0.0.0.0:8787
+
+    # Behind a proxy on the same network, drop this and let only the proxy reach the service.
+    ports:
+      - "8787:8787"
+
+    # Inherited from the image, repeated here so it is visible where someone is editing the deploy.
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8787/healthz"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+
+    # The service holds broadcaster tokens in memory and writes nothing to disk, so it needs no
+    # write access to its own filesystem. Revisit when a persistent token store lands.
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ─── TLS termination ────────────────────────────────────────────────────────
+  # Caddy gets a certificate automatically and is the smallest thing that satisfies Twitch's https
+  # requirement. Any proxy works. To use it: point the DNS A record at this host, drop the `ports`
+  # block from `ebs` above, and create a Caddyfile containing:
+  #
+  #   ednexus.signal-and-thread.com {
+  #       reverse_proxy ebs:8787
+  #   }
+  #
+  # caddy:
+  #   image: caddy:2-alpine
+  #   restart: unless-stopped
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./Caddyfile:/etc/caddy/Caddyfile:ro
+  #     - caddy-data:/data
+  #     - caddy-config:/config
+  #   depends_on:
+  #     ebs:
+  #       condition: service_healthy
+
+# volumes:
+#   caddy-data:
+#   caddy-config:

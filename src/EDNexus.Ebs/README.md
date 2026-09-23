@@ -111,8 +111,26 @@ Liveness probe for container/serverless hosting.
 
 ## Deployment
 
-A `Dockerfile` is included for containerized hosting; the service is also small enough to host on
-a serverless container platform (Azure Container Apps, Fly.io, etc.). **Production caveat:** both
+CI publishes an image to `ghcr.io/signal-thread-llc/ednexus-ebs` on every change to this project,
+and proves the container actually starts and answers `/healthz` before calling the build good — this
+service validates its Twitch configuration at startup, so "the image built" and "the service runs"
+are different claims.
+
+```sh
+cd src/EDNexus.Ebs
+cp .env.example .env        # then fill in ClientSecret and ExtensionSecret
+docker compose up -d
+curl http://localhost:8787/healthz
+```
+
+`docker-compose.yml` is a starting point rather than a finished deployment: it runs the published
+image with the settings from `.env`, and leaves TLS to a reverse proxy (there is a commented Caddy
+service showing the shape). That split matters because Twitch requires the OAuth redirect URI to be
+`https` and to match `Twitch:OAuthRedirectUri` exactly — so the **proxy's** public hostname is what
+gets registered with Twitch, not this container's port.
+
+The service is also small enough to host on a serverless container platform (Azure Container Apps,
+Fly.io, etc.). **Production caveat:** both
 `IChannelStateStore` and `IBroadcasterTokenStore` currently ship with in-memory implementations,
 sufficient for a single EBS instance and for local development/testing. A multi-instance deployment
 — or any deployment where losing broadcaster tokens on a restart is unacceptable — needs a real
