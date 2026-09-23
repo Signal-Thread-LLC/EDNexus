@@ -124,6 +124,13 @@ public sealed class RadioSettings
 
     /// <summary>Whether output is muted.</summary>
     public bool RadioMute { get; set; } = false;
+
+    /// <summary>
+    /// Whether the radio was playing (the user last pressed play, not pause/stop) when the app
+    /// closed. Only when this is set does the next launch resume <see cref="RadioLastStation"/>.
+    /// Default off, so a fresh install, or settings saved before this existed, start silent.
+    /// </summary>
+    public bool RadioWasPlaying { get; set; } = false;
 }
 
 /// <summary>
