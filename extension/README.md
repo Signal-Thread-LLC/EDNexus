@@ -24,11 +24,14 @@ TwitchStreamCardService  ──POST──►  /api/update-state  ──PubSub─
 | `js/state.js` | Transport: initial-state fetch + PubSub subscription. No rendering. |
 | `js/card.js` | Rendering and flyout behaviour. No network. |
 | `dev/sample-state.json` | A representative payload for local development. Not needed in the upload. |
+| `dev/serve-https.py` | Serves this folder over TLS for Twitch local testing. Not needed in the upload. |
 
 ## Developing locally
 
-No Twitch and no EBS required — the card falls back to the bundled sample when the Twitch helper is
-absent, or whenever `?mock=1` is in the query string:
+No Twitch and no EBS required — `?mock=1` renders the bundled sample payload with neither in the
+loop. Use the flag explicitly: both views load Twitch's helper from its CDN, so `window.Twitch.ext`
+exists even outside Twitch and the card would otherwise wait forever for an `onAuthorized` that
+never comes.
 
 ```bash
 python -m http.server 8931 --directory extension
@@ -36,19 +39,62 @@ python -m http.server 8931 --directory extension
 
 Then open <http://127.0.0.1:8931/video_overlay.html?mock=1>.
 
-To drive it from a real EBS instead, run the EBS (`dotnet run --project src/EDNexus.Ebs`), point the
-desktop app's `Twitch:EbsBaseUrl` at it, and load the extension through the
-[Twitch Developer Rig](https://dev.twitch.tv/docs/extensions/rig/). Add the Rig's origin to
-`Ebs:AdditionalAllowedFrontendOrigins` so `GET /api/initial-state/{channelId}` passes CORS.
+### Chrome will not load these assets from localhost
+
+Chrome 142+ enforces [Local Network Access](https://developer.chrome.com/blog/local-network-access):
+a request from a public origin (Twitch) to loopback (`localhost`) needs a user permission that is
+delegated through Permissions Policy, so **every** frame in the hierarchy must carry
+`allow="local-network-access"`. An extension renders inside Twitch's iframe, and Twitch does not set
+that attribute — so no site setting, header or server change on our side can unblock it. Chrome
+reports the failure as a "CORS error", which sends you hunting in the wrong place.
+
+Two ways round it:
+
+- **Develop in Firefox**, which has not implemented LNA. The local recipe below works there.
+- **Stop using a local Base URI**: upload the folder as a hosted asset bundle so Twitch serves it
+  from their own CDN, and deploy the EBS behind a public origin. Both halves then live on public
+  origins and LNA never applies. This is what release needs anyway.
+
+### Against the real Twitch console (HTTPS)
+
+Twitch only loads extension assets from an **https** Base URI, and the page it loads is then
+forbidden from fetching an `http://` EBS — the browser blocks it as mixed content. So local testing
+needs TLS on *both* servers. Both use the ASP.NET Core development certificate:
+
+```powershell
+# Once per machine. Without this the extension iframe fails silently — an iframe gets no
+# certificate interstitial to click through, it simply does not load.
+dotnet dev-certs https --trust
+
+# Terminal 1 — the extension assets, matching the console's Base URI.
+python extension/dev/serve-https.py            # https://localhost:8080/
+
+# Terminal 2 — the EBS.
+$env:ASPNETCORE_ENVIRONMENT = "Development"
+$env:ASPNETCORE_URLS = "https://localhost:8787"
+dotnet run --project src/EDNexus.Ebs --no-launch-profile
+```
+
+Then in the extension's developer console set **Base URI** `https://localhost:8080/`, **Video —
+Fullscreen Viewer Path** `video_overlay.html`, **Configuration Path** `config.html`; and in the
+desktop app set **Settings → Twitch → Backend service** to `https://localhost:8787`.
+
+`src/EDNexus.Ebs/appsettings.Development.json` (git-ignored) already allows `https://localhost:8080`
+as a frontend origin, so `GET /api/initial-state/{channelId}` passes CORS. Add the
+[Twitch Developer Rig](https://dev.twitch.tv/docs/extensions/rig/)'s origin there too if you use it.
 
 ## Publishing to Twitch
 
 The extension is configured in the [Twitch Developer Console](https://dev.twitch.tv/console/extensions),
 not by a file in this folder. Settings that matter:
 
-- **Type**: Video — Fullscreen *and* Video — Overlay. The card positions itself against the left edge
-  of the player in both.
-- **Viewer path**: `video_overlay.html`. **Config path**: `config.html`.
+- **Type**: **Video — Fullscreen**, and only that one — the type that hands the extension the whole
+  video area as a transparent canvas, which is what `video_overlay.html` is written against. Leave
+  Panel, Video — Component and Mobile unticked: this folder ships one viewer path, and Twitch's
+  review exercises every type a version declares. Note the cost — a video extension does not render
+  for mobile app viewers, who will see nothing until a Panel view exists.
+- **Viewer path**: `video_overlay.html` (the name predates the console's current type labels).
+  **Config path**: `config.html`.
 - **Testing base URI**: your local server while developing; the asset upload is used once hosted.
 - **Required Broadcaster Abilities**: none. The card only reads.
 - The extension's **Client ID** and **Secret** go into the EBS as `Twitch:ExtensionId` and
@@ -76,7 +122,8 @@ message at 5 KiB, so keys are short and lists are capped app-side.
                 "genus", "species", "samples", "body", "signals" },
   "mining":   { "content", "motherlode", "remaining", "materials": […], "prospected", "refined" },
   "missions": { "active", "cap", "reward", "stacks": [{ "target", "faction", "count", "kills", "reward" }] },
-  "cargo":    [ { "name", "t" } ]
+  "cargo":    [ { "name", "t" } ],
+  "cargoMore": 0               // lots beyond those listed, so the card can say "+7 more"
 }
 ```
 
@@ -97,6 +144,10 @@ whenever the broadcaster does, but the reverse is not true, so:
 
 ## Conventions
 
+- **Every view loads the Twitch helper first.** `https://extension-files.twitch.tv/helper/v1/twitch-ext.min.js`
+  defines `window.Twitch.ext`, which carries auth, the configuration service and the PubSub
+  subscription. Without it a view still renders its static HTML but is inert: the config page cannot
+  read or save anything, and the overlay never receives a snapshot.
 - **No inline script or style.** Twitch's extension CSP rejects both; everything lives in `css/` and
   `js/`.
 - **No `innerHTML` with payload data.** The snapshot carries commander-authored strings (ship name,

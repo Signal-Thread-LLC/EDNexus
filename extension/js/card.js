@@ -287,7 +287,7 @@
     return body.children.length > 1 ? body : null;
   }
 
-  function cargoSection(cargo) {
+  function cargoSection(cargo, more) {
     if (!Array.isArray(cargo) || !cargo.length) return null;
     var body = section('Cargo hold');
     var list = el('dl', 'ednx-rows');
@@ -299,6 +299,12 @@
     });
     if (!list.children.length) return null;
     body.appendChild(list);
+
+    // The app sends the biggest lots only. Say so, rather than letting a truncated manifest read
+    // as the whole hold.
+    if (typeof more === 'number' && more > 0) {
+      body.appendChild(el('p', 'ednx-more', '+ ' + num(more) + ' more ' + (more === 1 ? 'commodity' : 'commodities')));
+    }
     return body;
   }
 
@@ -332,7 +338,7 @@
       missionsSection(snapshot && snapshot.missions),
       miningSection(snapshot && snapshot.mining),
       carrierSection(snapshot && snapshot.carrier),
-      cargoSection(snapshot && snapshot.cargo),
+      cargoSection(snapshot && snapshot.cargo, snapshot && snapshot.cargoMore),
     ].filter(Boolean);
 
     if (!built.length) {

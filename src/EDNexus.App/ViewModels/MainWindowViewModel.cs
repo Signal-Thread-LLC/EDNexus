@@ -218,6 +218,20 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             reportingSuppressed: () => _boot.Dev.Enabled,
             settingsStore: _boot.Store);
         _boot.Crash.Attach(host.Bus); // report journal handler errors
+
+        // The stream card talks to a network service and can fail in several distinct ways. Without
+        // this the only feedback is a label in the settings dialog, so a commander whose card never
+        // appears has nothing to send us and nothing to read.
+        if (host.TwitchCard is { } twitchCard)
+        {
+            twitchCard.PublishCompleted += result =>
+            {
+                if (result.IsSuccess) Trace.TraceInformation("Twitch: stream card published.");
+                else Trace.TraceWarning($"Twitch: stream card publish failed ({result.Status}) — {result.Error}");
+            };
+            twitchCard.ReauthRequired += () =>
+                Trace.TraceWarning("Twitch: the backend rejected this machine's token; publishing stopped until re-login.");
+        }
         host.VoiceCallouts.CalloutRaised += OnVoiceCalloutRaised;
 
         // The radio plays in the background independent of the 250ms state-refresh tick, so it gets

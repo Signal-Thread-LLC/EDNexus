@@ -178,6 +178,47 @@ public class TwitchStreamCardServiceTests
     }
 
     [Fact]
+    public async Task Switching_the_card_on_publishes_without_waiting_for_a_journal_event()
+    {
+        var state = new CommanderState { StarSystem = "Nervi" };
+        var client = new FakeStreamStateApiClient();
+        var enabled = false;
+
+        // How the app wires it: the card being off reads through as "no token".
+        using var service = Create(state, client, token: () => enabled ? "ebs-token" : null);
+        Assert.False(await client.WaitForPublishAsync(TimeSpan.FromMilliseconds(300)));
+
+        // The commander ticks "Show my session to viewers". Nothing about the commander picture has
+        // changed, and with the game closed no journal event is ever coming — so the settings dialog
+        // has to ask for the publish itself.
+        enabled = true;
+        service.RequestPublish();
+
+        Assert.True(await client.WaitForPublishAsync(TimeSpan.FromSeconds(5)));
+        Assert.Equal("Nervi", client.Snapshots[^1].Location!.System);
+    }
+
+    [Fact]
+    public async Task Requesting_a_publish_that_changes_nothing_is_still_deduplicated()
+    {
+        var state = new CommanderState { StarSystem = "Nervi" };
+        var client = new FakeStreamStateApiClient();
+
+        using var service = Create(state, client);
+        Assert.True(await client.WaitForPublishAsync());
+
+        // Saving the settings dialog repeatedly must not spend the PubSub quota re-sending an
+        // identical card.
+        for (var i = 0; i < 3; i++)
+        {
+            service.RequestPublish();
+            await Task.Delay(FastInterval * 2);
+        }
+
+        Assert.Single(client.Snapshots);
+    }
+
+    [Fact]
     public async Task The_endpoint_is_read_afresh_on_every_publish()
     {
         var state = new CommanderState { StarSystem = "Nervi" };
@@ -231,6 +272,51 @@ public class TwitchStreamCardServiceTests
 
         Assert.Null(preview.Ship);
         Assert.NotNull(service.Preview().Ship);
+    }
+
+    [Fact]
+    public async Task A_failed_publish_is_retried_without_waiting_for_a_change()
+    {
+        var state = new CommanderState { StarSystem = "Nervi" };
+        var attempts = 0;
+        var client = new FakeStreamStateApiClient();
+        // The EBS was not listening yet when the app started — the exact race between launching the
+        // service and launching the app. Nothing about the commander will change afterwards if the
+        // game is closed, so the pump has to come back by itself.
+        client.Respond = _ => ++attempts < 3
+            ? new StreamStatePublishResult(StreamStatePublishStatus.Failed, "connection refused")
+            : StreamStatePublishResult.Ok;
+
+        using var service = Create(state, client);
+
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (DateTime.UtcNow < deadline && !client.Snapshots.Any())
+            await client.WaitForPublishAsync(TimeSpan.FromSeconds(1));
+
+        // Give the retries room to reach the successful attempt.
+        var success = DateTime.UtcNow.AddSeconds(10);
+        while (DateTime.UtcNow < success && attempts < 3)
+            await Task.Delay(FastInterval * 2);
+
+        Assert.True(attempts >= 3, $"Expected the pump to retry unprompted; it stopped after {attempts} attempt(s).");
+    }
+
+    [Fact]
+    public async Task Retries_are_bounded_so_a_dead_ebs_is_not_polled_forever()
+    {
+        var state = new CommanderState { StarSystem = "Nervi" };
+        var client = new FakeStreamStateApiClient
+        {
+            Respond = _ => new StreamStatePublishResult(StreamStatePublishStatus.Failed, "connection refused"),
+        };
+
+        using var service = Create(state, client);
+
+        await Task.Delay(FastInterval * (TwitchStreamCardService.MaxPublishRetries + 6) * 2);
+
+        // One initial attempt plus at most MaxPublishRetries, then the pump sleeps until something
+        // really changes.
+        Assert.InRange(client.Snapshots.Count, 1, TwitchStreamCardService.MaxPublishRetries + 1);
     }
 
     [Fact]

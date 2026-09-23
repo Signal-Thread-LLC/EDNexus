@@ -32,6 +32,11 @@ namespace EDNexus.Core.Twitch;
 /// <param name="Mining">The last prospected rock.</param>
 /// <param name="Missions">Held missions and the stacks they form.</param>
 /// <param name="Cargo">The biggest lots in the hold.</param>
+/// <param name="CargoMore">
+/// How many further lots the hold holds beyond those in <paramref name="Cargo"/>, so the card can
+/// say "+7 more" instead of quietly presenting a truncated manifest as the whole hold. 0 when
+/// nothing was left out.
+/// </param>
 public sealed record StreamCardSnapshot(
     [property: JsonPropertyName("v")] int Version,
     [property: JsonPropertyName("at")] DateTimeOffset At,
@@ -44,7 +49,8 @@ public sealed record StreamCardSnapshot(
     [property: JsonPropertyName("exo")] StreamCardExobiology? Exobiology = null,
     [property: JsonPropertyName("mining")] StreamCardMining? Mining = null,
     [property: JsonPropertyName("missions")] StreamCardMissions? Missions = null,
-    [property: JsonPropertyName("cargo")] IReadOnlyList<StreamCardCargoItem>? Cargo = null)
+    [property: JsonPropertyName("cargo")] IReadOnlyList<StreamCardCargoItem>? Cargo = null,
+    [property: JsonPropertyName("cargoMore")] int CargoMore = 0)
 {
     /// <summary>
     /// The options every snapshot is serialized with. Null sections are dropped rather than sent as
@@ -108,7 +114,7 @@ public sealed record StreamCardRank(
 /// <param name="Fuel">Main tank level (t).</param>
 /// <param name="FuelCapacity">Main tank size (t), so the frontend can draw a gauge.</param>
 /// <param name="CargoTons">Tonnage currently in the hold.</param>
-/// <param name="JumpRange">Jump range (ly) at the ship's present load, when a Loadout has been seen.</param>
+/// <param name="JumpRange">Maximum jump range (ly) as the game reports it, when a Loadout has been seen.</param>
 public sealed record StreamCardShip(
     [property: JsonPropertyName("type")] string? Type,
     [property: JsonPropertyName("name")] string? Name = null,

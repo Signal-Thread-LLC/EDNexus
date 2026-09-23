@@ -8,7 +8,7 @@ namespace EDNexus.Core.Twitch;
 public sealed class TwitchOAuthOptions
 {
     /// <summary>
-    /// Base URL of the EBS instance this app logs into (e.g. <c>https://ebs.ednexus.app</c>, or
+    /// Base URL of the EBS instance this app logs into (e.g. <c>https://ednexus.signal-and-thread.com</c>, or
     /// <c>http://localhost:8787</c> for a local EBS instance).
     /// </summary>
     public required string EbsBaseUrl { get; init; }

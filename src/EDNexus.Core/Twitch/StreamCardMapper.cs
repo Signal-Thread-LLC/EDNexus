@@ -16,7 +16,11 @@ namespace EDNexus.Core.Twitch;
 /// </remarks>
 public static class StreamCardMapper
 {
-    /// <summary>Most cargo lots listed, biggest first. The rest are summarised as "+N more" by the frontend.</summary>
+    /// <summary>
+    /// Most cargo lots listed, biggest first. Anything beyond this is counted into
+    /// <see cref="StreamCardSnapshot.CargoMore"/> so the frontend can say so rather than present a
+    /// truncated manifest as the whole hold.
+    /// </summary>
     public const int MaxCargoItems = 8;
 
     /// <summary>Most materials listed from the last prospected rock, richest first.</summary>
@@ -50,7 +54,8 @@ public static class StreamCardMapper
             Exobiology: visibility.Exobiology ? MapExobiology(sources) : null,
             Mining: visibility.Mining ? MapMining(sources) : null,
             Missions: visibility.Missions ? MapMissions(sources) : null,
-            Cargo: visibility.Cargo ? MapCargo(state) : null);
+            Cargo: visibility.Cargo ? MapCargo(state) : null,
+            CargoMore: visibility.Cargo ? CargoOverflow(state) : 0);
     }
 
     /// <summary>
@@ -104,21 +109,20 @@ public static class StreamCardMapper
             Fuel: Round(state.FuelMain, 2),
             FuelCapacity: Positive(state.FuelCapacity),
             CargoTons: state.CargoTons > 0 ? state.CargoTons : null,
-            JumpRange: CurrentJumpRange(state));
+            JumpRange: JumpRange(state));
 
     /// <summary>
-    /// Jump range at the ship's present load — hull plus the fuel and cargo actually aboard — rather
-    /// than the headline unladen figure, because that is the number a viewer watching the commander
-    /// plot a route would recognise. Null until a <c>Loadout</c> has been seen.
+    /// The build's maximum jump range, exactly as the game reports it on the <c>Loadout</c>. Null
+    /// until one has been seen.
     /// </summary>
-    private static double? CurrentJumpRange(CommanderState state)
-    {
-        if (state.Fsd is not { } fsd || fsd.BaseMass <= 0) return null;
-
-        var mass = fsd.BaseMass + state.FuelMain + state.CargoTons;
-        var range = fsd.JumpRangeAt(mass);
-        return range > 0 ? Math.Round(range, 2) : null;
-    }
+    /// <remarks>
+    /// Deliberately not derived from <see cref="Ship.ShipFsdProfile.JumpRangeAt"/>: that models the
+    /// drive for the route plotter and excludes the Guardian booster, so it does not agree with the
+    /// figure on the commander's own ship panel — and a viewer comparing the two would see the card
+    /// as simply wrong.
+    /// </remarks>
+    private static double? JumpRange(CommanderState state) =>
+        state.Fsd is { MaxJumpRange: > 0 } fsd ? Math.Round(fsd.MaxJumpRange, 2) : null;
 
     private static StreamCardLocation MapLocation(CommanderState state) =>
         new(
@@ -229,6 +233,10 @@ public static class StreamCardMapper
 
         return items.Length > 0 ? items : null;
     }
+
+    /// <summary>How many lots the hold has beyond the <see cref="MaxCargoItems"/> the card lists.</summary>
+    private static int CargoOverflow(CommanderState state) =>
+        Math.Max(0, state.Cargo.Count(kv => kv.Value > 0) - MaxCargoItems);
 
     private static double? Positive(double value) => value > 0 ? value : null;
 

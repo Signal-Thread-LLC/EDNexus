@@ -176,6 +176,10 @@ public partial class SettingsWindow : Window
                 TwitchCardToggle.IsChecked == true,
                 TwitchSectionsFromToggles(),
                 TwitchEbsBox.Text);
+            // Switching the card on (or changing which sections show) changes what viewers should
+            // see without touching the commander picture, so the publisher has nothing to react to —
+            // and with the game closed no journal event is coming to nudge it. Ask directly.
+            _dashboard?.TwitchCard?.RequestPublish();
             _boot.Dev.Enabled = DevModeToggle.IsChecked == true; // runtime-only; not persisted
             UpdateStatus();
             UpdateVersionAndUpdateLine();
@@ -404,6 +408,9 @@ public partial class SettingsWindow : Window
             // came here to do — but it is still their call, so only the toggle is unlocked.
             UpdateTwitchAccountLine();
             UpdateTwitchPreview();
+            // If the card was already switched on, the new token is what was missing: publish now
+            // rather than waiting for the next journal event.
+            if (result.IsSuccess) _dashboard?.TwitchCard?.RequestPublish();
         }
         catch (Exception ex)
         {

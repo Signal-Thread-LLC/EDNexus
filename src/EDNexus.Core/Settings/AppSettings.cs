@@ -85,7 +85,7 @@ public sealed class TwitchSettings
     /// Base URL of the EBS this app logs into and publishes to. Defaults to the hosted instance;
     /// override it to point at a local EBS while developing the extension.
     /// </summary>
-    public string EbsBaseUrl { get; set; } = "https://ebs.ednexus.app";
+    public string EbsBaseUrl { get; set; } = "https://ednexus.signal-and-thread.com";
 
     /// <summary>Which sections of the commander's picture the broadcaster is willing to show viewers.</summary>
     public TwitchCardSections Card { get; set; } = new();

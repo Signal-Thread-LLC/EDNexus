@@ -28,7 +28,7 @@
       </p>
       <label class="field">
         <span class="field__label">EBS base URL</span>
-        <input type="url" id="ebs" name="ebs" placeholder="https://ebs.ednexus.app" spellcheck="false">
+        <input type="url" id="ebs" name="ebs" placeholder="https://ednexus.signal-and-thread.com" spellcheck="false">
       </label>
       <div class="actions">
         <button type="button" id="save" class="button">Save</button>
@@ -46,6 +46,9 @@
     </section>
   </main>
 
+  <!-- Twitch's extension helper. Must load before our own scripts: it defines window.Twitch.ext,
+       which carries auth, the configuration service and the PubSub subscription. -->
+  <script src="https://extension-files.twitch.tv/helper/v1/twitch-ext.min.js"></script>
   <script src="js/config.js"></script>
 </body>
 </html>

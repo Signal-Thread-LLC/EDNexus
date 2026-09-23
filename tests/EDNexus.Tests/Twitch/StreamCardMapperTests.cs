@@ -172,6 +172,44 @@ public class StreamCardMapperTests
     }
 
     [Fact]
+    public void A_truncated_hold_reports_how_many_lots_were_left_out()
+    {
+        var state = new CommanderState();
+        for (var i = 0; i < StreamCardMapper.MaxCargoItems + 5; i++)
+            state.Cargo[$"Commodity{i}"] = i + 1;
+
+        var card = StreamCardMapper.Map(state, now: Now);
+
+        // Without this the card would present 8 lots as the entire hold.
+        Assert.Equal(StreamCardMapper.MaxCargoItems, card.Cargo!.Count);
+        Assert.Equal(5, card.CargoMore);
+    }
+
+    [Fact]
+    public void A_hold_that_fits_reports_no_overflow()
+    {
+        var state = new CommanderState();
+        state.Cargo["Painite"] = 96;
+
+        Assert.Equal(0, StreamCardMapper.Map(state, now: Now).CargoMore);
+    }
+
+    [Fact]
+    public void Overflow_is_not_reported_when_the_hold_is_hidden()
+    {
+        var state = new CommanderState();
+        for (var i = 0; i < StreamCardMapper.MaxCargoItems + 5; i++)
+            state.Cargo[$"Commodity{i}"] = i + 1;
+
+        var card = StreamCardMapper.Map(
+            state, visibility: StreamCardVisibility.Default with { Cargo = false }, now: Now);
+
+        // A count of what is in the hold is still information about the hold.
+        Assert.Null(card.Cargo);
+        Assert.Equal(0, card.CargoMore);
+    }
+
+    [Fact]
     public void Empty_sections_are_omitted_rather_than_sent_blank()
     {
         var card = StreamCardMapper.Map(new CommanderState(), now: Now);
@@ -214,6 +252,33 @@ public class StreamCardMapperTests
         // Twitch rejects a PubSub message over 5 KiB outright, and the EBS refuses one before it
         // ever gets there — so the shape the mapper emits has to fit with room to spare.
         Assert.True(Encoding.UTF8.GetByteCount(json) < 5000, $"Payload was {Encoding.UTF8.GetByteCount(json)} bytes.");
+    }
+
+    [Fact]
+    public void Jump_range_is_the_figure_the_game_reports_not_a_derived_one()
+    {
+        // Real values off an Anaconda's Loadout: the game says 25.05 ly, while the route plotter's
+        // drive model (JumpRangeAt) answers in the hundreds because it is solving a different
+        // problem. A viewer comparing the card to the commander's ship panel must see 25.05.
+        var state = new CommanderState
+        {
+            Ship = "anaconda",
+            FuelMain = 0,
+            Fsd = new EDNexus.Core.Ship.ShipFsdProfile(
+                OptimalMass: 1050, BaseMass: 1379.9, TankSize: 32, ReserveSize: 1.07,
+                FuelMultiplier: 0.012, FuelPower: 2.45, MaxFuelPerJump: 5, RangeBoost: 0,
+                CargoCapacity: 0, MaxJumpRange: 25.052088),
+        };
+
+        Assert.Equal(25.05, StreamCardMapper.Map(state, now: Now).Ship!.JumpRange);
+    }
+
+    [Fact]
+    public void Jump_range_is_omitted_when_the_loadout_never_reported_one()
+    {
+        var state = new CommanderState { Ship = "anaconda" };
+
+        Assert.Null(StreamCardMapper.Map(state, now: Now).Ship!.JumpRange);
     }
 
     [Fact]

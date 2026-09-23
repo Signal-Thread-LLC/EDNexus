@@ -253,7 +253,7 @@
           <Border Background="#0F1114" CornerRadius="6" Padding="16">
             <StackPanel Spacing="10">
               <TextBlock Text="BACKEND SERVICE (EBS)" Foreground="#E7E9EE" FontSize="12" />
-              <TextBox x:Name="TwitchEbsBox" PlaceholderText="https://ebs.ednexus.app" Foreground="#E7E9EE" Background="#14161A" />
+              <TextBox x:Name="TwitchEbsBox" PlaceholderText="https://ednexus.signal-and-thread.com" Foreground="#E7E9EE" Background="#14161A" />
               <TextBlock Foreground="#8A909C" FontSize="12" TextWrapping="Wrap"
                          Text="Leave blank for the hosted service. Change it only if you run your own — it must match the EBS base URL configured on the extension in your Twitch dashboard. Changing this signs you out." />
             </StackPanel>

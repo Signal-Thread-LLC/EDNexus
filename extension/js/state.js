@@ -13,7 +13,7 @@
   'use strict';
 
   /** Fallback EBS, used when the broadcaster has not configured one. Keep in sync with AppSettings.Twitch.EbsBaseUrl. */
-  var DEFAULT_EBS = 'https://ebs.ednexus.app';
+  var DEFAULT_EBS = 'https://ednexus.signal-and-thread.com';
 
   /** Schema version this frontend understands. See StreamCardSchema.Version on the app side. */
   var SUPPORTED_SCHEMA = 1;
@@ -98,14 +98,26 @@
 
     onStatus('waiting');
 
+    // Twitch re-runs onAuthorized on every token refresh, not just once. Without these guards each
+    // refresh would re-fetch the cached initial state, and a slow response could land after a live
+    // broadcast and roll the card back to older data.
+    var fetched = false;
+    var liveSeen = false;
+
     helper.onAuthorized(function (auth) {
+      if (fetched) return;
+      fetched = true;
       var base = resolveEbsBase(helper);
-      fetchInitialState(base, auth.channelId, onSnapshot, onStatus);
+      fetchInitialState(base, auth.channelId, function (snapshot) {
+        if (liveSeen) return;
+        onSnapshot(snapshot);
+      }, onStatus);
     });
 
     helper.listen('broadcast', function (_target, _contentType, message) {
       var snapshot = parseMessage(message);
       if (!snapshot) return;
+      liveSeen = true;
       onStatus('live');
       onSnapshot(snapshot);
     });

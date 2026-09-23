@@ -61,6 +61,9 @@
     </section>
   </div>
 
+  <!-- Twitch's extension helper. Must load before our own scripts: it defines window.Twitch.ext,
+       which carries auth, the configuration service and the PubSub subscription. -->
+  <script src="https://extension-files.twitch.tv/helper/v1/twitch-ext.min.js"></script>
   <script src="js/state.js"></script>
   <script src="js/card.js"></script>
 </body>

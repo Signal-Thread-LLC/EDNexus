@@ -48,7 +48,11 @@ public static class OAuthEndpoints
         var twitch = twitchOptions.Value;
         var sessionId = store.CreateSession(redirectUri, state, codeChallenge, TimeSpan.FromMinutes(Math.Max(1, ebsOptions.Value.OAuthSessionTtlMinutes)));
 
-        var scope = Uri.EscapeDataString(string.Join(' ', twitch.OAuthScopes));
+        // De-duplicated: the configuration binder APPENDS a bound array to a property that already
+        // has a default, so a scope listed in both TwitchEbsOptions and appsettings.json arrives
+        // twice and Twitch is asked for "user:read:email user:read:email".
+        var scope = Uri.EscapeDataString(string.Join(
+            ' ', twitch.OAuthScopes.Where(s => !string.IsNullOrWhiteSpace(s)).Distinct(StringComparer.OrdinalIgnoreCase)));
         var twitchAuthorizeUrl =
             $"{twitch.AuthorizationEndpoint}" +
             $"?client_id={Uri.EscapeDataString(twitch.ClientId)}" +

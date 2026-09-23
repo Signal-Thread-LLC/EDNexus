@@ -40,6 +40,13 @@ Thumbs.db
 # Local overrides
 *.local.json
 appsettings.*.Local.json
+# Per-environment ASP.NET config: the EBS's dev config holds the Twitch client secret and
+# extension secret, so it must never be committable.
+appsettings.Development.json
+# Container secrets. The committed .env.example is the template and holds no real values.
+.env
+!.env.example
+appsettings.*.Development.json
 
 # Installer build output
 installer/**/publish/

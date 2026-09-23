@@ -26,6 +26,10 @@ dotnet run --project src/EDNexus.Cli -- --once
 # Omit the blueprint id to list every plannable blueprint.
 dotnet run --project src/EDNexus.Cli -- --once --plan fsd_increased_range 5 3
 
+# Print the exact payload the Twitch extension would show viewers, from the live journal.
+# Add --show-credits to include the balance (withheld by default, as in the app).
+dotnet run --project src/EDNexus.Cli -- --twitch-card
+
 # Unit tests (xUnit).
 dotnet test EDNexus.slnx
 ```

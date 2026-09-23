@@ -37,6 +37,18 @@ public sealed class TwitchStreamCardService : IDisposable
     public static readonly TimeSpan DefaultMinInterval = TimeSpan.FromSeconds(5);
 
     /// <summary>
+    /// How many times a failed publish is retried before the pump goes back to sleep waiting for the
+    /// commander to actually do something.
+    /// </summary>
+    /// <remarks>
+    /// Without this a single transient failure is permanent: the pump only wakes on a state change,
+    /// so if the EBS was not yet listening when the app started — and the game is closed, as it is
+    /// whenever someone is setting this up — nothing would ever trigger another attempt. Bounded
+    /// rather than infinite so an EBS that is simply down does not get polled forever.
+    /// </remarks>
+    public const int MaxPublishRetries = 5;
+
+    /// <summary>
     /// <see cref="CommanderState"/> properties worth a republish. Deliberately not every property:
     /// <c>LastUpdated</c> ticks on virtually every journal line and would defeat the deduplication
     /// below.
@@ -79,6 +91,7 @@ public sealed class TwitchStreamCardService : IDisposable
     private readonly Task _pump;
 
     private string? _lastPublishedFingerprint;
+    private int _consecutiveFailures;
     private bool _stoppedForReauth;
     /// <summary>The token that earned the 401, so a later login with a different one can resume.</summary>
     private string? _rejectedToken;
@@ -169,6 +182,19 @@ public sealed class TwitchStreamCardService : IDisposable
     public bool StoppedForReauth => Volatile.Read(ref _stoppedForReauth);
 
     /// <summary>
+    /// Publish the current card as soon as the rate limit allows, without waiting for a journal
+    /// event to arrive.
+    /// </summary>
+    /// <remarks>
+    /// The pump is woken by state and tracker changes, which is the right trigger while the game is
+    /// running but leaves a hole everywhere else: switching the card on, or logging in, changes what
+    /// <em>would</em> be published without changing the commander picture at all. With the game
+    /// closed no journal event will ever follow, so without this the card would never go out. Call
+    /// this whenever the token or the visibility changes underneath the callbacks.
+    /// </remarks>
+    public void RequestPublish() => MarkDirty();
+
+    /// <summary>
     /// The snapshot this service would publish right now. Exposed for the settings UI's "what viewers
     /// will see" preview, and for diagnostics — computing one has no side effects.
     /// </summary>
@@ -206,6 +232,7 @@ public sealed class TwitchStreamCardService : IDisposable
             catch (OperationCanceledException) { return; }
 
             var backoff = _minInterval;
+            var retry = false;
             try
             {
                 var published = await PublishIfChangedAsync(ct).ConfigureAwait(false);
@@ -214,6 +241,11 @@ public sealed class TwitchStreamCardService : IDisposable
                     // Give a struggling EBS (or a tighter-than-expected rate limit) room to recover
                     // rather than retrying at the floor interval.
                     backoff = _minInterval * 2;
+                    retry = ++_consecutiveFailures <= MaxPublishRetries;
+                }
+                else if (published is not null)
+                {
+                    _consecutiveFailures = 0;
                 }
             }
             catch (OperationCanceledException) { return; }
@@ -221,12 +253,17 @@ public sealed class TwitchStreamCardService : IDisposable
             {
                 // Best-effort telemetry: never let a card failure take down the engine's task.
                 Raise(new StreamStatePublishResult(StreamStatePublishStatus.Failed, ex.Message));
+                retry = ++_consecutiveFailures <= MaxPublishRetries;
             }
 
             // Rate-limit floor. Any change arriving during this wait has already re-armed the signal,
             // so the next iteration publishes the newest state immediately after it elapses.
             try { await Task.Delay(backoff, ct).ConfigureAwait(false); }
             catch (OperationCanceledException) { return; }
+
+            // Nothing else will wake the pump for a retry: MarkDirty only fires on journal activity,
+            // and a commander configuring this typically has the game closed.
+            if (retry) MarkDirty();
         }
     }
 
