@@ -270,11 +270,17 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     private void RefreshRadio(RadioPlayerSnapshot s)
     {
         RadioStationName = s.Station?.Name ?? "No station tuned";
-        RadioPlayPauseGlyph = s.Status == RadioPlaybackStatus.Playing ? "⏸" : "▶";
+        // The glyph shows what clicking will do (see RadioPlayerService.ToggleActionFor).
+        RadioPlayPauseGlyph = RadioPlayerService.ToggleActionFor(s.Status) switch
+        {
+            RadioToggleAction.Pause => "⏸",
+            RadioToggleAction.Stop => "⏹",
+            _ => "▶",
+        };
         RadioTooltip = s.Status switch
         {
-            RadioPlaybackStatus.Error => s.LastError ?? "Radio error",
-            RadioPlaybackStatus.Buffering => $"Buffering {s.Station?.Name}…",
+            RadioPlaybackStatus.Error => $"{s.LastError ?? "Radio error"} — click to stop",
+            RadioPlaybackStatus.Buffering => $"Buffering {s.Station?.Name}… — click to stop",
             RadioPlaybackStatus.Playing => $"Playing {s.Station?.Name}",
             RadioPlaybackStatus.Paused => $"Paused — {s.Station?.Name}",
             _ => s.Station is null ? "Play the radio" : $"Play {s.Station.Name}",
