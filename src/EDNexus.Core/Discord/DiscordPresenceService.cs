@@ -51,6 +51,7 @@ public sealed class DiscordPresenceService : IDisposable
     private string? _lastSystem;
     private DateTimeOffset _systemEnteredAt;
     private DiscordPresencePayload? _lastComputed;
+    private DiscordPrivacyOptions _privacy;
     private CancellationTokenSource? _pending;
     private bool _disposed;
 
@@ -63,16 +64,24 @@ public sealed class DiscordPresenceService : IDisposable
     /// Optional live predicate; while it returns true no presence is computed or sent. Wired to
     /// developer mode so fabricated sample data never reaches a commander's real Discord profile.
     /// </param>
-    public DiscordPresenceService(CommanderState state, IDiscordRpcClient client, Func<bool>? isSuppressed = null)
-        : this(state, client, DefaultMinInterval, isSuppressed, null) { }
+    /// <param name="privacy">
+    /// The commander's initial privacy choices (everything visible when omitted). Change them live
+    /// with <see cref="UpdatePrivacy"/>.
+    /// </param>
+    public DiscordPresenceService(
+        CommanderState state, IDiscordRpcClient client, Func<bool>? isSuppressed = null,
+        DiscordPrivacyOptions? privacy = null)
+        : this(state, client, DefaultMinInterval, isSuppressed, null, privacy) { }
 
     /// <summary>Test-only constructor: a shortened throttle window and/or a controllable clock.</summary>
     internal DiscordPresenceService(
         CommanderState state, IDiscordRpcClient client, TimeSpan minInterval,
-        Func<bool>? isSuppressed = null, Func<DateTimeOffset>? clock = null)
+        Func<bool>? isSuppressed = null, Func<DateTimeOffset>? clock = null,
+        DiscordPrivacyOptions? privacy = null)
     {
         _state = state;
         _client = client;
+        _privacy = privacy ?? DiscordPrivacyOptions.Default;
         _isSuppressed = isSuppressed ?? (static () => false);
         _clock = clock ?? (static () => DateTimeOffset.UtcNow);
         _throttle = new PresenceThrottle(minInterval, _clock);
@@ -103,7 +112,28 @@ public sealed class DiscordPresenceService : IDisposable
         RequestUpdate();
     }
 
-    private void RequestUpdate()
+    /// <summary>The privacy choices currently applied to the outgoing presence.</summary>
+    public DiscordPrivacyOptions Privacy
+    {
+        get { lock (_gate) return _privacy; }
+    }
+
+    /// <summary>
+    /// Apply new privacy choices to the live presence. A change is pushed straight away rather than
+    /// waiting out the throttle window: this is a rare, user-initiated action, and a commander who has
+    /// just hidden their system must not keep broadcasting it for up to another 15 seconds.
+    /// </summary>
+    public void UpdatePrivacy(DiscordPrivacyOptions privacy)
+    {
+        lock (_gate)
+        {
+            if (_disposed || _privacy == privacy) return;
+            _privacy = privacy;
+        }
+        RequestUpdate(immediate: true);
+    }
+
+    private void RequestUpdate(bool immediate = false)
     {
         if (_isSuppressed()) return;
 
@@ -111,9 +141,18 @@ public sealed class DiscordPresenceService : IDisposable
         {
             if (_disposed) return;
 
-            var payload = DiscordPresenceMapper.Map(_state, _sessionStartedAt, _systemEnteredAt);
+            var payload = DiscordPresenceMapper.Map(_state, _sessionStartedAt, _systemEnteredAt, _privacy);
             if (_lastComputed is not null && payload.Equals(_lastComputed)) return;
             _lastComputed = payload;
+
+            if (immediate)
+            {
+                // Supersede any trailing send that would otherwise re-push the same payload later.
+                _pending?.Cancel();
+                _throttle.MarkSent();
+                Send(payload);
+                return;
+            }
 
             if (_throttle.TryAcquire())
             {

@@ -36,6 +36,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     {
         _boot = boot;
         _host = BuildHost();
+        // Reads `_host` at event time, so a host swapped in by ResetToLive() is the one updated.
+        _boot.DiscordSettingsChanged += OnDiscordSettingsChanged;
         _context = new DashboardContext(
             () => _host,
             () => _boot.Dev.Enabled,
@@ -244,9 +246,13 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
     public void Dispose()
     {
+        _boot.DiscordSettingsChanged -= OnDiscordSettingsChanged;
         _boot.Overlay.Hide();
         _host.Dispose();
     }
+
+    /// <summary>Push saved Discord Rich Presence settings onto the live engine (connect/disconnect, privacy).</summary>
+    private void OnDiscordSettingsChanged(DiscordSettings settings) => _host.ApplyDiscordSettings(settings);
 
     [ObservableProperty] private string _journalStatus = "";
     [ObservableProperty] private string _privacyStatus = "";

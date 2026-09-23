@@ -188,6 +188,28 @@
           </Border>
         </StackPanel>
 
+        <!-- Discord Rich Presence — a local IPC link to the commander's own Discord client. Applied
+             live on Save: off disconnects, the privacy toggles re-push the presence immediately. -->
+        <StackPanel Spacing="8">
+          <TextBlock Text="DISCORD PRESENCE" Foreground="#F07100" FontSize="12" FontWeight="SemiBold" LetterSpacing="2" />
+          <Border Background="#0F1114" CornerRadius="6" Padding="16">
+            <StackPanel Spacing="10">
+              <CheckBox x:Name="DiscordToggle" Content="Enable Discord Rich Presence" Foreground="#E7E9EE"
+                        IsCheckedChanged="OnDiscordToggleChanged" />
+              <TextBlock Foreground="#8A909C" FontSize="12" TextWrapping="Wrap"
+                         Text="Shows your ship, location, and activity on your Discord profile while EDNexus is running. Talks only to the Discord app on this machine — nothing is uploaded by EDNexus. Paused while developer mode is on." />
+
+              <CheckBox x:Name="DiscordShowSystemToggle" Content="Show current star system name" Foreground="#E7E9EE" />
+              <TextBlock Foreground="#8A909C" FontSize="12" TextWrapping="Wrap"
+                         Text="When off, your presence reads &quot;Exploring deep space&quot; or &quot;Docked&quot; — no system, body, station, or carrier name — so you can't be stream-sniped or give away a fresh discovery." />
+
+              <CheckBox x:Name="DiscordShowCommanderToggle" Content="Show commander name" Foreground="#E7E9EE" />
+              <TextBlock Foreground="#8A909C" FontSize="12" TextWrapping="Wrap"
+                         Text="When off, the &quot;View on Inara&quot; button (which carries your commander name) and your ship's ID are left out." />
+            </StackPanel>
+          </Border>
+        </StackPanel>
+
         <!-- Developer options — hidden entirely when the dev tools are stripped/disabled (FeatureFlags). -->
         <StackPanel x:Name="DevSection" Spacing="8" IsVisible="False">
           <TextBlock Text="DEVELOPER OPTIONS" Foreground="#F07100" FontSize="12" FontWeight="SemiBold" LetterSpacing="2" />

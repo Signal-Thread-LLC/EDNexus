@@ -1,4 +1,5 @@
 using EDNexus.Core.Colonisation;
+using EDNexus.Core.Discord;
 using EDNexus.Core.Engineering;
 using EDNexus.Core.Exobio;
 using EDNexus.Core.Journal;
@@ -74,6 +75,7 @@ PrintExobiology(exobio);
 PrintEngineers(engineering);
 PrintRanks(ranks);
 PrintOverlay(state, exobio, colonisation);
+PrintDiscordPresence(state);
 if (planId is not null) PrintEngineeringPlan(planId, planGrade, planRolls, state);
 
 if (args.Contains("--once"))
@@ -98,6 +100,7 @@ PrintExobiology(exobio);
 PrintEngineers(engineering);
 PrintRanks(ranks);
 PrintOverlay(state, exobio, colonisation);
+PrintDiscordPresence(state);
 if (liveCounts.Count > 0)
 {
     Console.WriteLine("\nLive events this session:");
@@ -370,6 +373,29 @@ static void PrintOverlay(CommanderState s, ExobiologyTracker exobio, Colonisatio
         Console.WriteLine("  Shortfall :");
         foreach (var line in content.ColonisationShortfalls)
             Console.WriteLine($"      {line.Remaining,6:N0}  {line.Name}");
+    }
+}
+
+/// <summary>
+/// What Discord Rich Presence would show for the replayed state under each privacy combination
+/// (issue #50), mapped through the same pure <see cref="DiscordPresenceMapper"/> the app uses. The CLI
+/// never connects to Discord; this is a preview only.
+/// </summary>
+static void PrintDiscordPresence(CommanderState s)
+{
+    var now = DateTimeOffset.UtcNow;
+    Console.WriteLine("\n======== Discord presence preview ========");
+    foreach (var (label, privacy) in new[]
+    {
+        ("all shown", DiscordPrivacyOptions.Default),
+        ("hide system", new DiscordPrivacyOptions(ShowSystem: false, ShowCommander: true)),
+        ("hide cmdr", new DiscordPrivacyOptions(ShowSystem: true, ShowCommander: false)),
+        ("hide both", new DiscordPrivacyOptions(ShowSystem: false, ShowCommander: false)),
+    })
+    {
+        var p = DiscordPresenceMapper.Map(s, now, now, privacy);
+        var buttons = string.Join(", ", p.Buttons.Select(b => b.Label));
+        Console.WriteLine($"  {label,-11} : {p.Details ?? "(no details)"} | {p.State} | buttons: {buttons}");
     }
 }
 
