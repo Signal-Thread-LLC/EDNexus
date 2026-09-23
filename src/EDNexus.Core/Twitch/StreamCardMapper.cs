@@ -148,10 +148,10 @@ public static class StreamCardMapper
     }
 
     /// <param name="showLocation">
-    /// Whether the broadcaster is showing where they are. An Elite body name contains its system name
-    /// ("Hypiae Aescs FB-W c1-1046 A 3 f"), so publishing it with Location hidden would hand viewers
-    /// the very thing that section exists to withhold — a commander hiding from stream snipers while
-    /// they sample would be given away by the exobiology panel.
+    /// Whether the broadcaster is showing where they are. A body name contains its system name
+    /// ("Hypiae Aescs FB-W c1-1046 A 3 f"), so publishing it while Location is hidden would send the
+    /// exact thing that section withholds. Settings → Twitch tells the commander that an unticked
+    /// section "is never sent"; whatever their reason for unticking it, that has to be true.
     /// </param>
     private static StreamCardExobiology? MapExobiology(StreamCardSources sources, bool showLocation)
     {
