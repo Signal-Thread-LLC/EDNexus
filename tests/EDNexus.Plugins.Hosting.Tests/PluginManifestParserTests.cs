@@ -467,6 +467,19 @@ public class PluginManifestParserTests
     }
 
     [Fact]
+    public void Parse_RawUnpairedSurrogateChar_IsRejectedNotThrown()
+    {
+        // A raw lone surrogate (not a JSON escape) makes JsonDocument.Parse throw ArgumentException
+        // while transcoding to UTF-8. Built at runtime so no invisible character sits in source.
+        var json = "{\"id\":\"a" + (char)0xD800 + "\"}";
+
+        var result = PluginManifestParser.Parse(json);
+
+        Assert.False(result.IsValid);
+        Assert.Contains("invalid Unicode", result.ErrorSummary);
+    }
+
+    [Fact]
     public void Parse_UnpairedSurrogateEscapeInPropertyNameOrCapability_IsRejectedNotThrown()
     {
         var inKey = TestPackages.ValidManifestJson.Replace("\"author\"", "\"auth\\uDC00or\"");

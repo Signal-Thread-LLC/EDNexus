@@ -95,6 +95,11 @@ public static partial class PluginManifestParser
         {
             return PluginManifestParseResult.Failure($"manifest is not valid JSON: {ex.Message}");
         }
+        catch (ArgumentException)
+        {
+            // Transcoding the string to UTF-8 throws on a raw unpaired surrogate char.
+            return PluginManifestParseResult.Failure("manifest contains invalid Unicode (an unpaired surrogate)");
+        }
 
         using (document)
         {

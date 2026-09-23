@@ -405,18 +405,58 @@ public class PluginPackageTests
     }
 
     [Fact]
-    public void ReadDeclaredEntryCount_IgnoresTrailingComment_AndRestoresPosition()
+    public void ReadDeclaredEntryCount_PlainComment_ReadsCount_AndRestoresPosition()
     {
         using var buffer = new MemoryStream();
         using (var archive = new ZipArchive(buffer, ZipArchiveMode.Create, leaveOpen: true))
         {
-            archive.Comment = "PK\u0005\u0006 decoy signature inside the comment";
+            archive.Comment = "an ordinary archive comment";
             archive.CreateEntry("x.txt");
         }
         buffer.Position = 3;
 
         Assert.Equal(1, PluginPackage.ReadDeclaredEntryCount(buffer));
         Assert.Equal(3, buffer.Position);
+    }
+
+    [Fact]
+    public void ReadDeclaredEntryCount_DecoySignatureInComment_IsAmbiguous_AndRestoresPosition()
+    {
+        // ZipArchive would trust the last signature (the decoy); we refuse rather than disagree.
+        using var buffer = new MemoryStream();
+        using (var archive = new ZipArchive(buffer, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            archive.Comment = "PK" + (char)5 + (char)6 + " decoy signature inside the comment";
+            archive.CreateEntry("x.txt");
+        }
+        buffer.Position = 3;
+
+        Assert.Null(PluginPackage.ReadDeclaredEntryCount(buffer));
+        Assert.Equal(3, buffer.Position);
+    }
+
+    [Fact]
+    public void Inspect_TrailingByteAfterValidZip_IsRejected()
+    {
+        byte[] zip = [.. Valid(), 0x00];
+        AssertRejected(Inspect(zip), "no unambiguous end of central directory record");
+    }
+
+    [Fact]
+    public void Inspect_DecoyEocdInComment_IsRejected()
+    {
+        using var buffer = new MemoryStream();
+        using (var archive = new ZipArchive(buffer, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            archive.Comment = "PK" + (char)5 + (char)6 + " decoy signature inside the comment";
+            foreach (var (name, content) in new[] { ("plugin.json", Utf8(ValidManifestJson)), ("Acme.JumpCounter.dll", Dll) })
+            {
+                using var stream = archive.CreateEntry(name).Open();
+                stream.Write(content);
+            }
+        }
+
+        AssertRejected(Inspect(buffer.ToArray()), "no unambiguous end of central directory record");
     }
 
     [Fact]

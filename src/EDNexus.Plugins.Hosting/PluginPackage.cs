@@ -136,6 +136,8 @@ public static class PluginPackage
             // many entries, so a header understating the count fails to open rather than slipping
             // past this check; Analyze re-checks the materialised count regardless.)
             var declaredEntries = ReadDeclaredEntryCount(source);
+            if (declaredEntries is null)
+                return PluginPackageInspection.Failure("package is not a readable zip archive: no unambiguous end of central directory record");
             if (declaredEntries > limits.MaxEntries)
                 return PluginPackageInspection.Failure($"package declares {declaredEntries} entries, over the {limits.MaxEntries}-entry limit");
 
@@ -155,8 +157,10 @@ public static class PluginPackage
     /// <summary>
     /// Reads the "total entries" field from the zip's End Of Central Directory record (following
     /// the Zip64 locator when the classic field is saturated), without parsing the directory.
-    /// Returns <see langword="null"/> when no EOCD record is found — <see cref="ZipArchive"/>
-    /// will then reject the stream itself. Restores the stream position.
+    /// Returns <see langword="null"/> when no unambiguous EOCD record is found: none at all, or
+    /// the last one's comment length doesn't end exactly at the end of the stream (a decoy
+    /// signature inside the comment, or trailing bytes). Callers must reject the package then.
+    /// Restores the stream position.
     /// </summary>
     internal static long? ReadDeclaredEntryCount(Stream stream)
     {
@@ -183,10 +187,12 @@ public static class PluginPackage
             {
                 if (BinaryPrimitives.ReadUInt32LittleEndian(tail.AsSpan(i)) != EocdSignature)
                     continue;
-                // A real EOCD's comment runs exactly to the end of the file; this skips a decoy
-                // signature embedded in the comment itself.
+                // The last EOCD signature is the one ZipArchive uses, and it does not check that the
+                // record's comment runs exactly to the end of the file. If ours doesn't, the two
+                // readers could disagree (e.g. a decoy record inside the comment with a different
+                // count, or trailing bytes after the archive) — refuse rather than guess.
                 if (BinaryPrimitives.ReadUInt16LittleEndian(tail.AsSpan(i + 20)) != tailLength - i - EocdSize)
-                    continue;
+                    return null;
 
                 long count = BinaryPrimitives.ReadUInt16LittleEndian(tail.AsSpan(i + 10));
                 if (count != ushort.MaxValue)
@@ -405,12 +411,16 @@ public static class PluginPackage
         if (Directory.Exists(destination) || File.Exists(destination))
             return PluginPackageInspection.Failure($"destination '{destination}' already exists");
 
-        // Only ever clean up a folder this call created: if creating it fails (e.g. a file or
-        // another process's folder appeared at that path), nothing is deleted.
+        // Only ever clean up a folder this call created. Directory.CreateDirectory succeeds
+        // silently on an existing folder, so if one appeared (with content) between the check
+        // above and here, it isn't ours: refuse without marking it created, so it is never
+        // deleted. If creating fails outright (e.g. a file appeared), nothing is deleted either.
         var created = false;
         try
         {
             Directory.CreateDirectory(destination);
+            if (Directory.EnumerateFileSystemEntries(destination).Any())
+                return PluginPackageInspection.Failure($"destination '{destination}' already exists");
             created = true;
 
             foreach (var entry in analysis.Inspection.Entries.Where(e => e.IsDirectory))
