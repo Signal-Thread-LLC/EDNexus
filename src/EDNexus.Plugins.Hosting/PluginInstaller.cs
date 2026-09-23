@@ -144,7 +144,8 @@ public static class PluginInstaller
     /// <summary>
     /// Repairs the plugins root after an install was interrupted (crash, power loss, kill):
     /// restores a <c>.replaced-*</c> backup when its plugin folder is missing, deletes backups
-    /// whose replacement completed, and deletes leftover <c>.staging-*</c> folders.
+    /// whose replacement completed, and deletes leftover <c>.staging-*</c> and <c>.extract-*</c>
+    /// folders.
     /// <para>
     /// Call once when the host starts, before discovering plugins and before any install — it
     /// must not run concurrently with <see cref="Install"/> on the same root. Never throws for
@@ -174,8 +175,11 @@ public static class PluginInstaller
             return new PluginRecoveryResult(restored, removed, errors);
         }
 
-        // Stale staging folders are never needed: the install that owned them did not finish.
-        foreach (var dir in entries.Where(d => Path.GetFileName(d).StartsWith(StagingPrefix, StringComparison.Ordinal)))
+        // Stale staging folders (the installer's, and PluginPackage.ExtractTo's sibling extraction
+        // folders) are never needed: the operation that owned them did not finish.
+        foreach (var dir in entries.Where(d => Path.GetFileName(d) is var name
+                     && (name.StartsWith(StagingPrefix, StringComparison.Ordinal)
+                         || name.StartsWith(PluginPackage.ExtractStagingPrefix, StringComparison.Ordinal))))
             Remove(dir);
 
         // Backups, newest first per id, so the most recent previous version wins a restore.

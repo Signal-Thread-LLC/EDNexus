@@ -366,6 +366,52 @@ public class PluginPackageTests
     }
 
     [Fact]
+    public void ExtractTo_PreExistingEmptyDestination_FailsAndIsLeftInPlace()
+    {
+        // An empty folder someone else created is not ours to claim — or to delete.
+        using var dir = new TempDir();
+        var dest = Path.Combine(dir.Path, "claimed-by-someone-else");
+        Directory.CreateDirectory(dest);
+
+        var result = PluginPackage.ExtractTo(new MemoryStream(Valid()), dest);
+
+        Assert.False(result.IsValid);
+        Assert.Contains("already exists", result.ErrorSummary);
+        Assert.True(Directory.Exists(dest));
+        Assert.Empty(Directory.EnumerateFileSystemEntries(dest));
+        Assert.Empty(Directory.EnumerateDirectories(dir.Path, PluginPackage.ExtractStagingPrefix + "*"));
+    }
+
+    [Fact]
+    public void ExtractTo_Success_LeavesNoStagingFolderBehind()
+    {
+        using var dir = new TempDir();
+        var dest = Path.Combine(dir.Path, "out");
+
+        Assert.True(PluginPackage.ExtractTo(new MemoryStream(Valid()), dest).IsValid);
+        Assert.Equal(["out"], Directory.GetDirectories(dir.Path).Select(Path.GetFileName));
+    }
+
+    [Fact]
+    public void ExtractTo_FailureMidExtraction_RemovesOnlyItsStagingFolder()
+    {
+        using var dir = new TempDir();
+        var dest = Path.Combine(dir.Path, "out");
+        File.WriteAllText(Path.Combine(dir.Path, "sibling.txt"), "keep");
+        var zip = Valid(("payload.bin", RandomBytes(2000)));
+        SetDeclaredUncompressedSize(zip, "payload.bin", 10); // fails during extraction
+
+        Assert.False(PluginPackage.ExtractTo(new MemoryStream(zip), dest).IsValid);
+        Assert.False(Directory.Exists(dest));
+        Assert.Empty(Directory.GetDirectories(dir.Path));
+        Assert.Equal("keep", File.ReadAllText(Path.Combine(dir.Path, "sibling.txt")));
+    }
+
+    [Fact]
+    public void ExtractStagingPrefix_IsNeverAValidPluginId()
+        => Assert.False(PluginManifestParser.IsValidId(PluginPackage.ExtractStagingPrefix + Guid.NewGuid().ToString("N")));
+
+    [Fact]
     public void ExtractTo_DestinationIsAFile_FailsWithoutDeletingIt()
     {
         using var dir = new TempDir();

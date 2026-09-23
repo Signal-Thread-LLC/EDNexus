@@ -164,11 +164,15 @@ public class PluginInstallerTests(Xunit.Abstractions.ITestOutputHelper output)
         var staging = Path.Combine(root, PluginInstaller.StagingPrefix + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(Path.Combine(staging, "lib"));
         File.WriteAllText(Path.Combine(staging, "lib", "half-written.dll"), "x");
+        var extract = Path.Combine(root, PluginPackage.ExtractStagingPrefix + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(extract);
+        File.WriteAllText(Path.Combine(extract, "partial.dll"), "x");
 
         var recovery = PluginInstaller.RecoverInterrupted(root);
 
         Assert.Equal([Id], recovery.Restored);
         Assert.Contains(Path.GetFileName(staging), recovery.Removed);
+        Assert.Contains(Path.GetFileName(extract), recovery.Removed);
         Assert.Empty(recovery.Errors);
         Assert.True(File.Exists(Path.Combine(root, Id, "v1.txt")));
         Assert.Equal([Id], Directory.GetDirectories(root).Select(Path.GetFileName));

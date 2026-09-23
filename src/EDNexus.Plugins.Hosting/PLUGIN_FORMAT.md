@@ -65,7 +65,9 @@ requested. A replace first renames the old version to `.replaced-<id>.<guid>`; i
 it is moved back (or, if that also fails, the error names where it was preserved). The host calls
 `PluginInstaller.RecoverInterrupted(root)` at startup to finish any replace cut short by a crash:
 it restores a backup whose `<id>` folder is missing, deletes backups that were superseded, and
-deletes stale staging folders. Folder names starting with `.` are never valid plugin ids, so
+deletes stale `.staging-*` and `.extract-*` folders. (`PluginPackage.ExtractTo` writes into a
+sibling `.extract-<guid>` folder and renames it onto its destination only when complete, so it
+never claims or deletes a destination folder it did not create.) Folder names starting with `.` are never valid plugin ids, so
 discovery ignores them.
 
 A package is **rejected** if any entry:

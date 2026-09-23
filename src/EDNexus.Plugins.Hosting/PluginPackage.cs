@@ -68,8 +68,10 @@ public static class PluginPackage
 
     /// <summary>
     /// Validates the package at <paramref name="packagePath"/> and, only if it is valid, extracts
-    /// it into <paramref name="destinationDirectory"/> (which must not exist yet). On any failure
-    /// the partially-written destination is removed.
+    /// it into <paramref name="destinationDirectory"/> (which must not exist yet). Files are
+    /// written to a sibling <c>.extract-&lt;guid&gt;</c> folder that is renamed onto the destination
+    /// only once complete; on any failure only that staging folder is removed, never the
+    /// destination.
     /// </summary>
     public static PluginPackageInspection ExtractTo(string packagePath, string destinationDirectory, PluginPackageLimits? limits = null)
     {
@@ -435,24 +437,31 @@ public static class PluginPackage
         {
             return PluginPackageInspection.Failure($"destination '{destinationDirectory}' is not a valid path: {ex.Message}");
         }
+        // Checked up front only for a clear error message; the Move below is what actually claims it.
         if (Directory.Exists(destination) || File.Exists(destination))
             return PluginPackageInspection.Failure($"destination '{destination}' already exists");
 
-        // Only ever clean up a folder this call created. Directory.CreateDirectory succeeds
-        // silently on an existing folder, so if one appeared (with content) between the check
-        // above and here, it isn't ours: refuse without marking it created, so it is never
-        // deleted. If creating fails outright (e.g. a file appeared), nothing is deleted either.
-        var created = false;
+        var parent = Path.GetDirectoryName(destination);
+        if (string.IsNullOrEmpty(parent))
+            return PluginPackageInspection.Failure($"destination '{destination}' has no parent folder");
+
+        // Extract into a sibling folder with an unguessable name that this call creates, then
+        // rename it onto the destination. Directory.Move refuses an existing destination, so a
+        // folder someone else created there (even an empty one) is never claimed — and on any
+        // failure only our own staging folder is deleted, never the destination.
+        var staging = Path.Combine(parent, ExtractStagingPrefix + Guid.NewGuid().ToString("N"));
+        var stagingCreated = false;
         try
         {
-            Directory.CreateDirectory(destination);
-            if (Directory.EnumerateFileSystemEntries(destination).Any())
-                return PluginPackageInspection.Failure($"destination '{destination}' already exists");
-            created = true;
+            Directory.CreateDirectory(parent);
+            if (Directory.Exists(staging))
+                throw new PackageRejectedException($"staging folder '{staging}' unexpectedly exists");
+            Directory.CreateDirectory(staging);
+            stagingCreated = true;
 
             foreach (var entry in analysis.Inspection.Entries.Where(e => e.IsDirectory))
             {
-                var dir = PluginPathRules.ResolveInside(destination, entry.Path.TrimEnd('/'))
+                var dir = PluginPathRules.ResolveInside(staging, entry.Path.TrimEnd('/'))
                     ?? throw new PackageRejectedException($"entry \"{entry.Path}\" resolves outside the plugin folder");
                 Directory.CreateDirectory(dir);
             }
@@ -462,7 +471,7 @@ public static class PluginPackage
             {
                 // Defence in depth: lexically re-check containment of the combined path (a string
                 // check — links can't occur because packages containing them were rejected).
-                var target = PluginPathRules.ResolveInside(destination, relative)
+                var target = PluginPathRules.ResolveInside(staging, relative)
                     ?? throw new PackageRejectedException($"entry \"{relative}\" resolves outside the plugin folder");
                 Directory.CreateDirectory(Path.GetDirectoryName(target)!);
 
@@ -483,17 +492,32 @@ public static class PluginPackage
                     throw new PackageRejectedException($"package expands past the {limits.MaxTotalUncompressedBytes}-byte limit");
             }
 
+            // The claim: Directory.Move fails if the destination now exists. (On Unix the runtime
+            // checks before calling rename(2), which could itself replace an *empty* directory
+            // created in that instant — nothing is lost then, since it held no data and is
+            // never deleted by us.)
+            Directory.Move(staging, destination);
             return analysis.Inspection;
         }
         catch (Exception ex) when (ex is PackageRejectedException or IOException or UnauthorizedAccessException or InvalidDataException or NotSupportedException or ArgumentException)
         {
-            if (created)
-                TryDeleteDirectory(destination);
+            if (stagingCreated)
+                TryDeleteDirectory(staging);
+            if (ex is not PackageRejectedException && (Directory.Exists(destination) || File.Exists(destination)))
+                return PluginPackageInspection.Failure($"destination '{destination}' already exists");
             return PluginPackageInspection.Failure(ex is PackageRejectedException
                 ? ex.Message
                 : $"extraction failed: {ex.Message}");
         }
     }
+
+    /// <summary>
+    /// Prefix of the sibling folder <see cref="ExtractTo(string, string, PluginPackageLimits?)"/>
+    /// extracts into before renaming it onto the destination. It starts with '.', so it is never a
+    /// valid plugin id; leftovers under the plugins root are removed by
+    /// <see cref="PluginInstaller.RecoverInterrupted"/>.
+    /// </summary>
+    internal const string ExtractStagingPrefix = ".extract-";
 
     private static long CopyAtMost(Stream input, Stream output, long maxBytes, Crc32? crc = null)
     {
