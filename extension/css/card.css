@@ -13,7 +13,10 @@
   --ednx-orange-dim: #b85200;
   --ednx-ink: #f4f1ea;
   --ednx-ink-soft: rgba(244, 241, 234, 0.62);
-  --ednx-ink-faint: rgba(244, 241, 234, 0.38);
+  /* 0.38 measured 3.2:1 on the panel, under the 4.5:1 minimum, and this carries the section
+     headings at 9.5px and the empty-state message. 0.55 measures 5.7:1 on a dark player and 5.3:1
+     with a bright video behind the 92%-opaque panel. */
+  --ednx-ink-faint: rgba(244, 241, 234, 0.55);
   --ednx-bg: rgba(10, 11, 13, 0.92);
   --ednx-bg-raised: rgba(255, 255, 255, 0.05);
   --ednx-line: rgba(255, 255, 255, 0.1);

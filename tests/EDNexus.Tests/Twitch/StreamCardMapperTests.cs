@@ -1,5 +1,7 @@
 using System.Text;
 using System.Text.Json;
+using EDNexus.Core.Exobio;
+using EDNexus.Core.Journal;
 using EDNexus.Core.State;
 using EDNexus.Core.Twitch;
 using Xunit;
@@ -279,6 +281,58 @@ public class StreamCardMapperTests
         var state = new CommanderState { Ship = "anaconda" };
 
         Assert.Null(StreamCardMapper.Map(state, now: Now).Ship!.JumpRange);
+    }
+
+    /// <summary>
+    /// An exobiology tracker that has seen one body's bio signals, for the location-leak tests.
+    /// </summary>
+    private static StreamCardSources ExobiologySources()
+    {
+        var bus = new JournalEventBus();
+        var tracker = new ExobiologyTracker(bus, new CommanderState());
+        const string dss = """
+        { "timestamp":"2026-08-01T10:00:00Z", "event":"SAASignalsFound", "BodyName":"Nervi 2 a",
+          "SystemAddress":2871051298217, "BodyID":12,
+          "Signals":[{"Type":"$SAA_SignalType_Biological;","Type_Localised":"Biological","Count":3}],
+          "Genuses":[{"Genus":"$Codex_Ent_Stratum_Genus_Name;","Genus_Localised":"Stratum"}] }
+        """;
+        Assert.True(JournalEntry.TryParse(dss, historical: false, out var entry));
+        bus.Publish(entry);
+
+        // CurrentBody — the "bio signals here" summary the card shows — is only set once the
+        // commander has actually arrived at the body.
+        const string approach = """
+        { "timestamp":"2026-08-01T10:05:00Z", "event":"ApproachBody", "StarSystem":"Nervi",
+          "SystemAddress":2871051298217, "Body":"Nervi 2 a", "BodyID":12 }
+        """;
+        Assert.True(JournalEntry.TryParse(approach, historical: false, out var arrival));
+        bus.Publish(arrival);
+
+        return new StreamCardSources(Exobiology: tracker);
+    }
+
+    [Fact]
+    public void Exobiology_names_the_body_while_location_is_shown()
+    {
+        var card = StreamCardMapper.Map(new CommanderState(), ExobiologySources(), now: Now);
+
+        Assert.Equal("Nervi 2 a", card.Exobiology!.BodyName);
+    }
+
+    [Fact]
+    public void Exobiology_withholds_the_body_once_location_is_hidden()
+    {
+        var visibility = StreamCardVisibility.Default with { Location = false };
+
+        var card = StreamCardMapper.Map(new CommanderState(), ExobiologySources(), visibility, Now);
+        var json = JsonSerializer.Serialize(card, StreamCardSnapshot.SerializerOptions);
+
+        // An Elite body name carries its system name, so publishing it here would hand viewers the
+        // exact thing hiding Location exists to withhold — the settings UI promises anything
+        // unchecked is never sent.
+        Assert.NotNull(card.Exobiology);
+        Assert.Null(card.Exobiology!.BodyName);
+        Assert.DoesNotContain("Nervi", json, StringComparison.Ordinal);
     }
 
     [Fact]

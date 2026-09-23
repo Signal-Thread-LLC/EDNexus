@@ -42,10 +42,26 @@
     return url.origin;
   }
 
+  // onAuthorized does not mean the configuration has arrived — Twitch delivers that through
+  // configuration.onChanged. Reading it on authorization showed an empty field to a broadcaster who
+  // had already saved a URL.
   if (helper) {
-    helper.onAuthorized(function () {
+    var loaded = false;
+
+    function showSavedUrl() {
+      // Never clobber an edit in progress: onChanged also fires on a token refresh, and on the
+      // broadcaster's own save.
+      if (loaded || input.value.trim() !== '') return;
+      loaded = true;
       input.value = currentConfig().ebsBaseUrl || '';
-    });
+    }
+
+    if (helper.configuration && typeof helper.configuration.onChanged === 'function') {
+      helper.configuration.onChanged(showSavedUrl);
+    }
+    // A channel with no configuration document yet never gets an onChanged, so the field simply
+    // stays empty and the placeholder explains the default.
+    helper.onAuthorized(showSavedUrl);
   }
 
   saveButton.addEventListener('click', function () {

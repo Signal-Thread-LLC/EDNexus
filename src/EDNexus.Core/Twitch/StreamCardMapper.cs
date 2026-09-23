@@ -51,7 +51,7 @@ public static class StreamCardMapper
             Ship: visibility.Ship ? MapShip(state) : null,
             Location: visibility.Location ? MapLocation(state) : null,
             Carrier: visibility.Carrier ? MapCarrier(state) : null,
-            Exobiology: visibility.Exobiology ? MapExobiology(sources) : null,
+            Exobiology: visibility.Exobiology ? MapExobiology(sources, visibility.Location) : null,
             Mining: visibility.Mining ? MapMining(sources) : null,
             Missions: visibility.Missions ? MapMissions(sources) : null,
             Cargo: visibility.Cargo ? MapCargo(state) : null,
@@ -147,7 +147,13 @@ public static class StreamCardMapper
             DepartsAt: state.CarrierPendingDeparture);
     }
 
-    private static StreamCardExobiology? MapExobiology(StreamCardSources sources)
+    /// <param name="showLocation">
+    /// Whether the broadcaster is showing where they are. An Elite body name contains its system name
+    /// ("Hypiae Aescs FB-W c1-1046 A 3 f"), so publishing it with Location hidden would hand viewers
+    /// the very thing that section exists to withhold — a commander hiding from stream snipers while
+    /// they sample would be given away by the exobiology panel.
+    /// </param>
+    private static StreamCardExobiology? MapExobiology(StreamCardSources sources, bool showLocation)
     {
         if (sources.Exobiology is not { } exo) return null;
 
@@ -168,7 +174,7 @@ public static class StreamCardMapper
             ActiveGenus: active?.GenusName,
             ActiveSpecies: active?.SpeciesName,
             SamplesTaken: active?.Samples ?? 0,
-            BodyName: body?.BodyName ?? active?.BodyName,
+            BodyName: showLocation ? body?.BodyName ?? active?.BodyName : null,
             BodySignals: body?.SignalCount ?? 0);
     }
 

@@ -183,7 +183,6 @@ public partial class SettingsWindow : Window
             // see without touching the commander picture, so the publisher has nothing to react to —
             // and with the game closed no journal event is coming to nudge it. Ask directly.
             _dashboard?.TwitchCard?.RequestPublish();
-            _boot.Dev.Enabled = DevModeToggle.IsChecked == true; // runtime-only; not persisted
             _boot.ApplyDiscordChoice(
                 DiscordToggle.IsChecked == true,
                 DiscordShowSystemToggle.IsChecked == true,

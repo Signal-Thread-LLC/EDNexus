@@ -64,22 +64,25 @@ jobs:
             type=sha,format=long
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Build and push
+      # Build once and load it locally so the smoke test exercises the exact image that will be
+      # pushed. buildx's docker-container driver does not populate the local image store, so a
+      # separate `docker build` here would test a different artifact — or nothing at all.
+      - name: Build the image
         uses: docker/build-push-action@v6
         with:
           context: .
           file: src/EDNexus.Ebs/Dockerfile
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
+          load: true
+          tags: ebs-smoke
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # A container that cannot start is worse than a failed build, and the service validates its
-      # configuration at startup — so prove it comes up before the image is called good.
+      # This gates the push. The service validates its Twitch configuration at startup, so an image
+      # that builds can still be one that cannot boot — publishing first would move `latest` to a
+      # broken image and docker-compose would pull it on the next restart.
       - name: Smoke test the image
         run: |
-          docker build -f src/EDNexus.Ebs/Dockerfile -t ebs-smoke .
           docker run -d --name ebs-smoke -p 8787:8787 \
             -e Twitch__ClientId=smoke \
             -e Twitch__ExtensionId=smoke \
@@ -94,6 +97,18 @@ jobs:
           echo "The service never became healthy. Container log:"
           docker logs ebs-smoke
           exit 1
+
+      # Only now, with a container proven to start, does the image become available to deploy.
+      - name: Push the verified image
+        if: github.event_name != 'pull_request'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: src/EDNexus.Ebs/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
 
       - name: Container log on failure
         if: failure()

@@ -49,6 +49,12 @@ public sealed class TwitchStreamCardService : IDisposable
     public const int MaxPublishRetries = 5;
 
     /// <summary>
+    /// Joins the parts of the publish deduplication key. A unit separator cannot occur in a URL, a
+    /// token or serialized JSON, so no combination of parts can collide with a different one.
+    /// </summary>
+    private const string KeySeparator = "\u001f";
+
+    /// <summary>
     /// <see cref="CommanderState"/> properties worth a republish. Deliberately not every property:
     /// <c>LastUpdated</c> ticks on virtually every journal line and would defeat the deduplication
     /// below.
@@ -90,7 +96,7 @@ public sealed class TwitchStreamCardService : IDisposable
     private readonly SemaphoreSlim _dirty = new(0, 1);
     private readonly Task _pump;
 
-    private string? _lastPublishedFingerprint;
+    private string? _lastPublishedKey;
     private int _consecutiveFailures;
     private bool _stoppedForReauth;
     /// <summary>The token that earned the 401, so a later login with a different one can resume.</summary>
@@ -167,9 +173,10 @@ public sealed class TwitchStreamCardService : IDisposable
 
         _pump = Task.Run(() => PumpAsync(_cts.Token));
 
-        // Publish whatever the state already knows (e.g. warmed from a replayed journal) right away,
-        // so a viewer who opens the card before the commander does anything still sees the card.
-        MarkDirty();
+        // Deliberately no publish here. This is constructed before the journal has been replayed, so
+        // publishing now would send "In the black" with no sections and leave that as the EBS's
+        // initial state until the warmed snapshot follows a MinInterval later. The host calls
+        // RequestPublish() once the replay has finished instead.
     }
 
     /// <summary>The floor between two publishes this service was built with.</summary>
@@ -287,12 +294,18 @@ public sealed class TwitchStreamCardService : IDisposable
 
         // Deduplicate on content, not on the timestamp the snapshot carries — otherwise a journal
         // line that changes nothing a viewer can see would still spend a publish from the quota.
-        var fingerprint = snapshot.ContentFingerprint();
-        if (fingerprint == _lastPublishedFingerprint) return null;
+        //
+        // Scoped to the destination and credential as well, because an identical card still has to go
+        // out when either changes: pointing at a different EBS, or signing in again after a restart
+        // wiped the in-memory token store, leaves a brand new service with no state at all. With the
+        // game closed the card would otherwise never change, so viewers would see nothing.
+        var endpoint = _endpoint();
+        var key = string.Join(KeySeparator, endpoint, token, snapshot.ContentFingerprint());
+        if (key == _lastPublishedKey) return null;
 
-        var result = await _client.PublishAsync(_endpoint(), token!, snapshot, ct).ConfigureAwait(false);
+        var result = await _client.PublishAsync(endpoint, token!, snapshot, ct).ConfigureAwait(false);
 
-        if (result.IsSuccess) _lastPublishedFingerprint = fingerprint;
+        if (result.IsSuccess) _lastPublishedKey = key;
 
         if (result.RequiresReauth)
         {

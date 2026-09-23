@@ -32,12 +32,26 @@ public class TwitchStreamCardServiceTests
             clock: null);
 
     [Fact]
-    public async Task Publishes_what_the_state_already_knows_on_startup()
+    public async Task Nothing_is_published_until_the_host_has_replayed_the_journal()
+    {
+        var client = new FakeStreamStateApiClient();
+
+        // Built inside EngineHost's constructor, before the replay. Publishing here would send an
+        // empty card and leave that as the EBS's initial state until the warm one follows.
+        using var service = Create(new CommanderState(), client);
+
+        Assert.False(await client.WaitForPublishAsync(TimeSpan.FromMilliseconds(300)));
+        Assert.Empty(client.Snapshots);
+    }
+
+    [Fact]
+    public async Task Publishes_the_warmed_picture_when_the_host_asks()
     {
         var state = new CommanderState { StarSystem = "Nervi", Ship = "Krait Phantom" };
         var client = new FakeStreamStateApiClient();
 
         using var service = Create(state, client);
+        service.RequestPublish();
 
         Assert.True(await client.WaitForPublishAsync());
         Assert.Equal("Nervi", client.Snapshots[0].Location!.System);
@@ -78,6 +92,7 @@ public class TwitchStreamCardServiceTests
         var client = new FakeStreamStateApiClient();
 
         using var service = Create(state, client);
+        service.RequestPublish();
         Assert.True(await client.WaitForPublishAsync());
 
         // LastUpdated ticks on virtually every journal line but changes nothing on the card.
@@ -97,6 +112,7 @@ public class TwitchStreamCardServiceTests
         var client = new FakeStreamStateApiClient();
 
         using var service = Create(state, client);
+        service.RequestPublish();
         Assert.True(await client.WaitForPublishAsync());
 
         state.StarSystem = "Colonia";
@@ -112,6 +128,7 @@ public class TwitchStreamCardServiceTests
         var client = new FakeStreamStateApiClient();
 
         using var service = Create(state, client);
+        service.RequestPublish();
         Assert.True(await client.WaitForPublishAsync());
 
         // A single hyperspace jump touches several properties at once; viewers only need the result.
@@ -137,6 +154,7 @@ public class TwitchStreamCardServiceTests
         };
 
         using var service = Create(state, client);
+        service.RequestPublish();
         var reauth = new TaskCompletionSource();
         service.ReauthRequired += () => reauth.TrySetResult();
 
@@ -163,7 +181,13 @@ public class TwitchStreamCardServiceTests
         var token = "stale-token";
 
         using var service = Create(state, client, token: () => token);
+        service.RequestPublish();
+        // The fake releases its signal before returning the 401, and the pump sets the latch only
+        // after that call returns — so waiting on the publish alone races the write.
+        var reauth = new TaskCompletionSource();
+        service.ReauthRequired += () => reauth.TrySetResult();
         Assert.True(await client.WaitForPublishAsync());
+        await reauth.Task.WaitAsync(TimeSpan.FromSeconds(5));
         Assert.True(service.StoppedForReauth);
 
         // The commander logs in again: a different credential is what tells the service the
@@ -205,6 +229,7 @@ public class TwitchStreamCardServiceTests
         var client = new FakeStreamStateApiClient();
 
         using var service = Create(state, client);
+        service.RequestPublish();
         Assert.True(await client.WaitForPublishAsync());
 
         // Saving the settings dialog repeatedly must not spend the PubSub quota re-sending an
@@ -228,6 +253,7 @@ public class TwitchStreamCardServiceTests
         using var service = new TwitchStreamCardService(
             state, StreamCardSources.Empty, client, () => endpoint, static () => "ebs-token",
             null, null, FastInterval, clock: null);
+        service.RequestPublish();
 
         Assert.True(await client.WaitForPublishAsync());
         Assert.Equal("https://first.example.com/api/update-state", client.LastEndpoint);
@@ -249,6 +275,7 @@ public class TwitchStreamCardServiceTests
         var enabled = true;
 
         using var service = Create(state, client, token: () => enabled ? "ebs-token" : null);
+        service.RequestPublish();
         Assert.True(await client.WaitForPublishAsync());
 
         enabled = false;
@@ -288,6 +315,7 @@ public class TwitchStreamCardServiceTests
             : StreamStatePublishResult.Ok;
 
         using var service = Create(state, client);
+        service.RequestPublish();
 
         var deadline = DateTime.UtcNow.AddSeconds(10);
         while (DateTime.UtcNow < deadline && !client.Snapshots.Any())
@@ -311,6 +339,7 @@ public class TwitchStreamCardServiceTests
         };
 
         using var service = Create(state, client);
+        service.RequestPublish();
 
         await Task.Delay(FastInterval * (TwitchStreamCardService.MaxPublishRetries + 6) * 2);
 
@@ -329,6 +358,7 @@ public class TwitchStreamCardServiceTests
         };
 
         using var service = Create(state, client);
+        service.RequestPublish();
         Assert.True(await client.WaitForPublishAsync());
 
         // The fingerprint is only remembered on success, so the same card is offered again.
@@ -347,6 +377,7 @@ public class TwitchStreamCardServiceTests
         var visibility = StreamCardVisibility.Default;
 
         using var service = Create(state, client, visibility: () => visibility);
+        service.RequestPublish();
         Assert.True(await client.WaitForPublishAsync());
         Assert.NotNull(client.Snapshots[0].Ship);
 

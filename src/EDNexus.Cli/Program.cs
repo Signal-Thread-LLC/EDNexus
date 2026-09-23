@@ -40,6 +40,11 @@ for (var i = 0; i < args.Length; i++)
     }
 }
 
+// --twitch-card emits a payload meant to be piped into a file or a POST body, so its progress
+// lines go to stderr — on stdout they would sit in front of the JSON and every parser would reject it.
+var twitchCardOnly = args.Contains("--twitch-card");
+var status = twitchCardOnly ? Console.Error : Console.Out;
+
 dir ??= JournalPaths.Resolve();
 if (dir is null)
 {
@@ -48,7 +53,7 @@ if (dir is null)
     return 1;
 }
 
-Console.WriteLine($"Journal directory: {dir}");
+status.WriteLine($"Journal directory: {dir}");
 
 var bus = new JournalEventBus();
 var state = new CommanderState();
@@ -74,12 +79,12 @@ voiceCallouts.CalloutRaised += callout => voiceLog.Add($"[{callout.Kind}] {callo
 bus.HandlerError += (e, ex) => Console.Error.WriteLine($"  [handler error on {e.Event}] {ex.Message}");
 
 var watcher = new JournalWatcher(dir, bus);
-Console.WriteLine("Replaying latest journal to warm up state...\n");
+status.WriteLine("Replaying latest journal to warm up state...\n");
 watcher.Replay();
 
 // --twitch-card is a payload dump, not a state dump: print just the JSON the extension would
 // receive, so it can be piped straight into a file or a POST body, then stop.
-if (args.Contains("--twitch-card"))
+if (twitchCardOnly)
 {
     var cardVisibility = args.Contains("--show-credits")
         ? StreamCardVisibility.Default with { Credits = true }

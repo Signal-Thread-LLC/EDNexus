@@ -316,6 +316,11 @@
     if (snapshot && snapshot.unsupported) {
       handleHeadline.textContent = 'EDNexus';
       handleSub.textContent = '';
+      // Clear the header too: a v1 snapshot followed by a newer broadcast would otherwise leave the
+      // old commander and location sitting above the incompatibility notice, reading as current.
+      cmdrName.textContent = 'CMDR';
+      cmdrWhere.textContent = '';
+      staleNote.hidden = true;
       sections.replaceChildren(el('p', 'ednx-empty',
         'This commander is running a newer EDNexus than this card understands.'));
       return;

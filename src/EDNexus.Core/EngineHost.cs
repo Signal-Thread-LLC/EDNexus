@@ -271,6 +271,12 @@ public sealed class EngineHost : IDisposable
     {
         if (_watcher is null) return;
         _watcher.Replay();
+
+        // Now that the commander picture is warm, put it in front of viewers. The card service is
+        // built in the constructor, before any of this has happened, so it deliberately publishes
+        // nothing until asked.
+        _twitchCard?.RequestPublish();
+
         _runTask = Task.Run(() => _watcher.RunAsync(_cts.Token));
     }
 
