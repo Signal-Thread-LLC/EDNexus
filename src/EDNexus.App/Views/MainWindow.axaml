@@ -164,7 +164,8 @@
           <!-- Compact radio transport: previous / play-pause / next, with the tuned station name
                underneath. Kept in the title bar so it stays reachable from anywhere, the same way the
                physical media keys it'll eventually wire up to (#124) do; the Space Radio card has the
-               full player (station picker, volume, mute). Always drives the real player. -->
+               full player (station picker, volume, mute). Drives the same player as the card: the
+               simulation while developer mode is on, tagged SIM. -->
           <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center"
                       ToolTip.Tip="{Binding RadioTooltip}">
             <Button Command="{Binding RadioPreviousCommand}" Content="⏮" FontSize="13"
@@ -182,6 +183,12 @@
             <TextBlock Text="{Binding RadioStationName}" Foreground="{StaticResource InkDim}"
                        FontSize="11" VerticalAlignment="Center" MaxWidth="120"
                        TextTrimming="CharacterEllipsis" Margin="6,0,0,0" />
+            <Border IsVisible="{Binding RadioIsSimulated}" Background="#1E1712" CornerRadius="4"
+                    Padding="4,1" Margin="4,0,0,0" VerticalAlignment="Center"
+                    ToolTip.Tip="Developer mode: the radio controls drive a simulation. No audio plays and nothing is saved.">
+              <TextBlock Text="SIM" FontSize="10" FontWeight="SemiBold" LetterSpacing="1"
+                         Foreground="{StaticResource AmberBrush}" />
+            </Border>
           </StackPanel>
 
           <StackPanel VerticalAlignment="Center">
@@ -1546,8 +1553,8 @@
           </DataTemplate>
 
           <!-- Space Radio — the full player: status (pulsing LIVE dot, BUFFERING, OFFLINE with the
-               reason), transport, station picker and volume/mute. In developer mode it drives an
-               in-memory simulation (tagged SIMULATED) that the 🎲 steps through every state; no audio. -->
+               reason), transport, station picker and volume/mute. In developer mode it and the title bar
+               drive an in-memory simulation (tagged SIMULATED) that the 🎲 steps through every state; no audio. -->
           <DataTemplate DataType="vm:RadioCardViewModel">
             <Border Classes="card">
               <StackPanel>

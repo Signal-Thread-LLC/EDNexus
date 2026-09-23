@@ -13,7 +13,6 @@ using EDNexus.Core.Missions;
 using EDNexus.Core.Navigation;
 using EDNexus.Core.Ranks;
 using EDNexus.Core.News;
-using EDNexus.Core.Radio;
 using EDNexus.Core.Reporting;
 using EDNexus.Core.Routes;
 using EDNexus.Core.Settings;
@@ -46,12 +45,6 @@ public sealed class EngineHost : IDisposable
     public CommanderState State { get; } = new();
     public ColonisationTracker Colonisation { get; }
     public MarketTracker Market { get; }
-
-    /// <summary>
-    /// Background radio player for the built-in simulation/space stations. Persists the last
-    /// selected station, volume, and mute state via the settings passed to this host, when supplied.
-    /// </summary>
-    public RadioPlayerService Radio { get; }
 
     /// <summary>Engineering planner: pinned-blueprint material/engineer guidance. Reads static reference data.</summary>
     public EngineeringTracker Engineering { get; }
@@ -118,15 +111,15 @@ public sealed class EngineHost : IDisposable
     /// Optional live predicate; while it returns true the reporters go silent. The app wires this to
     /// developer mode so fabricated events never reach EDDN or Inara.
     /// </param>
-    /// <param name="settingsStore">
-    /// Used by <see cref="Radio"/> to persist station/volume/mute changes. Only meaningful alongside
-    /// <paramref name="settings"/>; the CLI passes neither, so the radio player never touches disk.
-    /// </param>
+    /// <remarks>
+    /// The radio player (<see cref="EDNexus.Core.Radio.RadioPlayerService"/>) is deliberately not part of the
+    /// host: it isn't journal-driven, and the host is rebuilt on "reset to live" / leaving developer
+    /// mode, which must not interrupt the music. The app owns it for its whole lifetime instead.
+    /// </remarks>
     public EngineHost(
         string? journalDir = null,
         AppSettings? settings = null,
-        Func<bool>? reportingSuppressed = null,
-        SettingsStore? settingsStore = null)
+        Func<bool>? reportingSuppressed = null)
     {
         JournalDirectory = journalDir ?? JournalPaths.Resolve();
         _tracker = new StateTracker(Bus, State);
@@ -154,10 +147,6 @@ public sealed class EngineHost : IDisposable
                 ? MiningSpotBook.WorthMiningIn(settings.Mining.KnownSpots, address, name, settings.Mining.MinValueThreshold)
                 : Array.Empty<KnownMiningSpot>();
         }
-
-        // Not journal-driven: reads/persists its own settings section directly, same as the
-        // EDDN/Inara reporters below. The CLI passes neither, so it never touches storage.
-        Radio = new RadioPlayerService(settings, settingsStore);
 
         // Shared client for outbound trade lookups. The EDDN/Inara reporters own their own client
         // inside ReporterHost, so this one is dedicated to the read-side (Spansh) queries.
@@ -248,7 +237,6 @@ public sealed class EngineHost : IDisposable
         // Flush any queued reports before tearing down the shared HttpClient.
         try { _reporters?.DisposeAsync().AsTask().Wait(TimeSpan.FromSeconds(3)); }
         catch (AggregateException) { /* best effort */ }
-        Radio.Dispose();
         _discordPresence?.Dispose();
         _cts.Dispose();
         _http.Dispose();

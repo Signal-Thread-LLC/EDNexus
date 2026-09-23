@@ -64,18 +64,30 @@ public sealed class RadioSampleSource : JournalSampleSource
 /// An in-memory <see cref="IRadioPlayer"/> for developer mode. Its state is set by
 /// <see cref="RadioSampleSource"/> events arriving on the bus, and the card's controls act on it with
 /// the same transitions as the real player (play/pause goes through
-/// <see cref="RadioPlayerService.ToggleActionFor"/>) — but it never opens an audio device or a
-/// stream, and never persists anything, so the saved <c>RadioWasPlaying</c> is untouched.
+/// <see cref="RadioPlayerService.ToggleActionFor"/>, and playing a station goes Buffering then
+/// Playing) — but it never opens an audio device or a stream, and never persists anything, so the
+/// saved <c>RadioWasPlaying</c> is untouched.
 /// </summary>
 public sealed class SimulatedRadioPlayer : IRadioPlayer
 {
+    private static readonly TimeSpan DefaultConnectDelay = TimeSpan.FromMilliseconds(800);
+
     private readonly object _gate = new();
+    private readonly TimeSpan _connectDelay;
+    private int _generation; // bumped by every state change, so a stale "connected" can't overwrite a newer state
     private RadioStation? _station;
     private RadioPlaybackStatus _status = RadioPlaybackStatus.Stopped;
     private int _volume = 50;
     private bool _muted;
     private bool _enabled;
     private string? _lastError;
+
+    /// <param name="connectDelay">
+    /// How long a simulated station "buffers" before it reports Playing (default 800 ms). Zero
+    /// connects synchronously, which keeps tests deterministic.
+    /// </param>
+    public SimulatedRadioPlayer(TimeSpan? connectDelay = null)
+        => _connectDelay = connectDelay ?? DefaultConnectDelay;
 
     /// <inheritdoc />
     public event Action? Changed;
@@ -105,6 +117,7 @@ public sealed class SimulatedRadioPlayer : IRadioPlayer
 
         lock (_gate)
         {
+            _generation++;
             _status = status;
             _enabled = true;
             if (RadioStationCatalog.Find(e.GetString("Station")) is { } station) _station = station;
@@ -132,21 +145,42 @@ public sealed class SimulatedRadioPlayer : IRadioPlayer
         };
     }
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Tunes to the station and reports Buffering, then Playing once the connect delay passes — as
+    /// the real player does when LibVLC reports the stream has started. Returns once buffering has
+    /// begun, like the real player, so the UI's play button isn't held busy while it "connects".
+    /// </summary>
     public Task PlayAsync(string stationId, CancellationToken ct = default)
     {
         var station = RadioStationCatalog.Find(stationId);
         if (station is null) return Task.CompletedTask;
 
+        int generation;
         lock (_gate)
         {
+            generation = ++_generation;
             _station = station;
             _enabled = true;
-            _status = RadioPlaybackStatus.Playing;
+            _status = RadioPlaybackStatus.Buffering;
             _lastError = null;
         }
         RaiseChanged();
+
+        _ = ConnectAsync(generation);
         return Task.CompletedTask;
+    }
+
+    private async Task ConnectAsync(int generation)
+    {
+        if (_connectDelay > TimeSpan.Zero) await Task.Delay(_connectDelay).ConfigureAwait(false);
+
+        lock (_gate)
+        {
+            // Stopped, paused, retuned or re-sampled meanwhile: that newer state wins.
+            if (generation != _generation || _status != RadioPlaybackStatus.Buffering) return;
+            _status = RadioPlaybackStatus.Playing;
+        }
+        RaiseChanged();
     }
 
     /// <inheritdoc />
@@ -185,6 +219,7 @@ public sealed class SimulatedRadioPlayer : IRadioPlayer
     {
         lock (_gate)
         {
+            _generation++;
             _status = status;
             _lastError = null;
         }

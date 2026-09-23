@@ -1,7 +1,6 @@
 using EDNexus.Core.Dev;
 using EDNexus.Core.Journal;
 using EDNexus.Core.Radio;
-using EDNexus.Core.Settings;
 using Xunit;
 
 namespace EDNexus.Tests.Dev;
@@ -104,7 +103,7 @@ public class RadioSimulationTests
     [Fact]
     public async Task Toggle_follows_the_same_transitions_as_the_real_player()
     {
-        var sim = new SimulatedRadioPlayer();
+        var sim = new SimulatedRadioPlayer(connectDelay: TimeSpan.Zero);
 
         // Stopped with nothing tuned → plays the first station.
         await sim.TogglePlayPauseAsync();
@@ -136,7 +135,7 @@ public class RadioSimulationTests
     [Fact]
     public async Task Station_volume_and_mute_controls_update_the_simulated_state()
     {
-        var sim = new SimulatedRadioPlayer();
+        var sim = new SimulatedRadioPlayer(connectDelay: TimeSpan.Zero);
         var changes = 0;
         sim.Changed += () => changes++;
 
@@ -162,30 +161,148 @@ public class RadioSimulationTests
     }
 
     [Fact]
-    public async Task Simulation_never_touches_the_real_player_or_its_saved_resume_intent()
+    public async Task Playing_a_station_buffers_before_it_goes_live()
     {
-        var settings = new AppSettings();
-        settings.Radio.RadioEnabled = true;
-        settings.Radio.RadioWasPlaying = true;
-        settings.Radio.RadioLastStation = RadioStationCatalog.Stations[1].Id;
-        settings.Radio.RadioVolume = 40;
-        using var real = new RadioPlayerService(settings);
-
-        var (bus, sim) = Wired();
-        var dev = new DeveloperMode();
-        var rng = Seeded();
-        for (var i = 0; i < RadioSampleSource.Cycle.Count * 2; i++)
+        var sim = new SimulatedRadioPlayer(connectDelay: TimeSpan.FromMilliseconds(50));
+        var seen = new List<RadioPlaybackStatus>();
+        var live = new TaskCompletionSource();
+        sim.Changed += () =>
         {
-            dev.Randomize(bus, rng, cardKey: "radio");
-            await sim.TogglePlayPauseAsync();
-            await sim.SetVolumeAsync(rng.Next(0, 101));
-            await sim.SetMuteAsync(rng.Next(2) == 0);
+            var status = sim.Snapshot.Status;
+            lock (seen) seen.Add(status);
+            if (status == RadioPlaybackStatus.Playing) live.TrySetResult();
+        };
+
+        await sim.PlayAsync(RadioStationCatalog.Stations[0].Id);
+        Assert.Equal(RadioPlaybackStatus.Buffering, sim.Snapshot.Status);   // returns while still connecting
+
+        await live.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        lock (seen) Assert.Equal(new[] { RadioPlaybackStatus.Buffering, RadioPlaybackStatus.Playing }, seen);
+    }
+
+    [Fact]
+    public async Task Stopping_while_buffering_is_not_overridden_by_the_late_connect()
+    {
+        var sim = new SimulatedRadioPlayer(connectDelay: TimeSpan.FromMilliseconds(50));
+
+        await sim.PlayAsync(RadioStationCatalog.Stations[0].Id);
+        await sim.TogglePlayPauseAsync();   // Buffering → Stop
+        await Task.Delay(200);
+
+        Assert.Equal(RadioPlaybackStatus.Stopped, sim.Snapshot.Status);
+    }
+}
+
+/// <summary>An <see cref="IRadioPlayer"/> that records every call, standing in for the real LibVLC player.</summary>
+internal sealed class RecordingRadioPlayer : IRadioPlayer
+{
+    public List<string> Calls { get; } = new();
+    public event Action? Changed;
+    public RadioPlayerSnapshot Snapshot { get; } = new(true, RadioStationCatalog.Stations[0], RadioPlaybackStatus.Stopped, 50, false, null);
+
+    public void RaiseChanged() => Changed?.Invoke();
+
+    private Task Record(string call) { Calls.Add(call); return Task.CompletedTask; }
+    public Task TogglePlayPauseAsync(CancellationToken ct = default) => Record("toggle");
+    public Task PlayAsync(string stationId, CancellationToken ct = default) => Record($"play:{stationId}");
+    public Task NextStationAsync(CancellationToken ct = default) => Record("next");
+    public Task PreviousStationAsync(CancellationToken ct = default) => Record("previous");
+    public Task SetVolumeAsync(int volume, CancellationToken ct = default) => Record($"volume:{volume}");
+    public Task SetMuteAsync(bool muted, CancellationToken ct = default) => Record($"mute:{muted}");
+}
+
+public class RadioPlayerSelectorTests
+{
+    [Fact]
+    public void Outside_developer_mode_the_real_player_is_active()
+    {
+        var real = new RecordingRadioPlayer();
+        var selector = new RadioPlayerSelector(real, devEnabled: () => false, devToolsAvailable: true);
+        selector.AttachSimulation(new JournalEventBus());
+
+        Assert.Same(real, selector.Active);
+        Assert.False(selector.IsSimulated);
+    }
+
+    [Fact]
+    public async Task In_developer_mode_every_control_goes_to_the_simulation_and_never_the_real_player()
+    {
+        var real = new RecordingRadioPlayer();
+        var dev = true;
+        var selector = new RadioPlayerSelector(real, () => dev, devToolsAvailable: true);
+        var bus = new JournalEventBus();
+        selector.AttachSimulation(bus);
+
+        Assert.True(selector.IsSimulated);
+        Assert.Same(selector.Simulated, selector.Active);
+
+        // Everything the card and title bar can do, plus 🎲 rolls through the real bus.
+        var devMode = new DeveloperMode();
+        var rng = new Random(48);
+        for (var i = 0; i < RadioSampleSource.Cycle.Count; i++)
+        {
+            devMode.Randomize(bus, rng, cardKey: "radio");
+            await selector.Active.TogglePlayPauseAsync();
+            await selector.Active.PlayAsync(RadioStationCatalog.Stations[1].Id);
+            await selector.Active.NextStationAsync();
+            await selector.Active.PreviousStationAsync();
+            await selector.Active.SetVolumeAsync(rng.Next(0, 101));
+            await selector.Active.SetMuteAsync(rng.Next(2) == 0);
         }
 
-        Assert.True(settings.Radio.RadioWasPlaying);
-        Assert.True(settings.Radio.RadioEnabled);
-        Assert.Equal(RadioStationCatalog.Stations[1].Id, settings.Radio.RadioLastStation);
-        Assert.Equal(40, settings.Radio.RadioVolume);
-        Assert.Equal(RadioPlaybackStatus.Stopped, real.Snapshot.Status);   // nothing was started
+        Assert.Empty(real.Calls);
+
+        // Leaving developer mode hands control straight back to the real player.
+        dev = false;
+        await selector.Active.TogglePlayPauseAsync();
+        Assert.Equal(new[] { "toggle" }, real.Calls);
+    }
+
+    [Fact]
+    public void Without_dev_tools_there_is_no_simulation_even_if_dev_mode_is_on()
+    {
+        var real = new RecordingRadioPlayer();
+        var selector = new RadioPlayerSelector(real, devEnabled: () => true, devToolsAvailable: false);
+        selector.AttachSimulation(new JournalEventBus());
+
+        Assert.Null(selector.Simulated);
+        Assert.False(selector.IsSimulated);
+        Assert.Same(real, selector.Active);
+    }
+
+    [Fact]
+    public void Reattaching_to_a_rebuilt_bus_starts_a_fresh_simulation_that_hears_the_new_bus_only()
+    {
+        var real = new RecordingRadioPlayer();
+        var selector = new RadioPlayerSelector(real, devEnabled: () => true, devToolsAvailable: true);
+        var oldBus = new JournalEventBus();
+        selector.AttachSimulation(oldBus);
+        new DeveloperMode().Randomize(oldBus, new Random(1), cardKey: "radio");
+        Assert.True(selector.Simulated!.Snapshot.Enabled);
+
+        var newBus = new JournalEventBus();
+        selector.AttachSimulation(newBus);
+        Assert.False(selector.Simulated!.Snapshot.Enabled);   // fabricated state discarded
+
+        var changes = 0;
+        selector.Changed += () => changes++;
+        new DeveloperMode().Randomize(oldBus, new Random(2), cardKey: "radio");
+        Assert.Equal(0, changes);                               // the stale sim no longer reaches the UI
+        new DeveloperMode().Randomize(newBus, new Random(3), cardKey: "radio");
+        Assert.Equal(1, changes);
+        Assert.True(selector.Simulated!.Snapshot.Enabled);
+    }
+
+    [Fact]
+    public void Changed_forwards_the_real_player_too()
+    {
+        var real = new RecordingRadioPlayer();
+        var selector = new RadioPlayerSelector(real, devEnabled: () => false, devToolsAvailable: true);
+        var changes = 0;
+        selector.Changed += () => changes++;
+
+        real.RaiseChanged();
+
+        Assert.Equal(1, changes);
     }
 }

@@ -6,6 +6,7 @@ using Avalonia.Input.Platform;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using EDNexus.Core;
+using EDNexus.Core.Dev;
 using EDNexus.Core.Mining;
 using EDNexus.Core.Settings;
 using EDNexus.Core.State;
@@ -48,9 +49,11 @@ public sealed class DashboardContext
         Action<IEnumerable<(string Symbol, int MeanPrice)>> learnCommodityPrices,
         Action<DateTimeOffset> ensureMiningSessionDate,
         Action<DateTimeOffset, long> recordMiningRefined,
-        Action<RefinedUnit, int> recordMiningSpot)
+        Action<RefinedUnit, int> recordMiningSpot,
+        RadioPlayerSelector radio)
     {
         _host = host;
+        Radio = radio;
         _devEnabled = devEnabled;
         Rng = rng;
         _getEngineeringPin = getEngineeringPin;
@@ -73,6 +76,12 @@ public sealed class DashboardContext
     public bool DevEnabled => _devEnabled();
 
     public Random Rng { get; }
+
+    /// <summary>
+    /// The radio: <see cref="RadioPlayerSelector.Active"/> is what the card and title bar drive (the
+    /// simulation while developer mode is on). App-lifetime, so it survives host rebuilds.
+    /// </summary>
+    public RadioPlayerSelector Radio { get; }
 
     /// <summary>Read the persisted engineering pin (blueprint id + grade, and the on-foot pin/mode).</summary>
     public EngineeringSettings GetEngineeringPin() => _getEngineeringPin();

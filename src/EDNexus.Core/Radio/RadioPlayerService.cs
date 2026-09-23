@@ -34,6 +34,15 @@ public sealed class RadioPlayerService : IRadioPlayer, IDisposable, IAsyncDispos
     private string? _lastError;
     private bool _disposed;
 
+    // Volume changes arrive in bursts (a slider drag fires one per step). They apply to the player
+    // and the in-memory settings immediately, but the disk write is coalesced: one save once the
+    // burst goes quiet, flushed on Dispose so a change made just before shutdown isn't lost.
+    private static readonly TimeSpan DefaultSaveDelay = TimeSpan.FromMilliseconds(500);
+    private readonly TimeSpan _saveDelay;
+    private readonly object _saveGate = new();
+    private Timer? _saveTimer;
+    private bool _savePending;
+
     /// <summary>Raised after any playback state, station, volume, or mute change.</summary>
     public event Action? Changed;
 
@@ -42,10 +51,15 @@ public sealed class RadioPlayerService : IRadioPlayer, IDisposable, IAsyncDispos
     /// change is persisted back into it (and saved via <paramref name="store"/>, if present).
     /// </param>
     /// <param name="store">Used to write <paramref name="settings"/> to disk after each change.</param>
-    public RadioPlayerService(AppSettings? settings = null, SettingsStore? store = null)
+    /// <param name="saveDelay">
+    /// How long volume changes must go quiet before they're written to disk (default 500 ms).
+    /// Every other change is saved immediately.
+    /// </param>
+    public RadioPlayerService(AppSettings? settings = null, SettingsStore? store = null, TimeSpan? saveDelay = null)
     {
         _settings = settings;
         _store = store;
+        _saveDelay = saveDelay ?? DefaultSaveDelay;
 
         var radio = settings?.Radio;
         if (radio is not null)
@@ -248,7 +262,7 @@ public sealed class RadioPlayerService : IRadioPlayer, IDisposable, IAsyncDispos
     {
         var clamped = Math.Clamp(volume, 0, 100);
         lock (_gate) _volume = clamped;
-        Persist();
+        PersistSoon();
 
         return Task.Run(() =>
         {
@@ -366,15 +380,57 @@ public sealed class RadioPlayerService : IRadioPlayer, IDisposable, IAsyncDispos
     private void Persist()
     {
         if (_settings is null) return;
+        CopyToSettings(_settings);
+
+        // A full save covers anything a debounced volume write was still waiting to save.
+        lock (_saveGate)
+        {
+            _savePending = false;
+            _store?.Save(_settings);
+        }
+    }
+
+    /// <summary>
+    /// Like <see cref="Persist"/>, but the disk write waits until changes have gone quiet for the
+    /// save delay. The in-memory settings are updated straight away.
+    /// </summary>
+    private void PersistSoon()
+    {
+        if (_settings is null) return;
+        CopyToSettings(_settings);
+        if (_store is null) return;
+
+        lock (_saveGate)
+        {
+            if (_disposed) { _store.Save(_settings); return; }
+            _savePending = true;
+            _saveTimer ??= new Timer(_ => FlushPendingSave(), null, Timeout.Infinite, Timeout.Infinite);
+            _saveTimer.Change(_saveDelay, Timeout.InfiniteTimeSpan);
+        }
+    }
+
+    /// <summary>Writes any debounced settings change to disk now. A no-op when nothing is pending.</summary>
+    public void FlushPendingSave()
+    {
+        if (_settings is null) return;
+        lock (_saveGate)
+        {
+            if (!_savePending) return;
+            _savePending = false;
+            _store?.Save(_settings);
+        }
+    }
+
+    private void CopyToSettings(AppSettings settings)
+    {
         lock (_gate)
         {
-            _settings.Radio.RadioEnabled = _enabled;
-            _settings.Radio.RadioLastStation = _station?.Id;
-            _settings.Radio.RadioVolume = _volume;
-            _settings.Radio.RadioMute = _muted;
-            _settings.Radio.RadioWasPlaying = _wantsPlayback;
+            settings.Radio.RadioEnabled = _enabled;
+            settings.Radio.RadioLastStation = _station?.Id;
+            settings.Radio.RadioVolume = _volume;
+            settings.Radio.RadioMute = _muted;
+            settings.Radio.RadioWasPlaying = _wantsPlayback;
         }
-        _store?.Save(_settings);
     }
 
     private void RaiseChanged() => Changed?.Invoke();
@@ -383,6 +439,11 @@ public sealed class RadioPlayerService : IRadioPlayer, IDisposable, IAsyncDispos
     {
         if (_disposed) return;
         _disposed = true;
+
+        // Don't lose a volume change made just before shutdown.
+        FlushPendingSave();
+        lock (_saveGate) _saveTimer?.Dispose();
+
         lock (_gate)
         {
             try { _mediaPlayer?.Stop(); } catch { /* best effort */ }

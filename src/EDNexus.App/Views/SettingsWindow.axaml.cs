@@ -17,6 +17,10 @@ public partial class SettingsWindow : Window
     // the window is opened without one (the designer, and the pre-layout call sites).
     private readonly ViewModels.MainWindowViewModel? _dashboard;
 
+    // What the radio toggle showed when the dialog opened, so Save only touches the player when the
+    // commander actually changed it.
+    private bool _radioEnabledAtOpen;
+
     // Leaves room for the title bar and a little breathing space around the edges, so the capped
     // dialog still reads as a window rather than filling the display corner to corner.
     private const double ScreenMargin = 80;
@@ -57,7 +61,8 @@ public partial class SettingsWindow : Window
         ScanCompleteToggle.IsChecked = !boot.Settings.Voice.DisabledCallouts.Contains(nameof(EDNexus.Core.Voice.VoiceCalloutKind.ScanComplete));
         ShoppingListToggle.IsChecked = !boot.Settings.Voice.DisabledCallouts.Contains(nameof(EDNexus.Core.Voice.VoiceCalloutKind.ShoppingListItemAcquired));
 
-        RadioToggle.IsChecked = boot.Settings.Radio.RadioEnabled;
+        _radioEnabledAtOpen = boot.Settings.Radio.RadioEnabled;
+        RadioToggle.IsChecked = _radioEnabledAtOpen;
 
         DiscordToggle.IsChecked = boot.Settings.Discord.Enabled;
         DiscordShowSystemToggle.IsChecked = boot.Settings.Discord.ShowSystem;
@@ -175,8 +180,9 @@ public partial class SettingsWindow : Window
                 VoiceNameCombo.SelectedItem as string,
                 (int)VoiceVolumeSlider.Value,
                 DisabledCalloutNames());
-            // The radio player owns its own persistence; the dashboard routes this to the live player.
-            _dashboard?.ApplyRadioEnabled(RadioToggle.IsChecked == true);
+            // The radio player owns its own persistence; the dashboard routes this to the real player.
+            var radioEnabled = RadioToggle.IsChecked == true;
+            if (radioEnabled != _radioEnabledAtOpen) _dashboard?.ApplyRadioEnabled(radioEnabled);
             _boot.ApplyDiscordChoice(
                 DiscordToggle.IsChecked == true,
                 DiscordShowSystemToggle.IsChecked == true,
