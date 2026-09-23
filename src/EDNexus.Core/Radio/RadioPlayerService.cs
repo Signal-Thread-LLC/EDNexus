@@ -86,18 +86,31 @@ public sealed class RadioPlayerService : IDisposable, IAsyncDisposable
     /// </summary>
     public async Task RestoreAsync(CancellationToken ct = default)
     {
-        bool enabled, wantsPlayback;
-        RadioStation? station;
-        lock (_gate) { enabled = _enabled; wantsPlayback = _wantsPlayback; station = _station; }
+        RadioSettings current;
+        lock (_gate)
+        {
+            current = new RadioSettings
+            {
+                RadioEnabled = _enabled,
+                RadioWasPlaying = _wantsPlayback,
+                RadioLastStation = _station?.Id,
+            };
+        }
 
-        if (!enabled || !wantsPlayback || station is null) return;
-        await PlayAsync(station.Id, ct).ConfigureAwait(false);
+        if (!ShouldResumeOnLaunch(current)) return;
+        await PlayAsync(current.RadioLastStation!, ct).ConfigureAwait(false);
     }
 
     /// <summary>Turns the radio feature on/off. Turning it off stops any current playback.</summary>
     public async Task SetEnabledAsync(bool enabled, CancellationToken ct = default)
     {
-        lock (_gate) _enabled = enabled;
+        lock (_gate)
+        {
+            _enabled = enabled;
+            // Clear the resume intent here so the single save below covers it, and StopAsync
+            // (which only saves when the intent actually changes) doesn't write a second time.
+            if (!enabled) _wantsPlayback = false;
+        }
         Persist();
 
         if (!enabled) await StopAsync(ct).ConfigureAwait(false);
@@ -130,9 +143,11 @@ public sealed class RadioPlayerService : IDisposable, IAsyncDisposable
     }
 
     /// <summary>
-    /// Toggles between playing and paused: pauses if currently playing, otherwise resumes the tuned
-    /// station (or starts the first catalog station if none has been tuned yet). This is the single
-    /// entry point a hardware "Play/Pause" media key should call.
+    /// Toggles playback: pauses if currently playing; stops if buffering or in error (so a stream
+    /// that's connecting or has failed can be cancelled, and doesn't stay flagged to resume on the
+    /// next launch); otherwise resumes the tuned station (or starts the first catalog station if
+    /// none has been tuned yet). This is the single entry point a hardware "Play/Pause" media key
+    /// should call.
     /// </summary>
     public Task TogglePlayPauseAsync(CancellationToken ct = default)
     {
@@ -140,9 +155,21 @@ public sealed class RadioPlayerService : IDisposable, IAsyncDisposable
         RadioStation? station;
         lock (_gate) { status = _status; station = _station; }
 
-        if (status == RadioPlaybackStatus.Playing) return PauseAsync(ct);
-        return PlayAsync(station?.Id ?? RadioStationCatalog.Stations[0].Id, ct);
+        return ToggleActionFor(status) switch
+        {
+            RadioToggleAction.Pause => PauseAsync(ct),
+            RadioToggleAction.Stop => StopAsync(ct),
+            _ => PlayAsync(station?.Id ?? RadioStationCatalog.Stations[0].Id, ct),
+        };
     }
+
+    /// <summary>What <see cref="TogglePlayPauseAsync"/> does from the given playback status.</summary>
+    public static RadioToggleAction ToggleActionFor(RadioPlaybackStatus status) => status switch
+    {
+        RadioPlaybackStatus.Playing => RadioToggleAction.Pause,
+        RadioPlaybackStatus.Buffering or RadioPlaybackStatus.Error => RadioToggleAction.Stop,
+        _ => RadioToggleAction.Play,
+    };
 
     /// <summary>Advances to and plays the next station in the catalog (wrapping). This is what a hardware "Next" media key should call.</summary>
     public Task NextStationAsync(CancellationToken ct = default)
