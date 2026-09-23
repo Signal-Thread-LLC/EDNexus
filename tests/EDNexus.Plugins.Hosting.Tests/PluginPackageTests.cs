@@ -329,7 +329,132 @@ public class PluginPackageTests
         Assert.False(Directory.Exists(dest));
     }
 
+    [Fact]
+    public void ExtractTo_CrcMismatchWithCorrectSize_IsRejectedAndCleanedUp()
+    {
+        using var dir = new TempDir();
+        var dest = Path.Combine(dir.Path, "out");
+        var zip = Valid(("payload.bin", RandomBytes(2000)));
+        // Same size, wrong checksum: the content was altered (or the headers were).
+        PatchHeaders(zip, "payload.bin", (span, isCentral) =>
+        {
+            var offset = isCentral ? 16 : 14;
+            BinaryPrimitives.WriteUInt32LittleEndian(span[offset..], BinaryPrimitives.ReadUInt32LittleEndian(span[offset..]) ^ 0xDEADBEEF);
+        });
+
+        var result = PluginPackage.ExtractTo(new MemoryStream(zip), dest);
+
+        Assert.False(result.IsValid);
+        Assert.Contains("CRC", result.ErrorSummary, StringComparison.OrdinalIgnoreCase);
+        Assert.False(Directory.Exists(dest));
+    }
+
+    [Fact]
+    public void ExtractTo_PreExistingDestination_IsNeverDeleted()
+    {
+        using var dir = new TempDir();
+        var dest = Path.Combine(dir.Path, "mine");
+        Directory.CreateDirectory(dest);
+        File.WriteAllText(Path.Combine(dest, "keep.txt"), "user data");
+
+        var bad = PluginPackage.ExtractTo(new MemoryStream(Valid(("../evil.dll", Dll))), dest);
+        var good = PluginPackage.ExtractTo(new MemoryStream(Valid()), dest);
+
+        Assert.False(bad.IsValid);
+        Assert.False(good.IsValid);
+        Assert.Equal("user data", File.ReadAllText(Path.Combine(dest, "keep.txt")));
+    }
+
+    [Fact]
+    public void ExtractTo_DestinationIsAFile_FailsWithoutDeletingIt()
+    {
+        using var dir = new TempDir();
+        var dest = dir.Write("occupied", [1, 2, 3]);
+
+        var result = PluginPackage.ExtractTo(new MemoryStream(Valid()), dest);
+
+        Assert.False(result.IsValid);
+        Assert.Equal([1, 2, 3], File.ReadAllBytes(dest));
+    }
+
+    // --- Unicode aliasing -------------------------------------------------------------------------
+
+    [Fact]
+    public void Inspect_NfcAndNfdSpellingsOfTheSameName_AreDuplicates()
+    {
+        // "caf\u00E9.dll" precomposed (U+00E9) vs decomposed ("e" + U+0301): one file on macOS.
+        var zip = Valid(("caf\u00E9.dll", Dll), ("cafe\u0301.dll", Dll));
+        AssertRejected(Inspect(zip), "duplicated");
+    }
+
+    [Fact]
+    public void Inspect_NfdDirectoryAndNfcFile_Collide()
+        => AssertRejected(Inspect(Valid(("caf\u00E9", Dll), ("cafe\u0301/x.dll", Dll))), "which is a file");
+
+    [Fact]
+    public void Inspect_BidiOverrideInEntryName_IsRejected()
+        => AssertRejected(Inspect(Valid(("evil\u202Elld.exe", Dll))), "invisible formatting");
+
+    // --- Entry count read from the End Of Central Directory ---------------------------------------
+
+    [Fact]
+    public void ReadDeclaredEntryCount_MatchesTheArchive()
+    {
+        var zip = Valid(("a.txt", [1]), ("b/", []));
+        Assert.Equal(4, PluginPackage.ReadDeclaredEntryCount(new MemoryStream(zip)));
+    }
+
+    [Fact]
+    public void ReadDeclaredEntryCount_IgnoresTrailingComment_AndRestoresPosition()
+    {
+        using var buffer = new MemoryStream();
+        using (var archive = new ZipArchive(buffer, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            archive.Comment = "PK\u0005\u0006 decoy signature inside the comment";
+            archive.CreateEntry("x.txt");
+        }
+        buffer.Position = 3;
+
+        Assert.Equal(1, PluginPackage.ReadDeclaredEntryCount(buffer));
+        Assert.Equal(3, buffer.Position);
+    }
+
+    [Fact]
+    public void ReadDeclaredEntryCount_NoEocd_IsNull()
+        => Assert.Null(PluginPackage.ReadDeclaredEntryCount(new MemoryStream(new byte[100])));
+
+    [Fact]
+    public void Inspect_DeclaredEntryCountOverLimit_IsRejectedBeforeParsingEntries()
+    {
+        var zip = Valid();
+        SetEocdEntryCount(zip, 60_000);
+
+        AssertRejected(Inspect(zip, new PluginPackageLimits { MaxEntries = 10 }), "declares 60000 entries");
+    }
+
+    [Fact]
+    public void Inspect_EocdUnderstatingTheEntryCount_IsRejected()
+    {
+        // Claims 1 entry but the central directory holds 3: must not slip past the count check.
+        var zip = Valid(("extra.txt", [1]));
+        SetEocdEntryCount(zip, 1);
+
+        Assert.False(Inspect(zip, new PluginPackageLimits { MaxEntries = 2 }).IsValid);
+    }
+
     // --- Helpers ---------------------------------------------------------------------------------
+
+    private static void SetEocdEntryCount(byte[] zip, ushort count)
+    {
+        for (var i = zip.Length - 22; i >= 0; i--)
+        {
+            if (BinaryPrimitives.ReadUInt32LittleEndian(zip.AsSpan(i)) != 0x06054B50) continue;
+            BinaryPrimitives.WriteUInt16LittleEndian(zip.AsSpan(i + 8), count);  // entries on this disk
+            BinaryPrimitives.WriteUInt16LittleEndian(zip.AsSpan(i + 10), count); // total entries
+            return;
+        }
+        Assert.Fail("no EOCD record");
+    }
 
     private static byte[] RandomBytes(int count)
     {

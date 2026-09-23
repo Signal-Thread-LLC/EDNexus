@@ -424,6 +424,71 @@ public class PluginManifestParserTests
     public void FindDuplicateIds_NoDuplicates_IsEmpty()
         => Assert.Empty(PluginManifestParser.FindDuplicateIds([new("a.b", "N", "1.0.0", "1.0"), new("c.d", "N", "1.0.0", "1.0")]));
 
+    [Fact]
+    public void Parse_SameJsonTwice_ProducesEqualManifests()
+    {
+        var a = PluginManifestParser.Parse(TestPackages.ValidManifestJson).Manifest!;
+        var b = PluginManifestParser.Parse(TestPackages.ValidManifestJson).Manifest!;
+
+        Assert.Equal(a, b);
+        Assert.Equal(a.GetHashCode(), b.GetHashCode());
+    }
+
+    [Fact]
+    public void Parse_ManifestCapabilities_AreNotAWritableList()
+    {
+        var manifest = PluginManifestParser.Parse(TestPackages.ValidManifestJson).Manifest!;
+
+        Assert.IsNotType<List<string>>(manifest.Capabilities);
+        Assert.Throws<NotSupportedException>(() => ((ICollection<string>)manifest.Capabilities).Add(PluginCapabilities.Network));
+    }
+
+    [Theory]
+    [InlineData("name", "Jump\u202ECounter")]     // right-to-left override
+    [InlineData("name", "Jump\u200BCounter")]     // zero-width space
+    [InlineData("name", "Jump\u200DCounter")]     // zero-width joiner
+    [InlineData("name", "\uFEFFJump Counter")]    // BOM / zero-width no-break space
+    [InlineData("author", "Acme\u2066Corp")]      // left-to-right isolate
+    [InlineData("description", "Line one.\n\u202Egnirts")]
+    public void Parse_InvisibleFormattingCharacters_AreRejected(string key, string value)
+        => AssertRejected(With(key, value), "invisible formatting character");
+
+    [Fact]
+    public void Parse_UnpairedSurrogateEscape_IsRejectedNotThrown()
+    {
+        // A lone "\uD800" escape: either the JSON reader or the text rules must reject it.
+        var json = TestPackages.ValidManifestJson.Replace("\"Jump Counter\"", "\"Jump\\uD800Counter\"");
+        Assert.NotEqual(TestPackages.ValidManifestJson, json);
+
+        var result = PluginManifestParser.Parse(json);
+
+        Assert.False(result.IsValid);
+        Assert.Contains("'name' contains invalid Unicode", result.ErrorSummary);
+    }
+
+    [Fact]
+    public void Parse_UnpairedSurrogateEscapeInPropertyNameOrCapability_IsRejectedNotThrown()
+    {
+        var inKey = TestPackages.ValidManifestJson.Replace("\"author\"", "\"auth\\uDC00or\"");
+        var inCapability = TestPackages.ValidManifestJson.Replace("\"state\"", "\"st\\uD800ate\"");
+
+        Assert.Contains("invalid Unicode", PluginManifestParser.Parse(inKey).ErrorSummary);
+        Assert.Contains("'capabilities[1]' contains invalid Unicode", PluginManifestParser.Parse(inCapability).ErrorSummary);
+    }
+
+    [Fact]
+    public void Parse_NonAsciiButVisibleText_IsAccepted()
+    {
+        var result = PluginManifestParser.Parse(With("name", "Zähler für Sprünge ✦"));
+        Assert.True(result.IsValid, result.ErrorSummary);
+    }
+
+    [Theory]
+    [InlineData("com.acme.x\n")]
+    [InlineData("com.acme.x\r\n")]
+    public void IsValidId_RejectsTrailingNewline(string id)
+        => Assert.False(PluginManifestParser.IsValidId(id));
+
     private sealed class CountingStream(Stream inner) : Stream
     {
         public long BytesRead { get; private set; }

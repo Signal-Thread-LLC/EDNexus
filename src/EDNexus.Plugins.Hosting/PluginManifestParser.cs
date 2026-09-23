@@ -58,15 +58,16 @@ public static partial class PluginManifestParser
     // Lowercase reverse-DNS: at least two dot-separated segments; each starts and ends with a
     // letter/digit and may contain '-' or '_' in between. Lowercase-only so ids are unambiguous
     // on case-insensitive filesystems (the id is the install folder name).
-    [GeneratedRegex(@"^[a-z0-9](?:[a-z0-9_-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9_-]*[a-z0-9])?)+$", RegexOptions.CultureInvariant)]
+    // \z (not $, which also matches before a trailing newline) throughout.
+    [GeneratedRegex(@"^[a-z0-9](?:[a-z0-9_-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9_-]*[a-z0-9])?)+\z", RegexOptions.CultureInvariant)]
     private static partial Regex IdPattern();
 
     // A namespace-qualified CLR type name, optionally with nested types ('+'); no generics.
-    [GeneratedRegex(@"^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*(?:\+[A-Za-z_][A-Za-z0-9_]*)*$", RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*(?:\+[A-Za-z_][A-Za-z0-9_]*)*\z", RegexOptions.CultureInvariant)]
     private static partial Regex TypeNamePattern();
 
     // The SDK contract version: "major.minor" (the form PluginSdk.CurrentVersionString uses).
-    [GeneratedRegex(@"^(0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})$", RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"^(0|[1-9][0-9]{0,8})\.(0|[1-9][0-9]{0,8})\z", RegexOptions.CultureInvariant)]
     private static partial Regex SdkVersionPattern();
 
     private static readonly JsonDocumentOptions DocumentOptions = new()
@@ -96,7 +97,36 @@ public static partial class PluginManifestParser
         }
 
         using (document)
-            return FromElement(document.RootElement);
+        {
+            try
+            {
+                return FromElement(document.RootElement);
+            }
+            catch (InvalidOperationException ex)
+            {
+                // System.Text.Json accepts a lone-surrogate escape ("\uD800") while parsing but
+                // throws when the string is materialised (e.g. in a property name). Field values
+                // are handled precisely in TryGetString; this is the backstop.
+                return PluginManifestParseResult.Failure($"manifest contains invalid Unicode: {ex.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// <see cref="JsonElement.GetString"/> without the throw: <see langword="null"/> (and an error)
+    /// when the JSON string holds an escape that isn't valid UTF-16, such as a lone <c>\uD800</c>.
+    /// </summary>
+    private static string? TryGetString(JsonElement element, string key, List<string> errors)
+    {
+        try
+        {
+            return element.GetString();
+        }
+        catch (InvalidOperationException)
+        {
+            errors.Add($"'{key}' contains invalid Unicode (an unpaired surrogate escape)");
+            return null;
+        }
     }
 
     /// <summary>
@@ -130,7 +160,7 @@ public static partial class PluginManifestParser
             }
 
             // Tolerate a UTF-8 BOM, which Windows editors like to add.
-            return Parse(text.TrimStart('﻿'));
+            return Parse(text.TrimStart('\uFEFF'));
         }
         catch (Exception ex) when (ex is IOException or InvalidDataException or NotSupportedException or ObjectDisposedException)
         {
@@ -217,8 +247,11 @@ public static partial class PluginManifestParser
             author = CheckDisplayText("author", author, errors);
 
         var description = ReadString(properties, "description", required: false, MaxDescriptionLength, errors);
-        if (description is not null && description.Any(c => char.IsControl(c) && c is not '\n' and not '\r' and not '\t'))
-            errors.Add("'description' contains control characters");
+        if (description is not null && TextRules.FindInvisibleOrInvalid(description, allowLineBreaks: true) is { } descriptionProblem)
+        {
+            errors.Add($"'description' {descriptionProblem}");
+            description = null;
+        }
 
         var sdkVersion = ReadString(properties, "sdkVersion", required: true, 32, errors);
         if (sdkVersion is not null && !SdkVersionPattern().IsMatch(sdkVersion))
@@ -270,7 +303,10 @@ public static partial class PluginManifestParser
             return null;
         }
 
-        var value = element.GetString()!.Trim();
+        var raw = TryGetString(element, key, errors);
+        if (raw is null)
+            return null;
+        var value = raw.Trim();
         if (value.Length == 0)
         {
             // An empty optional field is treated as absent; an empty required one is missing.
@@ -288,9 +324,11 @@ public static partial class PluginManifestParser
 
     private static string? CheckDisplayText(string key, string value, List<string> errors)
     {
-        if (value.Any(char.IsControl))
+        // Control characters, and invisible format characters such as bidi overrides (U+202E)
+        // and zero-width joiners/spaces, could make a plugin's name spoof another in the UI.
+        if (TextRules.FindInvisibleOrInvalid(value, allowLineBreaks: false) is { } problem)
         {
-            errors.Add($"'{key}' contains control characters");
+            errors.Add($"'{key}' {problem}");
             return null;
         }
         return value;
@@ -321,9 +359,8 @@ public static partial class PluginManifestParser
             {
                 errors.Add($"'capabilities[{index}]' must be a string, not {Describe(item.ValueKind)}");
             }
-            else
+            else if (TryGetString(item, $"capabilities[{index}]", errors) is { } capability)
             {
-                var capability = item.GetString()!;
                 if (!PluginCapabilities.IsKnown(capability))
                     errors.Add($"'capabilities[{index}]' \"{Truncate(capability)}\" is not a known capability (expected one of: {string.Join(", ", PluginCapabilities.All.Order(StringComparer.Ordinal))})");
                 else if (!result.Contains(capability, StringComparer.Ordinal))

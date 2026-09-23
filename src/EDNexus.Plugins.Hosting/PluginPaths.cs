@@ -8,7 +8,12 @@ namespace EDNexus.Plugins.Hosting;
 /// </summary>
 public static class PluginPaths
 {
-    /// <summary>Set this environment variable to use a different plugins folder (dev/testing).</summary>
+    /// <summary>
+    /// Set this environment variable to an <em>absolute</em> path to use a different plugins
+    /// folder (dev/testing). Relative values are ignored. (This project cannot see
+    /// <c>EDNexus.Core.FeatureFlags</c>; a host that wants to restrict the override to developer
+    /// builds should pass its own lookup to <see cref="Resolve(Func{string, string?})"/>.)
+    /// </summary>
     public const string OverrideEnvVar = "EDNEXUS_PLUGINS_DIR";
 
     /// <summary>Name of the plugins folder under the EDNexus app-data folder.</summary>
@@ -29,16 +34,19 @@ public static class PluginPaths
     public static string? Resolve(Func<string, string?> getEnvironmentVariable)
     {
         ArgumentNullException.ThrowIfNull(getEnvironmentVariable);
-        var overridden = getEnvironmentVariable(OverrideEnvVar);
-        if (!string.IsNullOrWhiteSpace(overridden))
+        var overridden = getEnvironmentVariable(OverrideEnvVar)?.Trim();
+        // Only an absolute override is honoured: a relative one would resolve against whatever the
+        // current directory happens to be (possibly the install dir or a shared folder), so
+        // plugins could silently load from an unexpected place. Anything unusable falls back to
+        // the default rather than breaking startup.
+        if (!string.IsNullOrEmpty(overridden) && Path.IsPathFullyQualified(overridden))
         {
             try
             {
-                return Path.GetFullPath(overridden.Trim());
+                return Path.GetFullPath(overridden);
             }
             catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
             {
-                // An unusable override falls back to the default rather than breaking startup.
             }
         }
         return DefaultRoot();

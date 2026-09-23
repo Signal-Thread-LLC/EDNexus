@@ -38,7 +38,8 @@ public sealed class PluginInstallResult
 /// Installs a <c>.ednplugin</c> package into the plugins root: validate the whole package, extract
 /// it into a staging folder, then move it into place as <c>&lt;root&gt;/&lt;id&gt;/</c>. Nothing is
 /// written under <c>&lt;id&gt;</c> unless the package is valid, and a failed replace restores the
-/// previous version. This only lays files down — loading is the plugin host's job (#55).
+/// previous version; if the process dies mid-replace, <see cref="RecoverInterrupted"/> restores it
+/// on the next start. This only lays files down — loading is the plugin host's job (#55).
 /// </summary>
 public static class PluginInstaller
 {
@@ -57,6 +58,12 @@ public static class PluginInstaller
     /// <param name="limits">Package limits; <see cref="PluginPackageLimits.Default"/> when omitted.</param>
     public static PluginInstallResult Install(
         string packagePath, string pluginsRoot, bool replaceExisting = false, PluginPackageLimits? limits = null)
+        => InstallCore(packagePath, pluginsRoot, replaceExisting, limits, System.IO.Directory.Move);
+
+    /// <summary>As <see cref="Install"/>, with an injectable directory-move step so tests can fail it.</summary>
+    internal static PluginInstallResult InstallCore(
+        string packagePath, string pluginsRoot, bool replaceExisting, PluginPackageLimits? limits,
+        Action<string, string> moveDirectory)
     {
         ArgumentNullException.ThrowIfNull(packagePath);
         ArgumentNullException.ThrowIfNull(pluginsRoot);
@@ -96,26 +103,36 @@ public static class PluginInstaller
             return PluginInstallResult.Failure("package changed while it was being installed");
         }
 
+        // Replace = two renames. If the process dies between them, <id> is missing and the old
+        // version sits in ".replaced-<id>.<guid>"; RecoverInterrupted puts it back on next start.
         string? backup = null;
         try
         {
             if (exists)
             {
-                backup = Path.Combine(root, BackupPrefix + Guid.NewGuid().ToString("N"));
-                System.IO.Directory.Move(target, backup);
+                backup = Path.Combine(root, BackupName(id));
+                moveDirectory(target, backup);
             }
 
-            System.IO.Directory.Move(staging, target);
+            moveDirectory(staging, target);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
+            var message = $"could not move plugin into place: {ex.Message}";
             if (backup is not null && !System.IO.Directory.Exists(target))
             {
-                try { System.IO.Directory.Move(backup, target); backup = null; }
-                catch (Exception restoreEx) when (restoreEx is IOException or UnauthorizedAccessException) { }
+                try
+                {
+                    moveDirectory(backup, target);
+                }
+                catch (Exception restoreEx) when (restoreEx is IOException or UnauthorizedAccessException)
+                {
+                    // Leave the backup where it is (RecoverInterrupted will retry) and say where.
+                    message += $"; restoring the previous version also failed ({restoreEx.Message}) — it is preserved at '{backup}'";
+                }
             }
             PluginPackage.TryDeleteDirectory(staging);
-            return PluginInstallResult.Failure($"could not move plugin into place: {ex.Message}");
+            return PluginInstallResult.Failure(message);
         }
 
         if (backup is not null)
@@ -123,4 +140,109 @@ public static class PluginInstaller
 
         return PluginInstallResult.Success(extracted.Manifest, target);
     }
+
+    /// <summary>
+    /// Repairs the plugins root after an install was interrupted (crash, power loss, kill):
+    /// restores a <c>.replaced-*</c> backup when its plugin folder is missing, deletes backups
+    /// whose replacement completed, and deletes leftover <c>.staging-*</c> folders.
+    /// <para>
+    /// Call once when the host starts, before discovering plugins and before any install — it
+    /// must not run concurrently with <see cref="Install"/> on the same root. Never throws for
+    /// filesystem problems; they are reported in <see cref="PluginRecoveryResult.Errors"/>.
+    /// </para>
+    /// </summary>
+    /// <param name="pluginsRoot">The plugins root (see <see cref="PluginPaths.Resolve()"/>).</param>
+    public static PluginRecoveryResult RecoverInterrupted(string pluginsRoot)
+    {
+        ArgumentNullException.ThrowIfNull(pluginsRoot);
+        var restored = new List<string>();
+        var removed = new List<string>();
+        var errors = new List<string>();
+
+        string root;
+        string[] entries;
+        try
+        {
+            root = Path.GetFullPath(pluginsRoot);
+            if (!System.IO.Directory.Exists(root))
+                return new PluginRecoveryResult(restored, removed, errors);
+            entries = System.IO.Directory.GetDirectories(root);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        {
+            errors.Add($"plugins folder '{pluginsRoot}' could not be read: {ex.Message}");
+            return new PluginRecoveryResult(restored, removed, errors);
+        }
+
+        // Stale staging folders are never needed: the install that owned them did not finish.
+        foreach (var dir in entries.Where(d => Path.GetFileName(d).StartsWith(StagingPrefix, StringComparison.Ordinal)))
+            Remove(dir);
+
+        // Backups, newest first per id, so the most recent previous version wins a restore.
+        var backups = entries
+            .Select(d => (Path: d, Id: TryParseBackupId(Path.GetFileName(d))))
+            .Where(b => b.Id is not null)
+            .OrderByDescending(b => SafeLastWrite(b.Path));
+        foreach (var (path, id) in backups)
+        {
+            var target = Path.Combine(root, id!);
+            if (System.IO.Directory.Exists(target) || File.Exists(target))
+            {
+                Remove(path); // the replacement completed; this is the superseded version
+                continue;
+            }
+
+            try
+            {
+                System.IO.Directory.Move(path, target);
+                restored.Add(id!);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                errors.Add($"could not restore '{path}' to '{target}': {ex.Message}");
+            }
+        }
+
+        return new PluginRecoveryResult(restored, removed, errors);
+
+        void Remove(string dir)
+        {
+            PluginPackage.TryDeleteDirectory(dir);
+            if (System.IO.Directory.Exists(dir))
+                errors.Add($"could not delete leftover folder '{dir}'");
+            else
+                removed.Add(Path.GetFileName(dir));
+        }
+    }
+
+    /// <summary><c>.replaced-&lt;id&gt;.&lt;guid&gt;</c> — the id is recoverable from the name alone.</summary>
+    internal static string BackupName(string id) => BackupPrefix + id + "." + Guid.NewGuid().ToString("N");
+
+    /// <summary>The plugin id encoded in a backup folder name, or <see langword="null"/> if it isn't one.</summary>
+    internal static string? TryParseBackupId(string? folderName)
+    {
+        if (folderName is null || !folderName.StartsWith(BackupPrefix, StringComparison.Ordinal))
+            return null;
+        var rest = folderName[BackupPrefix.Length..];
+        var dot = rest.LastIndexOf('.');
+        if (dot <= 0 || !Guid.TryParseExact(rest[(dot + 1)..], "N", out _))
+            return null;
+        var id = rest[..dot];
+        return PluginManifestParser.IsValidId(id) ? id : null;
+    }
+
+    private static DateTime SafeLastWrite(string path)
+    {
+        try { return System.IO.Directory.GetLastWriteTimeUtc(path); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return DateTime.MinValue; }
+    }
 }
+
+/// <summary>What <see cref="PluginInstaller.RecoverInterrupted"/> did.</summary>
+/// <param name="Restored">Ids whose previous version was moved back into place.</param>
+/// <param name="Removed">Names of leftover staging/backup folders that were deleted.</param>
+/// <param name="Errors">Problems that could not be fixed (the folders involved are left as-is).</param>
+public sealed record PluginRecoveryResult(
+    IReadOnlyList<string> Restored,
+    IReadOnlyList<string> Removed,
+    IReadOnlyList<string> Errors);

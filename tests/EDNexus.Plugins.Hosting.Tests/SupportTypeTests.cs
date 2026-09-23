@@ -41,6 +41,30 @@ public class SemanticVersionTests
             Assert.True(SemanticVersion.Parse(ordered[i - 1]) < SemanticVersion.Parse(ordered[i]), $"{ordered[i - 1]} < {ordered[i]}");
     }
 
+    [Theory]
+    [InlineData("1.0.0\n")]
+    [InlineData("1.0.0-beta\n")]
+    [InlineData("1.0.0+build\n")]
+    [InlineData("\u0661.0.0")]      // Arabic-Indic digit one: \d would match it
+    [InlineData("1.\u0660.0")]
+    [InlineData("1.0.0-\u0661")]
+    public void TryParse_RejectsTrailingNewlineAndNonAsciiDigits(string text)
+        => Assert.False(SemanticVersion.TryParse(text, out _));
+
+    [Fact]
+    public void Precedence_HugeNumericPreReleaseIds_CompareNumerically()
+    {
+        // Both overflow ulong; they must still compare as numbers (by length, then digits),
+        // and still sort below alphanumeric identifiers.
+        var smaller = SemanticVersion.Parse("1.0.0-99999999999999999999999");
+        var larger = SemanticVersion.Parse("1.0.0-100000000000000000000000");
+
+        Assert.True(smaller < larger);
+        Assert.True(SemanticVersion.Parse("1.0.0-2") < smaller);
+        Assert.True(larger < SemanticVersion.Parse("1.0.0-alpha"));
+        Assert.Equal(SemanticVersion.Parse("1.0.0-123456789012345678901234567890"), SemanticVersion.Parse("1.0.0-123456789012345678901234567890"));
+    }
+
     [Fact]
     public void BuildMetadata_IsIgnoredForEquality()
     {
@@ -83,8 +107,22 @@ public class PluginPathRulesTests
     [InlineData("a|b")]
     [InlineData("a\u0000b")]
     [InlineData("a\nb")]
+    [InlineData("evil\u202Elld.exe")]   // RTL override: displays as "evilexe.dll"
+    [InlineData("a\u200Bb.dll")]         // zero-width space
     public void UnsafePaths_AreRejected(string path)
         => Assert.NotNull(PluginPathRules.CheckRelativePath(path));
+
+    [Fact]
+    public void UnpairedSurrogate_IsRejected()
+    {
+        // Built at runtime: attribute arguments are stored as UTF-8 and can't carry a lone surrogate.
+        var path = "a" + (char)0xD800 + "b.dll";
+        Assert.Contains("unpaired surrogate", PluginPathRules.CheckRelativePath(path));
+    }
+
+    [Fact]
+    public void VisibleNonAsciiNames_AreAccepted()
+        => Assert.Null(PluginPathRules.CheckRelativePath("lib/fr/Ressources.caf\u00E9.dll"));
 
     [Fact]
     public void TooLongOrTooDeep_IsRejected()
@@ -203,11 +241,18 @@ public class PluginPathsTests
     public void Resolve_BlankOverride_FallsBackToDefault(string? value)
         => Assert.Equal(PluginPaths.DefaultRoot(), PluginPaths.Resolve(_ => value));
 
+    [Theory]
+    [InlineData("dev-plugins")]
+    [InlineData("./plugins")]
+    [InlineData("../plugins")]
+    public void Resolve_RelativeOverride_IsIgnored(string value)
+        => Assert.Equal(PluginPaths.DefaultRoot(), PluginPaths.Resolve(_ => value));
+
     [Fact]
-    public void Resolve_RelativeOverride_IsMadeAbsolute()
+    public void Resolve_OverrideWithSurroundingWhitespace_IsTrimmed()
     {
-        var root = PluginPaths.Resolve(_ => "dev-plugins");
-        Assert.True(Path.IsPathFullyQualified(root!));
+        var custom = Path.Combine(Path.GetTempPath(), "ednexus-dev-plugins");
+        Assert.Equal(Path.GetFullPath(custom), PluginPaths.Resolve(_ => "  " + custom + "  "));
     }
 
     [Fact]

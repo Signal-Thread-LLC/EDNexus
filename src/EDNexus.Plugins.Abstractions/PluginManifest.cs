@@ -47,14 +47,62 @@ public sealed record PluginManifest(
     /// </summary>
     public string EntryType { get; init; } = string.Empty;
 
+    private readonly IReadOnlyList<string> _capabilities = Array.Empty<string>();
+
     /// <summary>
     /// The capabilities the plugin declares it needs — a de-duplicated subset of
     /// <see cref="PluginCapabilities.All"/>. The host only wires the matching parts of
     /// <see cref="IPluginContext"/> for granted capabilities.
     /// </summary>
-    public IReadOnlyList<string> Capabilities { get; init; } = [];
+    /// <remarks>
+    /// The setter stores a private, read-only copy: this record reaches plugin code through
+    /// <see cref="IPluginContext.Manifest"/>, so neither the caller's collection nor a downcast of
+    /// the returned list can be used to add a capability after validation.
+    /// </remarks>
+    public IReadOnlyList<string> Capabilities
+    {
+        get => _capabilities;
+        init => _capabilities = value is null || value.Count == 0
+            ? Array.Empty<string>()
+            : Array.AsReadOnly(value.ToArray());
+    }
 
     /// <summary>Whether the manifest declares <paramref name="capability"/> (ordinal match).</summary>
     /// <param name="capability">One of the <see cref="PluginCapabilities"/> constants.</param>
     public bool Declares(string capability) => Capabilities.Contains(capability, StringComparer.Ordinal);
+
+    /// <summary>
+    /// Value equality over every field, comparing <see cref="Capabilities"/> element-wise (in order)
+    /// rather than by reference, so two parses of the same <c>plugin.json</c> are equal.
+    /// </summary>
+    public bool Equals(PluginManifest? other)
+        => other is not null
+           && string.Equals(Id, other.Id, StringComparison.Ordinal)
+           && string.Equals(Name, other.Name, StringComparison.Ordinal)
+           && string.Equals(Version, other.Version, StringComparison.Ordinal)
+           && string.Equals(SdkVersion, other.SdkVersion, StringComparison.Ordinal)
+           && string.Equals(Author, other.Author, StringComparison.Ordinal)
+           && string.Equals(Description, other.Description, StringComparison.Ordinal)
+           && string.Equals(MinAppVersion, other.MinAppVersion, StringComparison.Ordinal)
+           && string.Equals(EntryAssembly, other.EntryAssembly, StringComparison.Ordinal)
+           && string.Equals(EntryType, other.EntryType, StringComparison.Ordinal)
+           && Capabilities.SequenceEqual(other.Capabilities, StringComparer.Ordinal);
+
+    /// <inheritdoc />
+    public override int GetHashCode()
+    {
+        var hash = new HashCode();
+        hash.Add(Id, StringComparer.Ordinal);
+        hash.Add(Name, StringComparer.Ordinal);
+        hash.Add(Version, StringComparer.Ordinal);
+        hash.Add(SdkVersion, StringComparer.Ordinal);
+        hash.Add(Author, StringComparer.Ordinal);
+        hash.Add(Description, StringComparer.Ordinal);
+        hash.Add(MinAppVersion, StringComparer.Ordinal);
+        hash.Add(EntryAssembly, StringComparer.Ordinal);
+        hash.Add(EntryType, StringComparer.Ordinal);
+        foreach (var capability in Capabilities)
+            hash.Add(capability, StringComparer.Ordinal);
+        return hash.ToHashCode();
+    }
 }

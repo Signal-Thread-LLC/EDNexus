@@ -55,10 +55,11 @@ public static class PluginPathRules
         if (body.Length == 0)
             return "path is empty";
 
+        if (TextRules.FindInvisibleOrInvalid(body, allowLineBreaks: false) is { } textProblem)
+            return "path " + textProblem;
+
         foreach (var ch in body)
         {
-            if (char.IsControl(ch))
-                return "path contains a control character";
             if (Array.IndexOf(InvalidChars, ch) >= 0)
                 return ch == ':' ? "path contains ':' (drive letter or alternate data stream)" : $"path contains the invalid character '{ch}'";
         }
@@ -103,9 +104,14 @@ public static class PluginPathRules
     }
 
     /// <summary>
-    /// Defence in depth for extraction: resolves <paramref name="relativePath"/> under
-    /// <paramref name="root"/> and returns the full path only if it is strictly inside
-    /// <paramref name="root"/>; otherwise <see langword="null"/>.
+    /// Defence in depth for extraction: lexically combines <paramref name="relativePath"/> with
+    /// <paramref name="root"/> and returns the normalised full path only if, <em>as a string</em>,
+    /// it is strictly inside <paramref name="root"/>; otherwise <see langword="null"/>.
+    /// <para>
+    /// This is a string check only — it does not resolve symbolic links or junctions. It is safe
+    /// for extraction because packages may not contain links (<see cref="PluginPackage"/> rejects
+    /// them) and extraction always writes into a folder it has just created.
+    /// </para>
     /// </summary>
     public static string? ResolveInside(string root, string relativePath)
     {
@@ -123,6 +129,7 @@ public static class PluginPathRules
             return null;
         }
 
+        // String prefix comparison on the normalised paths (no filesystem access).
         var comparison = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()
             ? StringComparison.OrdinalIgnoreCase
             : StringComparison.Ordinal;

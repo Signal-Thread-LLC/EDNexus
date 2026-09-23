@@ -1,4 +1,6 @@
+using System.Buffers.Binary;
 using System.IO.Compression;
+using System.Text;
 using EDNexus.Plugins.Abstractions;
 
 namespace EDNexus.Plugins.Hosting;
@@ -129,6 +131,14 @@ public static class PluginPackage
                 source = buffered;
             }
 
+            // Check the declared entry count before ZipArchive parses the central directory into
+            // one object per entry. (The runtime then verifies the directory really holds that
+            // many entries, so a header understating the count fails to open rather than slipping
+            // past this check; Analyze re-checks the materialised count regardless.)
+            var declaredEntries = ReadDeclaredEntryCount(source);
+            if (declaredEntries > limits.MaxEntries)
+                return PluginPackageInspection.Failure($"package declares {declaredEntries} entries, over the {limits.MaxEntries}-entry limit");
+
             using var archive = new ZipArchive(source, ZipArchiveMode.Read, leaveOpen: true);
             return action(archive, limits);
         }
@@ -139,6 +149,75 @@ public static class PluginPackage
         finally
         {
             buffered?.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Reads the "total entries" field from the zip's End Of Central Directory record (following
+    /// the Zip64 locator when the classic field is saturated), without parsing the directory.
+    /// Returns <see langword="null"/> when no EOCD record is found — <see cref="ZipArchive"/>
+    /// will then reject the stream itself. Restores the stream position.
+    /// </summary>
+    internal static long? ReadDeclaredEntryCount(Stream stream)
+    {
+        const int EocdSize = 22;
+        const int MaxCommentLength = ushort.MaxValue;
+        const uint EocdSignature = 0x06054B50;
+        const uint Zip64LocatorSignature = 0x07064B50;
+        const uint Zip64EocdSignature = 0x06064B50;
+
+        var origin = stream.Position;
+        try
+        {
+            var length = stream.Length;
+            if (length < EocdSize)
+                return null;
+
+            var tailLength = (int)Math.Min(length, EocdSize + MaxCommentLength);
+            var tail = new byte[tailLength];
+            stream.Position = length - tailLength;
+            stream.ReadExactly(tail);
+
+            // Scan backwards for the EOCD signature (the archive comment may follow it).
+            for (var i = tailLength - EocdSize; i >= 0; i--)
+            {
+                if (BinaryPrimitives.ReadUInt32LittleEndian(tail.AsSpan(i)) != EocdSignature)
+                    continue;
+                // A real EOCD's comment runs exactly to the end of the file; this skips a decoy
+                // signature embedded in the comment itself.
+                if (BinaryPrimitives.ReadUInt16LittleEndian(tail.AsSpan(i + 20)) != tailLength - i - EocdSize)
+                    continue;
+
+                long count = BinaryPrimitives.ReadUInt16LittleEndian(tail.AsSpan(i + 10));
+                if (count != ushort.MaxValue)
+                    return count;
+
+                // Zip64: a 20-byte locator sits immediately before the EOCD record.
+                var eocdPosition = length - tailLength + i;
+                if (eocdPosition < 20)
+                    return count;
+                var locator = new byte[20];
+                stream.Position = eocdPosition - 20;
+                stream.ReadExactly(locator);
+                if (BinaryPrimitives.ReadUInt32LittleEndian(locator) != Zip64LocatorSignature)
+                    return count;
+
+                var zip64Position = BinaryPrimitives.ReadUInt64LittleEndian(locator.AsSpan(8));
+                if (zip64Position > (ulong)(length - 56))
+                    return long.MaxValue; // points outside the file: treat as hostile
+                var zip64 = new byte[56];
+                stream.Position = (long)zip64Position;
+                stream.ReadExactly(zip64);
+                if (BinaryPrimitives.ReadUInt32LittleEndian(zip64) != Zip64EocdSignature)
+                    return long.MaxValue;
+                var total = BinaryPrimitives.ReadUInt64LittleEndian(zip64.AsSpan(32));
+                return total > long.MaxValue ? long.MaxValue : (long)total;
+            }
+            return null;
+        }
+        finally
+        {
+            stream.Position = origin;
         }
     }
 
@@ -172,10 +251,13 @@ public static class PluginPackage
                 continue;
             }
 
-            var key = isDirectory ? name[..^1] : name;
+            // Compare case-insensitively on the NFC form: macOS (and some Linux setups) treat
+            // precomposed e-acute (U+00E9) and "e" + combining acute (U+0301) as the same file,
+            // so they must collide here too.
+            var key = CollisionKey(isDirectory ? name[..^1] : name);
             if (!seen.Add(key))
             {
-                errors.Add($"entry \"{display}\" is duplicated (names are compared case-insensitively)");
+                errors.Add($"entry \"{display}\" is duplicated (names are compared case-insensitively after Unicode normalisation)");
                 continue;
             }
 
@@ -224,13 +306,13 @@ public static class PluginPackage
             errors.Add($"package expands to {totalUncompressed} bytes, over the {limits.MaxTotalUncompressedBytes}-byte limit");
 
         // A file and a directory may not share a path ("lib" the file vs "lib/x.dll").
-        var files = new HashSet<string>(normalized.Where(e => !e.IsDirectory).Select(e => e.Name), StringComparer.OrdinalIgnoreCase);
+        var files = new HashSet<string>(normalized.Where(e => !e.IsDirectory).Select(e => CollisionKey(e.Name)), StringComparer.OrdinalIgnoreCase);
         foreach (var (_, name, _) in normalized)
         {
             var trimmed = name.TrimEnd('/');
             for (var slash = trimmed.IndexOf('/'); slash >= 0; slash = trimmed.IndexOf('/', slash + 1))
             {
-                if (files.Contains(trimmed[..slash]))
+                if (files.Contains(CollisionKey(trimmed[..slash])))
                 {
                     errors.Add($"entry \"{Display(name)}\" is nested under \"{trimmed[..slash]}\", which is a file");
                     break;
@@ -323,9 +405,13 @@ public static class PluginPackage
         if (Directory.Exists(destination) || File.Exists(destination))
             return PluginPackageInspection.Failure($"destination '{destination}' already exists");
 
+        // Only ever clean up a folder this call created: if creating it fails (e.g. a file or
+        // another process's folder appeared at that path), nothing is deleted.
+        var created = false;
         try
         {
             Directory.CreateDirectory(destination);
+            created = true;
 
             foreach (var entry in analysis.Inspection.Entries.Where(e => e.IsDirectory))
             {
@@ -337,7 +423,8 @@ public static class PluginPackage
             long written = 0;
             foreach (var (zipEntry, relative) in analysis.Files)
             {
-                // Defence in depth: re-check containment against the real filesystem path.
+                // Defence in depth: lexically re-check containment of the combined path (a string
+                // check — links can't occur because packages containing them were rejected).
                 var target = PluginPathRules.ResolveInside(destination, relative)
                     ?? throw new PackageRejectedException($"entry \"{relative}\" resolves outside the plugin folder");
                 Directory.CreateDirectory(Path.GetDirectoryName(target)!);
@@ -363,7 +450,8 @@ public static class PluginPackage
         }
         catch (Exception ex) when (ex is PackageRejectedException or IOException or UnauthorizedAccessException or InvalidDataException or NotSupportedException or ArgumentException)
         {
-            TryDeleteDirectory(destination);
+            if (created)
+                TryDeleteDirectory(destination);
             return PluginPackageInspection.Failure(ex is PackageRejectedException
                 ? ex.Message
                 : $"extraction failed: {ex.Message}");
@@ -431,6 +519,13 @@ public static class PluginPackage
             // Best effort; a leftover staging folder is ignored by discovery (not a valid id).
         }
     }
+
+    /// <summary>
+    /// The key two entry names collide on: NFC form, compared case-insensitively by the caller.
+    /// Names have already passed <see cref="PluginPathRules.CheckRelativePath"/>, which rejects
+    /// unpaired surrogates, so normalisation cannot throw.
+    /// </summary>
+    private static string CollisionKey(string name) => name.Normalize(NormalizationForm.FormC);
 
     /// <summary>Entry names are attacker-controlled; strip control characters before echoing them.</summary>
     private static string Display(string name)

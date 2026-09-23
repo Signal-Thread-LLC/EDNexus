@@ -10,11 +10,13 @@ namespace EDNexus.Plugins.Hosting;
 /// </summary>
 public sealed partial class SemanticVersion : IComparable<SemanticVersion>, IEquatable<SemanticVersion>
 {
-    // The official semver.org regex (numbered-group form), anchored.
+    // The official semver.org regex (numbered-group form), with two .NET-specific hardenings:
+    // [0-9] instead of \d (which matches any Unicode decimal digit, e.g. Arabic-Indic), and \z
+    // instead of $ (which also matches before a trailing newline).
     [GeneratedRegex(
-        @"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)" +
-        @"(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?" +
-        @"(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$",
+        @"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)" +
+        @"(?:-((?:0|[1-9][0-9]*|[0-9]*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9][0-9]*|[0-9]*[a-zA-Z-][0-9a-zA-Z-]*))*))?" +
+        @"(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?\z",
         RegexOptions.CultureInvariant)]
     private static partial Regex SemVerPattern();
 
@@ -106,11 +108,13 @@ public sealed partial class SemanticVersion : IComparable<SemanticVersion>, IEqu
         var b = right.Split('.');
         for (var i = 0; i < Math.Min(a.Length, b.Length); i++)
         {
-            var aNumeric = ulong.TryParse(a[i], NumberStyles.None, CultureInfo.InvariantCulture, out var aNum);
-            var bNumeric = ulong.TryParse(b[i], NumberStyles.None, CultureInfo.InvariantCulture, out var bNum);
+            var aNumeric = IsNumericIdentifier(a[i]);
+            var bNumeric = IsNumericIdentifier(b[i]);
 
             int result;
-            if (aNumeric && bNumeric) result = aNum.CompareTo(bNum);
+            // Numeric identifiers have no leading zeros (the regex guarantees it), so comparing by
+            // length then ordinally is exact for any size — no overflow for huge values.
+            if (aNumeric && bNumeric) result = a[i].Length != b[i].Length ? a[i].Length.CompareTo(b[i].Length) : string.CompareOrdinal(a[i], b[i]);
             else if (aNumeric) result = -1; // numeric identifiers sort below alphanumeric ones
             else if (bNumeric) result = 1;
             else result = string.CompareOrdinal(a[i], b[i]);
@@ -119,6 +123,9 @@ public sealed partial class SemanticVersion : IComparable<SemanticVersion>, IEqu
         }
         return a.Length.CompareTo(b.Length);
     }
+
+    private static bool IsNumericIdentifier(string identifier)
+        => identifier.Length > 0 && identifier.All(char.IsAsciiDigit);
 
     /// <inheritdoc />
     public bool Equals(SemanticVersion? other) => other is not null && CompareTo(other) == 0;
