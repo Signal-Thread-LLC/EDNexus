@@ -71,7 +71,9 @@ public static class PluginPackage
     /// it into <paramref name="destinationDirectory"/> (which must not exist yet). Files are
     /// written to a sibling <c>.extract-&lt;guid&gt;</c> folder that is renamed onto the destination
     /// only once complete; on any failure only that staging folder is removed, never the
-    /// destination.
+    /// destination. If the process dies mid-extraction, a leftover <c>.extract-*</c> folder is
+    /// only swept by <see cref="PluginInstaller.RecoverInterrupted"/> when it sits under the
+    /// plugins root — direct callers extracting elsewhere own that cleanup.
     /// </summary>
     public static PluginPackageInspection ExtractTo(string packagePath, string destinationDirectory, PluginPackageLimits? limits = null)
     {
@@ -431,7 +433,8 @@ public static class PluginPackage
         string destination;
         try
         {
-            destination = Path.GetFullPath(destinationDirectory);
+            // Trim a trailing separator so "…\out\" has parent "…" (not "…\out" itself).
+            destination = Path.TrimEndingDirectorySeparator(Path.GetFullPath(destinationDirectory));
         }
         catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
         {

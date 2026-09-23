@@ -383,6 +383,19 @@ public class PluginPackageTests
     }
 
     [Fact]
+    public void ExtractTo_DestinationWithTrailingSeparator_Succeeds()
+    {
+        using var dir = new TempDir();
+        var dest = Path.Combine(dir.Path, "trail") + Path.DirectorySeparatorChar;
+
+        var result = PluginPackage.ExtractTo(new MemoryStream(Valid()), dest);
+
+        Assert.True(result.IsValid, result.ErrorSummary);
+        Assert.True(File.Exists(Path.Combine(dir.Path, "trail", "plugin.json")));
+        Assert.Equal(["trail"], Directory.GetDirectories(dir.Path).Select(Path.GetFileName));
+    }
+
+    [Fact]
     public void ExtractTo_Success_LeavesNoStagingFolderBehind()
     {
         using var dir = new TempDir();
