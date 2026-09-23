@@ -197,13 +197,13 @@
               <CheckBox x:Name="DiscordToggle" Content="Enable Discord Rich Presence" Foreground="#E7E9EE"
                         IsCheckedChanged="OnDiscordToggleChanged" />
               <TextBlock Foreground="#8A909C" FontSize="12" TextWrapping="Wrap"
-                         Text="Shows your ship, location, and activity on your Discord profile while EDNexus is running. Talks only to the Discord app on this machine — nothing is uploaded by EDNexus. Paused while developer mode is on." />
+                         Text="Shows your ship, location, and activity on your Discord profile while EDNexus is running. EDNexus hands this to the Discord app on this machine, and Discord shares it with your friends and servers like any other game status. Hidden while developer mode is on." />
 
               <CheckBox x:Name="DiscordShowSystemToggle" Content="Show current star system name" Foreground="#E7E9EE" />
               <TextBlock Foreground="#8A909C" FontSize="12" TextWrapping="Wrap"
-                         Text="When off, your presence reads &quot;Exploring deep space&quot; or &quot;Docked&quot; — no system, body, station, or carrier name — so you can't be stream-sniped or give away a fresh discovery." />
+                         Text="When off, your presence reads &quot;In flight&quot; or &quot;Docked&quot; — no system, body, station, or carrier name, and no Inara link (Inara shows your location) — so you can't be stream-sniped or give away a fresh discovery." />
 
-              <CheckBox x:Name="DiscordShowCommanderToggle" Content="Show commander name" Foreground="#E7E9EE" />
+              <CheckBox x:Name="DiscordShowCommanderToggle" Content="Show commander identity (Inara link, ship ID)" Foreground="#E7E9EE" />
               <TextBlock Foreground="#8A909C" FontSize="12" TextWrapping="Wrap"
                          Text="When off, the &quot;View on Inara&quot; button (which carries your commander name) and your ship's ID are left out." />
             </StackPanel>

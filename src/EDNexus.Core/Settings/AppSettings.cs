@@ -138,8 +138,9 @@ public sealed class DiscordSettings
 
     /// <summary>
     /// When false, the presence never names the current star system, body, station, or carrier — it
-    /// reads "Exploring deep space" / "Docked" instead, so a commander can't be stream-sniped or give
-    /// away a fresh discovery before logging it.
+    /// reads "In flight" / "Docked" instead, so a commander can't be stream-sniped or give away a fresh
+    /// discovery before logging it. The "View on Inara" button is dropped too, since EDNexus's Inara
+    /// sync publishes location there.
     /// </summary>
     public bool ShowSystem { get; set; } = true;
 

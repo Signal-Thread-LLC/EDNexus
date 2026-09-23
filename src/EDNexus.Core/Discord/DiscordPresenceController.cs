@@ -91,6 +91,15 @@ public sealed class DiscordPresenceController : IDisposable
         retired?.Dispose();
     }
 
+    /// <summary>
+    /// Re-evaluate the suppression predicate on the running service (see
+    /// <see cref="DiscordPresenceService.Refresh"/>), e.g. right after developer mode is switched on.
+    /// </summary>
+    public void Refresh()
+    {
+        lock (_gate) _service?.Refresh();
+    }
+
     public void Dispose()
     {
         DiscordPresenceService? retired;

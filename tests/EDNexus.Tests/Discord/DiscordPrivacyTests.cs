@@ -60,11 +60,11 @@ public class DiscordPrivacyMapperTests
     }
 
     [Fact]
-    public void Hidden_system_replaces_the_system_and_body_with_deep_space()
+    public void Hidden_system_replaces_the_system_and_body_with_a_neutral_in_flight()
     {
         var payload = DiscordPresenceMapper.Map(Flying(), SessionStart, SystemEntered, HideSystem);
 
-        Assert.Equal(DiscordPresenceMapper.HiddenSystemState, payload.State);
+        Assert.Equal("In flight", payload.State);
         Assert.DoesNotContain(AllText(payload), t => t?.Contains("Colonia", StringComparison.OrdinalIgnoreCase) == true);
     }
 
@@ -109,12 +109,20 @@ public class DiscordPrivacyMapperTests
     }
 
     [Fact]
-    public void Hidden_system_keeps_the_commander_details()
+    public void Hidden_system_keeps_the_ship_ident()
     {
         var payload = DiscordPresenceMapper.Map(Flying(), SessionStart, SystemEntered, HideSystem);
 
         Assert.Equal("Flying Anaconda (JM-01A)", payload.Details);
-        Assert.Contains(payload.Buttons, b => b.Label == "View on Inara");
+    }
+
+    [Fact]
+    public void Hidden_system_drops_the_inara_button_because_inara_shows_location()
+    {
+        var payload = DiscordPresenceMapper.Map(Flying(), SessionStart, SystemEntered, HideSystem);
+
+        Assert.Equal(DiscordPresenceMapper.GetEdNexusButton, Assert.Single(payload.Buttons));
+        Assert.DoesNotContain(payload.Buttons, b => b.Url.Contains("inara", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -211,29 +219,105 @@ public class DiscordPresenceServicePrivacyTests
     [Fact]
     public void Later_state_changes_keep_honouring_the_updated_privacy()
     {
+        var now = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
         var state = new CommanderState { StarSystem = "Sol" };
         var client = new FakeDiscordRpcClient();
-        using var service = new DiscordPresenceService(state, client, TimeSpan.FromMilliseconds(1));
+        using var service = new DiscordPresenceService(
+            state, client, TimeSpan.FromSeconds(15), clock: () => now);
 
         service.UpdatePrivacy(new DiscordPrivacyOptions(ShowSystem: false, ShowCommander: true));
-        System.Threading.Thread.Sleep(5);   // clear the 1ms window
-        state.Docked = true;
+        now = now.AddMinutes(1);   // past the throttle window, so the next change sends synchronously
         state.StationName = "Jameson Memorial";
+        state.Docked = true;
 
-        Assert.DoesNotContain(client.Sent, p => p.State?.Contains("Jameson") == true);
+        Assert.Equal(3, client.Sent.Count);   // initial, privacy change, docking
+        Assert.DoesNotContain(client.Sent.Skip(1), p => p.State?.Contains("Jameson") == true);
         Assert.Equal("Docked", client.Sent[^1].State);
     }
 
     [Fact]
-    public void A_suppressed_service_ignores_privacy_changes()
+    public async Task A_system_change_queued_in_the_throttle_window_never_leaks_after_hiding_the_system()
+    {
+        var state = new CommanderState { StarSystem = "Sol" };
+        var client = new FakeDiscordRpcClient();
+        using var service = new DiscordPresenceService(state, client, TimeSpan.FromMilliseconds(150));
+
+        // Inside the window opened by the constructor's push: this is queued as a trailing send.
+        state.StarSystem = "Colonia";
+        service.UpdatePrivacy(new DiscordPrivacyOptions(ShowSystem: false, ShowCommander: true));
+
+        await Task.Delay(500);   // well past when the queued send would have fired
+
+        Assert.DoesNotContain(client.Sent, p =>
+            p.State?.Contains("Colonia") == true || p.Buttons.Any(b => b.Url.Contains("Colonia")));
+        Assert.Equal(DiscordPresenceMapper.HiddenSystemState, client.Sent[^1].State);
+    }
+
+    [Fact]
+    public void A_suppressed_service_clears_presence_on_a_privacy_change_and_sends_nothing()
     {
         var client = new FakeDiscordRpcClient();
         using var service = new DiscordPresenceService(
             new CommanderState { StarSystem = "Sol" }, client, TimeSpan.FromMilliseconds(1), isSuppressed: () => true);
+        var clearsBefore = client.ClearCalls;
 
         service.UpdatePrivacy(new DiscordPrivacyOptions(ShowSystem: false, ShowCommander: false));
 
         Assert.Empty(client.Sent);
+        Assert.Equal(clearsBefore + 1, client.ClearCalls);
+    }
+
+    [Fact]
+    public void Entering_suppression_clears_the_last_real_presence()
+    {
+        var suppressed = false;
+        var client = new FakeDiscordRpcClient();
+        using var service = new DiscordPresenceService(
+            new CommanderState { StarSystem = "Sol" }, client, TimeSpan.FromMilliseconds(1), isSuppressed: () => suppressed);
+        Assert.Single(client.Sent);
+        Assert.Equal(0, client.ClearCalls);
+
+        suppressed = true;   // developer mode switched on
+        service.Refresh();
+
+        Assert.Equal(1, client.ClearCalls);
+        Assert.Single(client.Sent);
+    }
+
+    [Fact]
+    public void Fabricated_state_while_suppressed_clears_once_and_never_sends()
+    {
+        var suppressed = false;
+        var now = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        var state = new CommanderState { StarSystem = "Sol" };
+        var client = new FakeDiscordRpcClient();
+        using var service = new DiscordPresenceService(
+            state, client, TimeSpan.FromSeconds(15), isSuppressed: () => suppressed, clock: () => now);
+
+        suppressed = true;
+        now = now.AddMinutes(1);
+        state.StarSystem = "Fabricated 1";
+        state.StarSystem = "Fabricated 2";
+
+        Assert.Equal(1, client.ClearCalls);
+        Assert.DoesNotContain(client.Sent, p => p.State?.Contains("Fabricated") == true);
+    }
+
+    [Fact]
+    public void Leaving_suppression_re_pushes_the_real_presence()
+    {
+        var suppressed = true;
+        var now = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        var client = new FakeDiscordRpcClient();
+        using var service = new DiscordPresenceService(
+            new CommanderState { StarSystem = "Sol" }, client, TimeSpan.FromSeconds(15),
+            isSuppressed: () => suppressed, clock: () => now);
+        Assert.Empty(client.Sent);
+
+        suppressed = false;
+        service.Refresh();
+
+        Assert.Equal("Exploring Sol", Assert.Single(client.Sent).State);
     }
 }
 
@@ -338,6 +422,26 @@ public class DiscordPresenceControllerTests
         h.State.StarSystem = "Colonia";
 
         Assert.Equal(sent, h.Clients[0].Sent.Count);
+    }
+
+    [Fact]
+    public void Refresh_after_entering_suppression_clears_the_running_presence()
+    {
+        var suppressed = false;
+        var clients = new List<FakeDiscordRpcClient>();
+        using var controller = new DiscordPresenceController(new CommanderState { StarSystem = "Sol" }, () =>
+        {
+            var c = new FakeDiscordRpcClient();
+            clients.Add(c);
+            return c;
+        }, () => suppressed, TimeSpan.FromMinutes(5));
+        controller.Apply(new DiscordSettings { Enabled = true });
+
+        suppressed = true;
+        controller.Refresh();
+
+        Assert.Equal(1, Assert.Single(clients).ClearCalls);
+        Assert.True(controller.IsActive);
     }
 
     [Fact]

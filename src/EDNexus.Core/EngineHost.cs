@@ -226,6 +226,12 @@ public sealed class EngineHost : IDisposable
     /// </summary>
     public void ApplyDiscordSettings(DiscordSettings settings) => _discordPresence?.Apply(settings);
 
+    /// <summary>
+    /// Re-check the reporting-suppressed predicate for Discord presence, so switching developer mode on
+    /// clears the commander's real presence immediately instead of on the next state change.
+    /// </summary>
+    public void RefreshDiscordPresence() => _discordPresence?.Refresh();
+
     /// <summary>Warm state from the latest journal, then watch live on a background task.</summary>
     public void Start()
     {

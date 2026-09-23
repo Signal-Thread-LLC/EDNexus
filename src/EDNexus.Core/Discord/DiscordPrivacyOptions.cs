@@ -8,8 +8,9 @@ namespace EDNexus.Core.Discord;
 /// flags so the mapper stays pure and the service can swap them atomically when Settings change.
 /// </summary>
 /// <param name="ShowSystem">
-/// When false, no star system, body, station, or carrier name is emitted, and the elapsed timer counts
-/// from session start rather than from the last jump (which would otherwise reveal jump timing).
+/// When false, no star system, body, station, or carrier name is emitted; the "View on Inara" button is
+/// dropped (EDNexus's Inara sync publishes location there); and the elapsed timer counts from session
+/// start rather than from the last jump (which would otherwise reveal jump timing).
 /// </param>
 /// <param name="ShowCommander">
 /// When false, nothing that identifies the commander is emitted: no "View on Inara" button (it embeds

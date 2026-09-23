@@ -52,6 +52,7 @@ public sealed class DiscordPresenceService : IDisposable
     private DateTimeOffset _systemEnteredAt;
     private DiscordPresencePayload? _lastComputed;
     private DiscordPrivacyOptions _privacy;
+    private bool _clearedForSuppression;
     private CancellationTokenSource? _pending;
     private bool _disposed;
 
@@ -61,8 +62,9 @@ public sealed class DiscordPresenceService : IDisposable
     /// <see cref="NoOpDiscordRpcClient"/> to disable it outright (still safe to construct either way).
     /// </param>
     /// <param name="isSuppressed">
-    /// Optional live predicate; while it returns true no presence is computed or sent. Wired to
-    /// developer mode so fabricated sample data never reaches a commander's real Discord profile.
+    /// Optional live predicate; while it returns true no presence is computed or sent, and the last
+    /// real presence is cleared. Wired to developer mode so fabricated sample data never reaches a
+    /// commander's real Discord profile. Call <see cref="Refresh"/> when it flips.
     /// </param>
     /// <param name="privacy">
     /// The commander's initial privacy choices (everything visible when omitted). Change them live
@@ -123,45 +125,82 @@ public sealed class DiscordPresenceService : IDisposable
     /// waiting out the throttle window: this is a rare, user-initiated action, and a commander who has
     /// just hidden their system must not keep broadcasting it for up to another 15 seconds.
     /// </summary>
+    /// <remarks>
+    /// The new choices are stored and the presence recomputed under one lock, so a delayed send that
+    /// was already queued can never go out carrying the old (less private) payload. While suppressed,
+    /// the presence is cleared instead.
+    /// </remarks>
     public void UpdatePrivacy(DiscordPrivacyOptions privacy)
     {
         lock (_gate)
         {
             if (_disposed || _privacy == privacy) return;
             _privacy = privacy;
+            RequestUpdateLocked(immediate: true, forceClearIfSuppressed: true);
         }
-        RequestUpdate(immediate: true);
     }
 
-    private void RequestUpdate(bool immediate = false)
+    /// <summary>
+    /// Re-evaluate the suppression predicate now. Call when it may have flipped (developer mode switched
+    /// on) so the last real presence is cleared straight away rather than on the next state change; and
+    /// when it flips back off, so the real presence is pushed again.
+    /// </summary>
+    public void Refresh()
     {
-        if (_isSuppressed()) return;
-
         lock (_gate)
         {
             if (_disposed) return;
-
-            var payload = DiscordPresenceMapper.Map(_state, _sessionStartedAt, _systemEnteredAt, _privacy);
-            if (_lastComputed is not null && payload.Equals(_lastComputed)) return;
-            _lastComputed = payload;
-
-            if (immediate)
-            {
-                // Supersede any trailing send that would otherwise re-push the same payload later.
-                _pending?.Cancel();
-                _throttle.MarkSent();
-                Send(payload);
-                return;
-            }
-
-            if (_throttle.TryAcquire())
-            {
-                Send(payload);
-                return;
-            }
-
-            SchedulePendingLocked(_throttle.TimeUntilNextSend());
+            RequestUpdateLocked(immediate: false, forceClearIfSuppressed: false);
         }
+    }
+
+    private void RequestUpdate()
+    {
+        lock (_gate)
+        {
+            if (_disposed) return;
+            RequestUpdateLocked(immediate: false, forceClearIfSuppressed: false);
+        }
+    }
+
+    /// <summary>Caller must hold <see cref="_gate"/>.</summary>
+    private void RequestUpdateLocked(bool immediate, bool forceClearIfSuppressed)
+    {
+        if (_isSuppressed())
+        {
+            // The last real presence must not linger while suppressed (e.g. developer mode): clear it
+            // once on entering suppression, and forget it so the real state is re-pushed on leaving.
+            if (!_clearedForSuppression || forceClearIfSuppressed)
+            {
+                _pending?.Cancel();
+                _lastComputed = null;
+                _clearedForSuppression = true;
+                try { _client.Clear(); } catch { /* graceful fallback: never throw */ }
+            }
+            return;
+        }
+        _clearedForSuppression = false;
+
+        var payload = DiscordPresenceMapper.Map(_state, _sessionStartedAt, _systemEnteredAt, _privacy);
+        if (_lastComputed is not null && payload.Equals(_lastComputed)) return;
+        _lastComputed = payload;
+
+        if (immediate)
+        {
+            // Supersede any trailing send that would otherwise re-push an older payload later.
+            _pending?.Cancel();
+            _throttle.MarkSent();
+            Send(payload);
+            return;
+        }
+
+        if (_throttle.TryAcquire())
+        {
+            Send(payload);
+            return;
+        }
+
+        SchedulePendingLocked(_throttle.TimeUntilNextSend());
     }
 
     private void Send(DiscordPresencePayload payload)
@@ -183,7 +222,7 @@ public sealed class DiscordPresenceService : IDisposable
 
             lock (_gate)
             {
-                if (_disposed || cts.IsCancellationRequested) return;
+                if (_disposed || cts.IsCancellationRequested || _isSuppressed()) return;
                 if (_lastComputed is { } latest && _throttle.TryAcquire()) Send(latest);
             }
         });

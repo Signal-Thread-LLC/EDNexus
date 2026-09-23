@@ -311,6 +311,10 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         // events went through the real bus into the real CommanderState, so without a rebuild the
         // cards keep showing invented systems and cargo that no longer have a dev-mode label on them.
         if (wasDev && !_boot.Dev.Enabled) ResetToLive();
+
+        // Entering developer mode suppresses Discord presence; clear the real one right away rather
+        // than leaving it up until the first fabricated event arrives.
+        if (!wasDev && _boot.Dev.Enabled) _host.RefreshDiscordPresence();
     }
 
     [RelayCommand]

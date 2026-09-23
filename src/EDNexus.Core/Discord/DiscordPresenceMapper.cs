@@ -19,7 +19,7 @@ public static class DiscordPresenceMapper
     private const string DefaultLargeImageText = "EDNexus";
 
     /// <summary>Shown in place of the system name when <see cref="DiscordPrivacyOptions.ShowSystem"/> is off.</summary>
-    public const string HiddenSystemState = "Exploring deep space";
+    public const string HiddenSystemState = "In flight";
 
     /// <param name="state">The live commander picture. Read-only.</param>
     /// <param name="sessionStartedAt">When this play session began, for the elapsed-time fallback.</param>
@@ -66,7 +66,9 @@ public static class DiscordPresenceMapper
         var smallImageText = docked ? "Docked" : "In flight";
 
         var buttons = new List<DiscordPresenceButton> { GetEdNexusButton };
-        if (options.ShowCommander && !string.IsNullOrWhiteSpace(state.Name))
+        // The Inara profile names the commander, and — because EDNexus's own Inara sync uploads
+        // location on every jump and dock — also shows where they are. So it needs both allowed.
+        if (options.ShowCommander && options.ShowSystem && !string.IsNullOrWhiteSpace(state.Name))
             buttons.Add(new DiscordPresenceButton(
                 "View on Inara",
                 $"https://inara.cz/elite/cmdrs/?search={Uri.EscapeDataString(state.Name!)}"));

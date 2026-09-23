@@ -378,7 +378,7 @@ static void PrintOverlay(CommanderState s, ExobiologyTracker exobio, Colonisatio
 
 /// <summary>
 /// What Discord Rich Presence would show for the replayed state under each privacy combination
-/// (issue #50), mapped through the same pure <see cref="DiscordPresenceMapper"/> the app uses. The CLI
+/// (issue #50; hiding the system also drops the Inara link, since Inara shows location), mapped through the same pure <see cref="DiscordPresenceMapper"/> the app uses. The CLI
 /// never connects to Discord; this is a preview only.
 /// </summary>
 static void PrintDiscordPresence(CommanderState s)
