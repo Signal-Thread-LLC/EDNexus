@@ -100,8 +100,13 @@ not by a file in this folder. Settings that matter:
 - The extension's **Client ID** and **Secret** go into the EBS as `Twitch:ExtensionId` and
   `Twitch:ExtensionSecret` — see `src/EDNexus.Ebs/README.md`.
 
-Zip the contents of this folder (`dev/` can be left out) and upload it as the extension's asset
-bundle.
+**Don't zip this by hand.** The `Twitch extension bundle` workflow builds it on every change to
+`extension/` and attaches `ednexus-twitch-extension.zip` to the run as an artifact — download that
+and upload it as the extension's asset bundle. Tagged releases get it attached to the release too.
+
+The workflow also guards the two mistakes that only surface as 404s *after* upload: it fails if the
+viewer paths are missing, if a view has lost the Twitch helper script, if `dev/` leaked in, or if the
+files end up inside a wrapping folder instead of at the archive root.
 
 ## The payload
 
