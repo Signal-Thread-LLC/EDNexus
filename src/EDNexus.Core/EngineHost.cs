@@ -42,6 +42,7 @@ public sealed class EngineHost : IDisposable
     private readonly DiscordPresenceService? _discordPresence;
     private readonly TwitchStreamCardService? _twitchCard;
     private readonly StreamStateApiClient? _twitchCardClient;
+    private readonly DiscordPresenceController? _discordPresence;
     private readonly HttpClient _http;
     private Task? _runTask;
 
@@ -212,13 +213,17 @@ public sealed class EngineHost : IDisposable
 
         // Discord Rich Presence: a local IPC integration to the commander's own Discord client, not a
         // third-party upload. Like the reporters above it's still opt-out via AppSettings, and — same
-        // as EDDN/Inara — the CLI's replay-only runs (settings: null) never activate it.
-        if (settings?.Discord.Enabled == true)
+        // as EDDN/Inara — the CLI's replay-only runs (settings: null) never activate it. The
+        // controller exists whenever settings do, so the Settings window can switch it on/off live.
+        if (settings is not null)
         {
-            IDiscordRpcClient discordClient;
-            try { discordClient = new DiscordRpcClientAdapter(settings.Discord.ApplicationId); }
-            catch { discordClient = NoOpDiscordRpcClient.Instance; }   // unsupported platform, etc.
-            _discordPresence = new DiscordPresenceService(State, discordClient, reportingSuppressed);
+            var discord = settings.Discord;
+            _discordPresence = new DiscordPresenceController(State, () =>
+            {
+                try { return new DiscordRpcClientAdapter(discord.ApplicationId); }
+                catch { return NoOpDiscordRpcClient.Instance; }   // unsupported platform, etc.
+            }, reportingSuppressed);
+            _discordPresence.Apply(discord);
         }
 
         // Twitch stream card: publishes the sections the broadcaster opted into to their extension,
@@ -248,6 +253,19 @@ public sealed class EngineHost : IDisposable
         if (JournalDirectory is not null)
             _watcher = new JournalWatcher(JournalDirectory, Bus);
     }
+
+    /// <summary>
+    /// Re-apply the commander's Discord Rich Presence settings to the live integration: connects or
+    /// disconnects to match <see cref="DiscordSettings.Enabled"/> and pushes privacy changes straight
+    /// away. A no-op on hosts built without settings (the CLI).
+    /// </summary>
+    public void ApplyDiscordSettings(DiscordSettings settings) => _discordPresence?.Apply(settings);
+
+    /// <summary>
+    /// Re-check the reporting-suppressed predicate for Discord presence, so switching developer mode on
+    /// clears the commander's real presence immediately instead of on the next state change.
+    /// </summary>
+    public void RefreshDiscordPresence() => _discordPresence?.Refresh();
 
     /// <summary>Warm state from the latest journal, then watch live on a background task.</summary>
     public void Start()

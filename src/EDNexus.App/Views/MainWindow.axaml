@@ -219,9 +219,10 @@
         </ItemsControl.ItemsPanel>
 
         <!-- Column, span and visibility belong to the container the panel lays out, not to the card
-             inside it: a hidden card has to leave no slot behind at all. -->
+             inside it: a hidden card has to leave no slot behind at all. Scoped to CardHost by name so
+             the nested ItemsControls inside cards (material, engineer, market rows…) don't match it. -->
         <ItemsControl.Styles>
-          <Style Selector="ItemsControl > ContentPresenter" x:DataType="vm:CardViewModel">
+          <Style Selector="ItemsControl#CardHost > ContentPresenter" x:DataType="vm:CardViewModel">
             <Setter Property="controls:MasonryPanel.Column" Value="{Binding Column}" />
             <Setter Property="controls:MasonryPanel.ColumnSpan" Value="{Binding ColumnSpan}" />
             <Setter Property="IsVisible" Value="{Binding IsVisible}" />

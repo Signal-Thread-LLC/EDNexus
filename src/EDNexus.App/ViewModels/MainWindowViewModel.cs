@@ -36,6 +36,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     {
         _boot = boot;
         _host = BuildHost();
+        // Reads `_host` at event time, so a host swapped in by ResetToLive() is the one updated.
+        _boot.DiscordSettingsChanged += OnDiscordSettingsChanged;
         _context = new DashboardContext(
             () => _host,
             () => _boot.Dev.Enabled,
@@ -265,9 +267,13 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
     public void Dispose()
     {
+        _boot.DiscordSettingsChanged -= OnDiscordSettingsChanged;
         _boot.Overlay.Hide();
         _host.Dispose();
     }
+
+    /// <summary>Push saved Discord Rich Presence settings onto the live engine (connect/disconnect, privacy).</summary>
+    private void OnDiscordSettingsChanged(DiscordSettings settings) => _host.ApplyDiscordSettings(settings);
 
     [ObservableProperty] private string _journalStatus = "";
     [ObservableProperty] private string _privacyStatus = "";
@@ -291,11 +297,17 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     private void RefreshRadio(RadioPlayerSnapshot s)
     {
         RadioStationName = s.Station?.Name ?? "No station tuned";
-        RadioPlayPauseGlyph = s.Status == RadioPlaybackStatus.Playing ? "⏸" : "▶";
+        // The glyph shows what clicking will do (see RadioPlayerService.ToggleActionFor).
+        RadioPlayPauseGlyph = RadioPlayerService.ToggleActionFor(s.Status) switch
+        {
+            RadioToggleAction.Pause => "⏸",
+            RadioToggleAction.Stop => "⏹",
+            _ => "▶",
+        };
         RadioTooltip = s.Status switch
         {
-            RadioPlaybackStatus.Error => s.LastError ?? "Radio error",
-            RadioPlaybackStatus.Buffering => $"Buffering {s.Station?.Name}…",
+            RadioPlaybackStatus.Error => $"{s.LastError ?? "Radio error"} — click to stop",
+            RadioPlaybackStatus.Buffering => $"Buffering {s.Station?.Name}… — click to stop",
             RadioPlaybackStatus.Playing => $"Playing {s.Station?.Name}",
             RadioPlaybackStatus.Paused => $"Paused — {s.Station?.Name}",
             _ => s.Station is null ? "Play the radio" : $"Play {s.Station.Name}",
@@ -315,17 +327,39 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     private async Task OpenSettings()
     {
         var owner = (Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.MainWindow;
-        var wasDev = _boot.Dev.Enabled;
         var dialog = new SettingsWindow(_boot, this);
         if (owner is not null) await dialog.ShowDialog(owner);
         else dialog.Show();
         RefreshPrivacyStatus();
         DevMode = _boot.Dev.Enabled; // reflect a dev-mode toggle made in the settings dialog
+    }
 
-        // Leaving developer mode has to discard the fabricated state as well as the banner: those
-        // events went through the real bus into the real CommanderState, so without a rebuild the
-        // cards keep showing invented systems and cargo that no longer have a dev-mode label on them.
-        if (wasDev && !_boot.Dev.Enabled) ResetToLive();
+    /// <summary>
+    /// Switch developer mode (runtime-only, never persisted). Called by the settings dialog on Save.
+    /// </summary>
+    public void SetDeveloperMode(bool enabled)
+    {
+        var wasDev = _boot.Dev.Enabled;
+
+        if (wasDev && !enabled)
+        {
+            // Leaving developer mode has to discard the fabricated state as well as the banner: those
+            // events went through the real bus into the real CommanderState, so without a rebuild the
+            // cards keep showing invented systems and cargo that no longer have a dev-mode label on
+            // them. The flag flips only once the fabricated engine is gone, so it never gets a moment
+            // unsuppressed in which to report to EDDN/Inara or Discord.
+            RebuildHost(beforeRebuild: () => _boot.Dev.Enabled = false);
+        }
+        else
+        {
+            _boot.Dev.Enabled = enabled;
+
+            // Entering developer mode suppresses Discord presence; clear the real one right away
+            // rather than leaving it up until the first fabricated event arrives.
+            if (!wasDev && _boot.Dev.Enabled) _host.RefreshDiscordPresence();
+        }
+
+        DevMode = _boot.Dev.Enabled;
     }
 
     [RelayCommand]
@@ -407,9 +441,16 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
     /// <summary>Discard fabricated state and re-warm from the real journal by rebuilding the engine.</summary>
     [RelayCommand]
-    private void ResetToLive()
+    private void ResetToLive() => RebuildHost(beforeRebuild: null);
+
+    /// <param name="beforeRebuild">
+    /// Runs after the old engine is disposed and before the new one is built — the only point at which
+    /// developer mode can be switched off without the fabricated engine briefly running unsuppressed.
+    /// </param>
+    private void RebuildHost(Action? beforeRebuild)
     {
         _host.Dispose();
+        beforeRebuild?.Invoke();
         _host = BuildHost();
         _host.Start();
         foreach (var card in Cards) card.Reset();

@@ -198,6 +198,23 @@ public sealed class Bootstrap
     }
 
     /// <summary>
+    /// Raised after the Discord Rich Presence settings are saved, so whoever owns the live engine can
+    /// re-apply them (connect/disconnect, privacy) without a restart.
+    /// </summary>
+    public event Action<DiscordSettings>? DiscordSettingsChanged;
+
+    /// <summary>Persist the Discord Rich Presence choices and apply them to the live integration.</summary>
+    public void ApplyDiscordChoice(bool enabled, bool showSystem, bool showCommander)
+    {
+        var discord = Settings.Discord;
+        discord.Enabled = enabled;
+        discord.ShowSystem = showSystem;
+        discord.ShowCommander = showCommander;
+        Store.Save(Settings);
+        DiscordSettingsChanged?.Invoke(discord);
+    }
+
+    /// <summary>
     /// Persist the voice-callout choices and apply the voice/volume live, so a change here doesn't
     /// need a restart to take effect.
     /// </summary>

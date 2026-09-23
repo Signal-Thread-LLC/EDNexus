@@ -30,6 +30,7 @@ public sealed class RadioPlayerService : IDisposable, IAsyncDisposable
     private int _volume = 50;
     private bool _muted;
     private bool _enabled;
+    private bool _wantsPlayback; // user intent: last transport action was play (vs pause/stop)
     private string? _lastError;
     private bool _disposed;
 
@@ -53,8 +54,18 @@ public sealed class RadioPlayerService : IDisposable, IAsyncDisposable
             _volume = Math.Clamp(radio.RadioVolume, 0, 100);
             _muted = radio.RadioMute;
             _station = RadioStationCatalog.Find(radio.RadioLastStation);
+            _wantsPlayback = radio.RadioWasPlaying;
         }
     }
+
+    /// <summary>
+    /// Whether persisted <paramref name="radio"/> settings ask for playback to resume at launch: the
+    /// radio must be enabled, a known station tuned, and it must have been playing (not paused or
+    /// stopped) when the app last closed.
+    /// </summary>
+    public static bool ShouldResumeOnLaunch(RadioSettings? radio)
+        => radio is { RadioEnabled: true, RadioWasPlaying: true }
+           && RadioStationCatalog.Find(radio.RadioLastStation) is not null;
 
     /// <summary>A point-in-time snapshot of everything the UI needs to render the player.</summary>
     public RadioPlayerSnapshot Snapshot
@@ -67,25 +78,39 @@ public sealed class RadioPlayerService : IDisposable, IAsyncDisposable
     }
 
     /// <summary>
-    /// Resumes whatever was persisted from a previous session: if the radio was left enabled with a
-    /// station tuned, starts playing it (respecting the saved volume/mute). Safe to call once at app
-    /// startup; a no-op if the radio was never enabled or no station was saved. Never throws — a
-    /// failed resume just leaves the player in <see cref="RadioPlaybackStatus.Error"/>.
+    /// Resumes whatever was persisted from a previous session: if the radio was still playing when
+    /// the app last closed, starts the tuned station again (respecting the saved volume/mute). Safe
+    /// to call once at app startup; a no-op if the radio was paused/stopped, never enabled, or no
+    /// station was saved. Never throws — a failed resume just leaves the player in
+    /// <see cref="RadioPlaybackStatus.Error"/>.
     /// </summary>
     public async Task RestoreAsync(CancellationToken ct = default)
     {
-        bool enabled;
-        RadioStation? station;
-        lock (_gate) { enabled = _enabled; station = _station; }
+        RadioSettings current;
+        lock (_gate)
+        {
+            current = new RadioSettings
+            {
+                RadioEnabled = _enabled,
+                RadioWasPlaying = _wantsPlayback,
+                RadioLastStation = _station?.Id,
+            };
+        }
 
-        if (!enabled || station is null) return;
-        await PlayAsync(station.Id, ct).ConfigureAwait(false);
+        if (!ShouldResumeOnLaunch(current)) return;
+        await PlayAsync(current.RadioLastStation!, ct).ConfigureAwait(false);
     }
 
     /// <summary>Turns the radio feature on/off. Turning it off stops any current playback.</summary>
     public async Task SetEnabledAsync(bool enabled, CancellationToken ct = default)
     {
-        lock (_gate) _enabled = enabled;
+        lock (_gate)
+        {
+            _enabled = enabled;
+            // Clear the resume intent here so the single save below covers it, and StopAsync
+            // (which only saves when the intent actually changes) doesn't write a second time.
+            if (!enabled) _wantsPlayback = false;
+        }
         Persist();
 
         if (!enabled) await StopAsync(ct).ConfigureAwait(false);
@@ -102,6 +127,7 @@ public sealed class RadioPlayerService : IDisposable, IAsyncDisposable
         {
             _station = station;
             _enabled = true;
+            _wantsPlayback = true;
         }
         Persist();
 
@@ -113,13 +139,15 @@ public sealed class RadioPlayerService : IDisposable, IAsyncDisposable
     {
         RadioStation? station;
         lock (_gate) station = _station;
-        return station is null ? Task.CompletedTask : Task.Run(() => PlayStationCore(station), ct);
+        return station is null ? Task.CompletedTask : PlayAsync(station.Id, ct);
     }
 
     /// <summary>
-    /// Toggles between playing and paused: pauses if currently playing, otherwise resumes the tuned
-    /// station (or starts the first catalog station if none has been tuned yet). This is the single
-    /// entry point a hardware "Play/Pause" media key should call.
+    /// Toggles playback: pauses if currently playing; stops if buffering or in error (so a stream
+    /// that's connecting or has failed can be cancelled, and doesn't stay flagged to resume on the
+    /// next launch); otherwise resumes the tuned station (or starts the first catalog station if
+    /// none has been tuned yet). This is the single entry point a hardware "Play/Pause" media key
+    /// should call.
     /// </summary>
     public Task TogglePlayPauseAsync(CancellationToken ct = default)
     {
@@ -127,9 +155,21 @@ public sealed class RadioPlayerService : IDisposable, IAsyncDisposable
         RadioStation? station;
         lock (_gate) { status = _status; station = _station; }
 
-        if (status == RadioPlaybackStatus.Playing) return PauseAsync(ct);
-        return PlayAsync(station?.Id ?? RadioStationCatalog.Stations[0].Id, ct);
+        return ToggleActionFor(status) switch
+        {
+            RadioToggleAction.Pause => PauseAsync(ct),
+            RadioToggleAction.Stop => StopAsync(ct),
+            _ => PlayAsync(station?.Id ?? RadioStationCatalog.Stations[0].Id, ct),
+        };
     }
+
+    /// <summary>What <see cref="TogglePlayPauseAsync"/> does from the given playback status.</summary>
+    public static RadioToggleAction ToggleActionFor(RadioPlaybackStatus status) => status switch
+    {
+        RadioPlaybackStatus.Playing => RadioToggleAction.Pause,
+        RadioPlaybackStatus.Buffering or RadioPlaybackStatus.Error => RadioToggleAction.Stop,
+        _ => RadioToggleAction.Play,
+    };
 
     /// <summary>Advances to and plays the next station in the catalog (wrapping). This is what a hardware "Next" media key should call.</summary>
     public Task NextStationAsync(CancellationToken ct = default)
@@ -147,9 +187,14 @@ public sealed class RadioPlayerService : IDisposable, IAsyncDisposable
         return PlayAsync(RadioStationCatalog.Previous(current).Id, ct);
     }
 
-    /// <summary>Pauses playback, leaving the current station loaded.</summary>
+    /// <summary>
+    /// Pauses playback, leaving the current station loaded. Also records that the user no longer
+    /// wants the radio playing, so the next launch stays silent.
+    /// </summary>
     public Task PauseAsync(CancellationToken ct = default)
-        => Task.Run(() =>
+    {
+        ClearPlaybackIntent();
+        return Task.Run(() =>
         {
             try
             {
@@ -160,10 +205,16 @@ public sealed class RadioPlayerService : IDisposable, IAsyncDisposable
                 SetError(ex.Message);
             }
         }, ct);
+    }
 
-    /// <summary>Stops playback and releases the loaded media.</summary>
+    /// <summary>
+    /// Stops playback and releases the loaded media. Also records that the user no longer wants the
+    /// radio playing, so the next launch stays silent.
+    /// </summary>
     public Task StopAsync(CancellationToken ct = default)
-        => Task.Run(() =>
+    {
+        ClearPlaybackIntent();
+        return Task.Run(() =>
         {
             try
             {
@@ -179,6 +230,18 @@ public sealed class RadioPlayerService : IDisposable, IAsyncDisposable
                 SetError(ex.Message);
             }
         }, ct);
+    }
+
+    /// <summary>Forgets that the radio should be playing (and persists that) so the next launch doesn't resume it.</summary>
+    private void ClearPlaybackIntent()
+    {
+        lock (_gate)
+        {
+            if (!_wantsPlayback) return;
+            _wantsPlayback = false;
+        }
+        Persist();
+    }
 
     /// <summary>Sets output volume (0-100), applying it immediately if the engine is initialized.</summary>
     public Task SetVolumeAsync(int volume, CancellationToken ct = default)
@@ -309,6 +372,7 @@ public sealed class RadioPlayerService : IDisposable, IAsyncDisposable
             _settings.Radio.RadioLastStation = _station?.Id;
             _settings.Radio.RadioVolume = _volume;
             _settings.Radio.RadioMute = _muted;
+            _settings.Radio.RadioWasPlaying = _wantsPlayback;
         }
         _store?.Save(_settings);
     }

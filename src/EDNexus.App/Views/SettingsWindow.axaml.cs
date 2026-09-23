@@ -58,8 +58,11 @@ public partial class SettingsWindow : Window
         FuelLowToggle.IsChecked = !boot.Settings.Voice.DisabledCallouts.Contains(nameof(EDNexus.Core.Voice.VoiceCalloutKind.FuelLow));
         ScanCompleteToggle.IsChecked = !boot.Settings.Voice.DisabledCallouts.Contains(nameof(EDNexus.Core.Voice.VoiceCalloutKind.ScanComplete));
         ShoppingListToggle.IsChecked = !boot.Settings.Voice.DisabledCallouts.Contains(nameof(EDNexus.Core.Voice.VoiceCalloutKind.ShoppingListItemAcquired));
-
         LoadTwitch(boot.Settings.Twitch);
+        DiscordToggle.IsChecked = boot.Settings.Discord.Enabled;
+        DiscordShowSystemToggle.IsChecked = boot.Settings.Discord.ShowSystem;
+        DiscordShowCommanderToggle.IsChecked = boot.Settings.Discord.ShowCommander;
+        UpdateDiscordPrivacyEnabled();
 
         // The whole section disappears when the dev tools are compiled out / disabled.
         DevSection.IsVisible = boot.Dev.Available;
@@ -181,6 +184,14 @@ public partial class SettingsWindow : Window
             // and with the game closed no journal event is coming to nudge it. Ask directly.
             _dashboard?.TwitchCard?.RequestPublish();
             _boot.Dev.Enabled = DevModeToggle.IsChecked == true; // runtime-only; not persisted
+            _boot.ApplyDiscordChoice(
+                DiscordToggle.IsChecked == true,
+                DiscordShowSystemToggle.IsChecked == true,
+                DiscordShowCommanderToggle.IsChecked == true);
+            // Runtime-only; not persisted. The dashboard owns the switch so leaving dev mode can tear
+            // down the fabricated engine before reporting is un-suppressed.
+            if (_dashboard is not null) _dashboard.SetDeveloperMode(DevModeToggle.IsChecked == true);
+            else _boot.Dev.Enabled = DevModeToggle.IsChecked == true;
             UpdateStatus();
             UpdateVersionAndUpdateLine();
             System.Diagnostics.Trace.TraceInformation("Settings: saved by user");
@@ -210,6 +221,16 @@ public partial class SettingsWindow : Window
     /// <summary>Fabricate the three callout-triggering events through the real bus, via developer mode.</summary>
     private void OnSimulateOverlayVoice(object? sender, RoutedEventArgs e)
         => _dashboard?.SimulateOverlayVoiceCommand.Execute(null);
+
+    private void OnDiscordToggleChanged(object? sender, RoutedEventArgs e) => UpdateDiscordPrivacyEnabled();
+
+    /// <summary>The privacy toggles only mean something while presence itself is on; their values are kept either way.</summary>
+    private void UpdateDiscordPrivacyEnabled()
+    {
+        var enabled = DiscordToggle.IsChecked == true;
+        DiscordShowSystemToggle.IsEnabled = enabled;
+        DiscordShowCommanderToggle.IsEnabled = enabled;
+    }
 
     private void OnRevealApiKeyChanged(object? sender, RoutedEventArgs e)
         => InaraApiKey.RevealPassword = RevealApiKey.IsChecked == true;

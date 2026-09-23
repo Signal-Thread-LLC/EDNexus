@@ -190,6 +190,13 @@ public sealed class RadioSettings
 
     /// <summary>Whether output is muted.</summary>
     public bool RadioMute { get; set; } = false;
+
+    /// <summary>
+    /// Whether the radio was playing (the user last pressed play, not pause/stop) when the app
+    /// closed. Only when this is set does the next launch resume <see cref="RadioLastStation"/>.
+    /// Default off, so a fresh install, or settings saved before this existed, start silent.
+    /// </summary>
+    public bool RadioWasPlaying { get; set; } = false;
 }
 
 /// <summary>
@@ -201,6 +208,20 @@ public sealed class DiscordSettings
 {
     /// <summary>When true, mirror system/ship/activity onto Discord Rich Presence.</summary>
     public bool Enabled { get; set; } = true;
+
+    /// <summary>
+    /// When false, the presence never names the current star system, body, station, or carrier — it
+    /// reads "In flight" / "Docked" instead, so a commander can't be stream-sniped or give away a fresh
+    /// discovery before logging it. The "View on Inara" button is dropped too, since EDNexus's Inara
+    /// sync publishes location there.
+    /// </summary>
+    public bool ShowSystem { get; set; } = true;
+
+    /// <summary>
+    /// When false, the presence carries nothing that identifies the commander: the "View on Inara"
+    /// button (which embeds the commander name) and the ship's custom ident are omitted.
+    /// </summary>
+    public bool ShowCommander { get; set; } = true;
 
     /// <summary>
     /// Discord application (Client) ID presence is registered under. Override only to point at a

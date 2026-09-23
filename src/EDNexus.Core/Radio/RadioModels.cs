@@ -78,6 +78,19 @@ public enum RadioPlaybackStatus
     Error,
 }
 
+/// <summary>What the single play/pause transport control does from a given <see cref="RadioPlaybackStatus"/>.</summary>
+public enum RadioToggleAction
+{
+    /// <summary>Start (or resume) the tuned station.</summary>
+    Play,
+
+    /// <summary>Pause the playing stream.</summary>
+    Pause,
+
+    /// <summary>Cancel a stream that's still connecting or has failed.</summary>
+    Stop,
+}
+
 /// <summary>Immutable snapshot of the radio player's current state, for UI consumption.</summary>
 /// <param name="Enabled">Whether the radio feature is turned on.</param>
 /// <param name="Station">The currently tuned station, if any.</param>
