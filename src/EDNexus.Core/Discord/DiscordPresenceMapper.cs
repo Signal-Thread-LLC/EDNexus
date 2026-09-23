@@ -18,25 +18,46 @@ public static class DiscordPresenceMapper
     private const string DefaultLargeImageKey = "ednexus_logo";
     private const string DefaultLargeImageText = "EDNexus";
 
+    /// <summary>Shown in place of the system name when <see cref="DiscordPrivacyOptions.ShowSystem"/> is off.</summary>
+    public const string HiddenSystemState = "In flight";
+
     /// <param name="state">The live commander picture. Read-only.</param>
     /// <param name="sessionStartedAt">When this play session began, for the elapsed-time fallback.</param>
     /// <param name="systemEnteredAt">
     /// When the commander arrived in <see cref="CommanderState.StarSystem"/>, so Discord can show
     /// elapsed time "in system" instead of elapsed time for the whole session.
     /// </param>
+    /// <param name="privacy">
+    /// The commander's privacy choices; <see cref="DiscordPrivacyOptions.Default"/> (everything
+    /// visible) when omitted.
+    /// </param>
     public static DiscordPresencePayload Map(
-        CommanderState state, DateTimeOffset sessionStartedAt, DateTimeOffset? systemEnteredAt = null)
+        CommanderState state, DateTimeOffset sessionStartedAt, DateTimeOffset? systemEnteredAt = null,
+        DiscordPrivacyOptions? privacy = null)
     {
+        var options = privacy ?? DiscordPrivacyOptions.Default;
         var docked = state.Docked;
         var station = state.StationDisplayName;
         var system = state.StarSystem;
         var body = state.Body;
 
-        var stateText = docked && !string.IsNullOrWhiteSpace(station)
-            ? $"Docked at {station}"
-            : BuildExploringState(system, body);
+        string stateText;
+        if (!options.ShowSystem)
+        {
+            // A station or carrier name pins down the system just as surely as the system name does,
+            // so hiding the system hides every location name.
+            stateText = docked ? "Docked"
+                : string.IsNullOrWhiteSpace(system) ? "In the black"
+                : HiddenSystemState;
+        }
+        else
+        {
+            stateText = docked && !string.IsNullOrWhiteSpace(station)
+                ? $"Docked at {station}"
+                : BuildExploringState(system, body);
+        }
 
-        var detailsText = BuildDetails(state);
+        var detailsText = BuildDetails(state, options.ShowCommander);
 
         var largeImageKey = ShipImageKey(state.Ship) ?? DefaultLargeImageKey;
         var largeImageText = state.Ship ?? DefaultLargeImageText;
@@ -45,7 +66,9 @@ public static class DiscordPresenceMapper
         var smallImageText = docked ? "Docked" : "In flight";
 
         var buttons = new List<DiscordPresenceButton> { GetEdNexusButton };
-        if (!string.IsNullOrWhiteSpace(state.Name))
+        // The Inara profile names the commander, and — because EDNexus's own Inara sync uploads
+        // location on every jump and dock — also shows where they are. So it needs both allowed.
+        if (options.ShowCommander && options.ShowSystem && !string.IsNullOrWhiteSpace(state.Name))
             buttons.Add(new DiscordPresenceButton(
                 "View on Inara",
                 $"https://inara.cz/elite/cmdrs/?search={Uri.EscapeDataString(state.Name!)}"));
@@ -57,7 +80,9 @@ public static class DiscordPresenceMapper
             LargeImageText: largeImageText,
             SmallImageKey: smallImageKey,
             SmallImageText: smallImageText,
-            StartedAt: systemEnteredAt ?? sessionStartedAt,
+            // The "in system" timer restarting on every jump would leak jump timing while the system
+            // itself is hidden, so fall back to the session-wide timer.
+            StartedAt: options.ShowSystem ? systemEnteredAt ?? sessionStartedAt : sessionStartedAt,
             Buttons: buttons);
     }
 
@@ -69,7 +94,7 @@ public static class DiscordPresenceMapper
             : $"Exploring {system}";
     }
 
-    private static string? BuildDetails(CommanderState state)
+    private static string? BuildDetails(CommanderState state, bool showCommander)
     {
         // A loaded hold is the more interesting "what are you doing" story than the ship name alone.
         if (state.CargoTons > 0)
@@ -77,7 +102,9 @@ public static class DiscordPresenceMapper
 
         if (string.IsNullOrWhiteSpace(state.Ship)) return null;
 
-        return string.IsNullOrWhiteSpace(state.ShipIdent)
+        // The ship ident is chosen by the commander and routinely tied to them, so it counts as
+        // commander-identifying detail.
+        return !showCommander || string.IsNullOrWhiteSpace(state.ShipIdent)
             ? $"Flying {state.Ship}"
             : $"Flying {state.Ship} ({state.ShipIdent})";
     }

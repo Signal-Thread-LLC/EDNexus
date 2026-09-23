@@ -33,6 +33,12 @@ public sealed class PresenceThrottle
         return true;
     }
 
+    /// <summary>
+    /// Record a send that happened regardless of the window (a user-initiated privacy change), so the
+    /// next automatic update still waits a full interval after it.
+    /// </summary>
+    public void MarkSent() => _lastSentAt = _clock();
+
     /// <summary>How long until a send would be allowed. <see cref="TimeSpan.Zero"/> means "now".</summary>
     public TimeSpan TimeUntilNextSend()
     {

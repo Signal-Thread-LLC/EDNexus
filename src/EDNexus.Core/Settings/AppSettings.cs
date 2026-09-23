@@ -144,6 +144,20 @@ public sealed class DiscordSettings
     public bool Enabled { get; set; } = true;
 
     /// <summary>
+    /// When false, the presence never names the current star system, body, station, or carrier — it
+    /// reads "In flight" / "Docked" instead, so a commander can't be stream-sniped or give away a fresh
+    /// discovery before logging it. The "View on Inara" button is dropped too, since EDNexus's Inara
+    /// sync publishes location there.
+    /// </summary>
+    public bool ShowSystem { get; set; } = true;
+
+    /// <summary>
+    /// When false, the presence carries nothing that identifies the commander: the "View on Inara"
+    /// button (which embeds the commander name) and the ship's custom ident are omitted.
+    /// </summary>
+    public bool ShowCommander { get; set; } = true;
+
+    /// <summary>
     /// Discord application (Client) ID presence is registered under. Override only to point at a
     /// different Discord application (e.g. for local testing); the default is EDNexus's own.
     /// </summary>
