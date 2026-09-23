@@ -39,7 +39,7 @@ public sealed class EngineHost : IDisposable
     private readonly StateTracker _tracker;
     private readonly JournalWatcher? _watcher;
     private readonly ReporterHost? _reporters;
-    private readonly DiscordPresenceService? _discordPresence;
+    private readonly DiscordPresenceController? _discordPresence;
     private readonly TwitchStreamCardService? _twitchCard;
     private readonly StreamStateApiClient? _twitchCardClient;
     private readonly HttpClient _http;
