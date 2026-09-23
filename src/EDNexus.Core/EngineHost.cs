@@ -19,6 +19,7 @@ using EDNexus.Core.Routes;
 using EDNexus.Core.Settings;
 using EDNexus.Core.State;
 using EDNexus.Core.Trade;
+using EDNexus.Core.Twitch;
 using EDNexus.Core.Voice;
 using EliteDangerous.Edsm;
 using EliteDangerous.Galnet;
@@ -39,6 +40,8 @@ public sealed class EngineHost : IDisposable
     private readonly JournalWatcher? _watcher;
     private readonly ReporterHost? _reporters;
     private readonly DiscordPresenceController? _discordPresence;
+    private readonly TwitchStreamCardService? _twitchCard;
+    private readonly StreamStateApiClient? _twitchCardClient;
     private readonly HttpClient _http;
     private Task? _runTask;
 
@@ -70,6 +73,13 @@ public sealed class EngineHost : IDisposable
 
     /// <summary>Prospected-asteroid history for the current mining session.</summary>
     public MiningTracker Mining { get; }
+
+    /// <summary>
+    /// Publishes the commander's state to their Twitch extension for viewers. Null unless the
+    /// commander has logged in to Twitch <em>and</em> switched the stream card on — see
+    /// <c>AppSettings.Twitch</c>. The UI subscribes to it for the "last published" status line.
+    /// </summary>
+    public TwitchStreamCardService? TwitchCard { get; }
 
     /// <summary>
     /// Turns fuel-low, scan-complete, shopping-list-acquired and known-mining-spot moments into spoken callouts. Never
@@ -215,6 +225,30 @@ public sealed class EngineHost : IDisposable
             _discordPresence.Apply(discord);
         }
 
+        // Twitch stream card: publishes the sections the broadcaster opted into to their extension,
+        // via the EBS. Built whenever the app supplies settings, and idle until the commander both
+        // logs in and switches the card on — the token callback below returns null until then, so
+        // logging in mid-session starts it without a restart. Like the reporters and Discord above it
+        // goes silent while developer mode is feeding the bus fabricated events, so sample data never
+        // reaches a live audience.
+        if (settings is not null)
+        {
+            var twitch = settings.Twitch;
+            // Its own client: the shared _http above carries a 20s timeout tuned for Spansh/EDSM
+            // lookups, where a stream card that cannot publish in a few seconds is already stale.
+            _twitchCardClient = new StreamStateApiClient();
+            TwitchCard = _twitchCard = new TwitchStreamCardService(
+                State,
+                new StreamCardSources(Ranks, Exobiology, Mining, this.Missions),
+                _twitchCardClient,
+                // Live callbacks throughout, so a change made in Settings → Twitch takes effect on
+                // the next publish rather than the next launch.
+                updateStateEndpoint: () => new TwitchOAuthOptions { EbsBaseUrl = twitch.EbsBaseUrl }.UpdateStateEndpoint,
+                token: () => twitch.StreamCardEnabled ? twitch.Token : null,
+                visibility: () => twitch.Card.ToVisibility(),
+                isSuppressed: reportingSuppressed);
+        }
+
         if (JournalDirectory is not null)
             _watcher = new JournalWatcher(JournalDirectory, Bus);
     }
@@ -237,6 +271,12 @@ public sealed class EngineHost : IDisposable
     {
         if (_watcher is null) return;
         _watcher.Replay();
+
+        // Now that the commander picture is warm, put it in front of viewers. The card service is
+        // built in the constructor, before any of this has happened, so it deliberately publishes
+        // nothing until asked.
+        _twitchCard?.RequestPublish();
+
         _runTask = Task.Run(() => _watcher.RunAsync(_cts.Token));
     }
 
@@ -250,6 +290,8 @@ public sealed class EngineHost : IDisposable
         catch (AggregateException) { /* best effort */ }
         Radio.Dispose();
         _discordPresence?.Dispose();
+        _twitchCard?.Dispose();
+        _twitchCardClient?.Dispose();
         _cts.Dispose();
         _http.Dispose();
     }

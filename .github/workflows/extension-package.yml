@@ -1,0 +1,93 @@
+name: Twitch extension bundle
+
+# Packages extension/ into the zip Twitch accepts as an extension's hosted asset bundle, so the
+# upload is a download-and-drop rather than a local zip someone has to remember the rules for.
+#
+# Twitch serves the archive's contents directly under the extension's Base URI, so the files must sit
+# at the ROOT of the zip — a wrapping folder would make every viewer path 404.
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+    paths:
+      - 'extension/**'
+      - '.github/workflows/extension-package.yml'
+  pull_request:
+    paths:
+      - 'extension/**'
+      - '.github/workflows/extension-package.yml'
+  workflow_dispatch:
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write        # attaching the bundle to a release on a tag
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Stage the files Twitch serves
+        run: |
+          mkdir -p bundle
+          # dev/ is the local harness — an HTTPS server and a sample payload. Shipping it would
+          # publish a mock-data path to viewers.
+          rsync -a --exclude 'dev/' --exclude 'README.md' extension/ bundle/
+          echo "Bundle contents:"
+          find bundle -type f | sort | sed 's/^/  /'
+
+      - name: Check the bundle is what Twitch expects
+        run: |
+          fail=0
+
+          # Paths configured in the developer console, resolved against the Base URI.
+          for required in video_overlay.html config.html js/state.js js/card.js css/card.css css/config.css; do
+            if [ ! -f "bundle/$required" ]; then
+              echo "::error::missing from the bundle: $required"
+              fail=1
+            fi
+          done
+
+          # The local harness must never reach viewers.
+          if [ -e bundle/dev ]; then
+            echo "::error::dev/ was included; it is the local mock-data harness"
+            fail=1
+          fi
+
+          # Every view needs Twitch's helper or window.Twitch.ext never exists and the view is inert.
+          for view in video_overlay.html config.html; do
+            if ! grep -q 'twitch-ext.min.js' "bundle/$view"; then
+              echo "::error::$view does not load the Twitch helper script"
+              fail=1
+            fi
+          done
+
+          exit $fail
+
+      - name: Zip it
+        run: |
+          # Zip the top-level entries by name rather than ".": Info-ZIP can record "." as a
+          # "./" prefix on every path, and Twitch resolves viewer paths against the archive root.
+          cd bundle && zip -r ../ednexus-twitch-extension.zip * && cd ..
+          echo "Archive:"
+          unzip -l ednexus-twitch-extension.zip | sed 's/^/  /'
+          echo "Size: $(du -h ednexus-twitch-extension.zip | cut -f1)"
+
+      - name: Confirm the views sit at the archive root
+        run: |
+          # A wrapping folder is the classic mistake and only shows up as 404s after upload.
+          unzip -l ednexus-twitch-extension.zip | grep -qE ' video_overlay\.html$' \
+            || { echo "::error::video_overlay.html is not at the root of the archive"; exit 1; }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ednexus-twitch-extension
+          path: ednexus-twitch-extension.zip
+          if-no-files-found: error
+
+      - name: Attach to the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ednexus-twitch-extension.zip

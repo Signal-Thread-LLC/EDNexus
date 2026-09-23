@@ -12,6 +12,9 @@ handshake on the broadcaster's behalf, and issues its own long-lived opaque toke
 desktop client. The desktop app never talks to `*.twitch.tv` directly and never sees a raw Twitch
 access/refresh token — see "OAuth login flow" below.
 
+The extension frontend that consumes these updates lives in [`extension/`](../../extension/README.md),
+along with the payload contract it expects.
+
 ## Running locally
 
 ```sh
@@ -22,6 +25,18 @@ Configuration can be supplied via `appsettings.json`, `appsettings.Development.j
 environment variables, or `dotnet user-secrets` — standard ASP.NET Core configuration precedence
 applies.
 
+**Put the two secrets in user-secrets, not in a file.** `Twitch:ClientSecret` and
+`Twitch:ExtensionSecret` are the credentials that let anyone act as this extension; user-secrets
+keeps them outside the working tree entirely, where no `git add -A` can reach them:
+
+```powershell
+dotnet user-secrets --project src/EDNexus.Ebs set "Twitch:ClientSecret" "<client secret>"
+dotnet user-secrets --project src/EDNexus.Ebs set "Twitch:ExtensionSecret" "<base64 extension secret>"
+```
+
+The client id and extension id are public identifiers — they travel in OAuth URLs and in the
+extension's own frontend — so those are fine in `appsettings.json`.
+
 | Setting | Environment variable | Description |
 |---|---|---|
 | `Twitch:ClientId` | `Twitch__ClientId` | Twitch application Client ID (used for both the OAuth login flow and PubSub). |
@@ -30,7 +45,7 @@ applies.
 | `Twitch:OAuthScopes` | `Twitch__OAuthScopes__0`, `...__1`, ... | Scopes requested from Twitch during login. Default `user:read:email`. |
 | `Twitch:ExtensionId` | `Twitch__ExtensionId` | The Twitch Extension's Client ID. |
 | `Twitch:ExtensionSecret` | `Twitch__ExtensionSecret` | Base64-encoded Extension Secret from the Twitch Developer Console. **Never commit this.** |
-| `Ebs:Port` | `Ebs__Port` | HTTP port Kestrel listens on when `ASPNETCORE_URLS` isn't set. Default `8787`. |
+| `Ebs:Port` | `Ebs__Port` | HTTP port Kestrel listens on when `ASPNETCORE_URLS` isn't set. Default `8787`. Note that a launch profile's `applicationUrl` *is* `ASPNETCORE_URLS`, so running from an IDE takes its port from `Properties/launchSettings.json` and ignores this setting — which is why that file is committed, pinned to 8787 to match the registered OAuth redirect URI. |
 | `Ebs:MaxStatePayloadBytes` | `Ebs__MaxStatePayloadBytes` | Max serialized state size forwarded to PubSub. Default `5000` (Twitch's hard limit is 5 KiB). |
 | `Ebs:UpdateStateRateLimit` / `Ebs:UpdateStateRateLimitWindowSeconds` | `Ebs__UpdateStateRateLimit` / `Ebs__UpdateStateRateLimitWindowSeconds` | Per-channel rate limit applied to `POST /api/update-state`. Default 1 request / 2 seconds. |
 | `Ebs:OAuthSessionTtlMinutes` | `Ebs__OAuthSessionTtlMinutes` | How long a commander has to complete the Twitch consent page before the login session expires. Default 10 minutes. |
@@ -123,9 +138,26 @@ refuses to start against a file from a newer build.
 
 ## Deployment
 
-A `Dockerfile` is included for containerized hosting; the service is also small enough to host on
-a serverless container platform (Azure Container Apps, Fly.io, etc.). Mount a persistent volume at
-`/data` (see [Persistence](#persistence)).
+CI publishes an image to `ghcr.io/signal-thread-llc/ednexus-ebs` on every change to this project,
+and proves the container actually starts and answers `/healthz` before calling the build good — this
+service validates its Twitch configuration at startup, so "the image built" and "the service runs"
+are different claims.
+
+```sh
+cd src/EDNexus.Ebs
+cp .env.example .env        # then fill in ClientSecret and ExtensionSecret
+docker compose up -d
+curl http://localhost:8787/healthz
+```
+
+`docker-compose.yml` is a starting point rather than a finished deployment: it runs the published
+image with the settings from `.env`, and leaves TLS to a reverse proxy (there is a commented Caddy
+service showing the shape). That split matters because Twitch requires the OAuth redirect URI to be
+`https` and to match `Twitch:OAuthRedirectUri` exactly — so the **proxy's** public hostname is what
+gets registered with Twitch, not this container's port.
+
+The service is also small enough to host on a serverless container platform (Azure Container Apps,
+Fly.io, etc.). Wherever it runs, mount a persistent volume at `/data` (see [Persistence](#persistence)).
 
 **Production caveat:** SQLite suits the single EBS instance we deploy. A multi-instance
 (horizontally scaled) deployment needs a shared backing store, e.g. Postgres or Redis, behind

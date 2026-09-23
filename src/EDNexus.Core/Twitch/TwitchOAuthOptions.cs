@@ -8,7 +8,7 @@ namespace EDNexus.Core.Twitch;
 public sealed class TwitchOAuthOptions
 {
     /// <summary>
-    /// Base URL of the EBS instance this app logs into (e.g. <c>https://ebs.ednexus.app</c>, or
+    /// Base URL of the EBS instance this app logs into (e.g. <c>https://ednexus.signal-and-thread.com</c>, or
     /// <c>http://localhost:8787</c> for a local EBS instance).
     /// </summary>
     public required string EbsBaseUrl { get; init; }
@@ -30,4 +30,11 @@ public sealed class TwitchOAuthOptions
 
     /// <summary>The EBS's best-effort logout/revoke endpoint, derived from <see cref="EbsBaseUrl"/>.</summary>
     public string RevokeEndpoint => $"{EbsBaseUrl.TrimEnd('/')}/oauth/revoke";
+
+    /// <summary>
+    /// The EBS's state-publish endpoint, derived from <see cref="EbsBaseUrl"/>. Where
+    /// <see cref="TwitchStreamCardService"/> POSTs each <see cref="StreamCardSnapshot"/> for relay to
+    /// viewers over Twitch Extensions PubSub.
+    /// </summary>
+    public string UpdateStateEndpoint => $"{EbsBaseUrl.TrimEnd('/')}/api/update-state";
 }

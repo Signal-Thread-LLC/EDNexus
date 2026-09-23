@@ -116,6 +116,24 @@ public class OAuthEndpointsTests : IClassFixture<OAuthEndpointsTests.Factory>
     }
 
     [Fact]
+    public async Task Authorize_asks_Twitch_for_each_scope_only_once()
+    {
+        using var client = NoRedirectClient(_factory);
+
+        var response = await client.GetAsync(
+            "/oauth/authorize?redirect_uri=" + Uri.EscapeDataString("http://localhost:59123/callback") +
+            "&state=desktop-state-123&code_challenge=abc-challenge&code_challenge_method=S256");
+
+        var scope = ExtractQueryParam(response.Headers.Location!, "scope");
+        var requested = scope.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+        // The configuration binder appends a bound array onto the options default rather than
+        // replacing it, so a scope named in both arrives twice and Twitch is sent
+        // "user:read:email user:read:email".
+        Assert.Equal(requested.Length, requested.Distinct(StringComparer.OrdinalIgnoreCase).Count());
+    }
+
+    [Fact]
     public async Task Authorize_rejects_a_non_loopback_redirect_uri()
     {
         using var client = NoRedirectClient(_factory);

@@ -73,6 +73,72 @@ public sealed class TwitchSettings
 
     /// <summary>The authenticated Twitch display name, for showing "Logged in as ...".</summary>
     public string? Username { get; set; }
+
+    /// <summary>
+    /// When true — and once <see cref="Token"/> is present — the commander's state is published to
+    /// their extension for viewers to see. Off by default: logging in is not the same as agreeing to
+    /// put your session on screen.
+    /// </summary>
+    public bool StreamCardEnabled { get; set; }
+
+    /// <summary>
+    /// Base URL of the EBS this app logs into and publishes to. Defaults to the hosted instance;
+    /// override it to point at a local EBS while developing the extension.
+    /// </summary>
+    public string EbsBaseUrl { get; set; } = "https://ednexus.signal-and-thread.com";
+
+    /// <summary>Which sections of the commander's picture the broadcaster is willing to show viewers.</summary>
+    public TwitchCardSections Card { get; set; } = new();
+}
+
+/// <summary>
+/// Per-section opt-in for the Twitch stream card. Anything left off is never included in the
+/// published payload at all, so it does not leave the commander's machine — see
+/// <c>EDNexus.Core.Twitch.StreamCardVisibility</c>, which this maps onto.
+/// </summary>
+public sealed class TwitchCardSections
+{
+    /// <summary>Commander name and rank standing.</summary>
+    public bool Commander { get; set; } = true;
+
+    /// <summary>
+    /// The credit balance. Off by default — it is the field commanders most often prefer not to put on
+    /// stream, and a card is still useful without it.
+    /// </summary>
+    public bool Credits { get; set; }
+
+    /// <summary>Hull, fuel and hold.</summary>
+    public bool Ship { get; set; } = true;
+
+    /// <summary>System, body and docked station.</summary>
+    public bool Location { get; set; } = true;
+
+    /// <summary>The commander's own fleet carrier and any booked jump.</summary>
+    public bool Carrier { get; set; } = true;
+
+    /// <summary>Sampling progress and unsold Vista Genomics data.</summary>
+    public bool Exobiology { get; set; } = true;
+
+    /// <summary>The last prospected rock and this session's yield.</summary>
+    public bool Mining { get; set; } = true;
+
+    /// <summary>Held missions and massacre stacks.</summary>
+    public bool Missions { get; set; } = true;
+
+    /// <summary>The manifest of the hold.</summary>
+    public bool Cargo { get; set; } = true;
+
+    /// <summary>Projects these flags onto the mapper's own visibility record.</summary>
+    public Twitch.StreamCardVisibility ToVisibility() => new(
+        Commander: Commander,
+        Credits: Credits,
+        Ship: Ship,
+        Location: Location,
+        Carrier: Carrier,
+        Exobiology: Exobiology,
+        Mining: Mining,
+        Missions: Missions,
+        Cargo: Cargo);
 }
 
 /// <summary>

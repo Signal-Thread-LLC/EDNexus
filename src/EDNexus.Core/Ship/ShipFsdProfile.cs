@@ -18,7 +18,8 @@ public sealed record ShipFsdProfile(
     double FuelPower,
     double MaxFuelPerJump,
     double RangeBoost,
-    double CargoCapacity)
+    double CargoCapacity,
+    double MaxJumpRange = 0)
 {
     /// <summary>
     /// Build a profile from a <c>Loadout</c> event, or null if the drive can't be identified (no FSD
@@ -64,7 +65,11 @@ public sealed record ShipFsdProfile(
             FuelPower: d.FuelPower,
             MaxFuelPerJump: engineeredMaxFuel ?? d.MaxFuelPerJump,
             RangeBoost: rangeBoost,
-            CargoCapacity: loadout.GetDouble("CargoCapacity") ?? 0);
+            CargoCapacity: loadout.GetDouble("CargoCapacity") ?? 0,
+            // The game's own headline figure for this build. Taken verbatim rather than derived:
+            // JumpRangeAt() below models the drive for the route plotter and deliberately ignores the
+            // Guardian booster, so it is not the number to show a commander.
+            MaxJumpRange: loadout.GetDouble("MaxJumpRange") ?? 0);
     }
 
     /// <summary>

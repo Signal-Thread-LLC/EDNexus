@@ -3,7 +3,9 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using Avalonia.Threading;
 using EDNexus.Core.Settings;
+using EDNexus.Core.Twitch;
 using System.Diagnostics;
 using System.IO;
 
@@ -56,7 +58,7 @@ public partial class SettingsWindow : Window
         FuelLowToggle.IsChecked = !boot.Settings.Voice.DisabledCallouts.Contains(nameof(EDNexus.Core.Voice.VoiceCalloutKind.FuelLow));
         ScanCompleteToggle.IsChecked = !boot.Settings.Voice.DisabledCallouts.Contains(nameof(EDNexus.Core.Voice.VoiceCalloutKind.ScanComplete));
         ShoppingListToggle.IsChecked = !boot.Settings.Voice.DisabledCallouts.Contains(nameof(EDNexus.Core.Voice.VoiceCalloutKind.ShoppingListItemAcquired));
-
+        LoadTwitch(boot.Settings.Twitch);
         DiscordToggle.IsChecked = boot.Settings.Discord.Enabled;
         DiscordShowSystemToggle.IsChecked = boot.Settings.Discord.ShowSystem;
         DiscordShowCommanderToggle.IsChecked = boot.Settings.Discord.ShowCommander;
@@ -173,6 +175,14 @@ public partial class SettingsWindow : Window
                 VoiceNameCombo.SelectedItem as string,
                 (int)VoiceVolumeSlider.Value,
                 DisabledCalloutNames());
+            _boot.ApplyTwitchChoice(
+                TwitchCardToggle.IsChecked == true,
+                TwitchSectionsFromToggles(),
+                TwitchEbsBox.Text);
+            // Switching the card on (or changing which sections show) changes what viewers should
+            // see without touching the commander picture, so the publisher has nothing to react to —
+            // and with the game closed no journal event is coming to nudge it. Ask directly.
+            _dashboard?.TwitchCard?.RequestPublish();
             _boot.ApplyDiscordChoice(
                 DiscordToggle.IsChecked == true,
                 DiscordShowSystemToggle.IsChecked == true,
@@ -274,6 +284,221 @@ public partial class SettingsWindow : Window
         {
             CheckNowButton.IsEnabled = true;
         }
+    }
+
+    // --- Twitch stream card ---
+
+    /// <summary>
+    /// Cancels an in-flight sign-in when the dialog closes, so the loopback listener and the browser
+    /// wait do not outlive the window that started them.
+    /// </summary>
+    private CancellationTokenSource? _twitchLogin;
+
+    private void LoadTwitch(TwitchSettings twitch)
+    {
+        TwitchCardToggle.IsChecked = twitch.StreamCardEnabled;
+
+        var card = twitch.Card;
+        TwitchCommanderToggle.IsChecked = card.Commander;
+        TwitchCreditsToggle.IsChecked = card.Credits;
+        TwitchShipToggle.IsChecked = card.Ship;
+        TwitchLocationToggle.IsChecked = card.Location;
+        TwitchCarrierToggle.IsChecked = card.Carrier;
+        TwitchExobioToggle.IsChecked = card.Exobiology;
+        TwitchMiningToggle.IsChecked = card.Mining;
+        TwitchMissionsToggle.IsChecked = card.Missions;
+        TwitchCargoToggle.IsChecked = card.Cargo;
+
+        // Blank rather than the literal default, so the placeholder does the explaining and saving an
+        // untouched box doesn't pin the commander to today's hosted URL.
+        TwitchEbsBox.Text = string.Equals(twitch.EbsBaseUrl, new TwitchSettings().EbsBaseUrl, StringComparison.OrdinalIgnoreCase)
+            ? string.Empty
+            : twitch.EbsBaseUrl;
+
+        UpdateTwitchAccountLine();
+        UpdateTwitchPreview();
+
+        if (_dashboard?.TwitchCard is { } card2)
+        {
+            // Publishing happens on a background pump; hop to the UI thread to report it.
+            card2.PublishCompleted += OnTwitchPublishCompleted;
+            card2.ReauthRequired += OnTwitchReauthRequired;
+        }
+    }
+
+    /// <summary>Reflects the live section toggles into the record the mapper reads.</summary>
+    private TwitchCardSections TwitchSectionsFromToggles() => new()
+    {
+        Commander = TwitchCommanderToggle.IsChecked == true,
+        Credits = TwitchCreditsToggle.IsChecked == true,
+        Ship = TwitchShipToggle.IsChecked == true,
+        Location = TwitchLocationToggle.IsChecked == true,
+        Carrier = TwitchCarrierToggle.IsChecked == true,
+        Exobiology = TwitchExobioToggle.IsChecked == true,
+        Mining = TwitchMiningToggle.IsChecked == true,
+        Missions = TwitchMissionsToggle.IsChecked == true,
+        Cargo = TwitchCargoToggle.IsChecked == true,
+    };
+
+    private void UpdateTwitchAccountLine()
+    {
+        if (_boot is null) return;
+
+        var session = _boot.Twitch.State;
+        TwitchAccountLine.Text = session.LoggedIn
+            ? $"Signed in as {session.Username ?? "(unknown)"}."
+            : "Not signed in.";
+        TwitchLoginButton.Content = session.LoggedIn ? "Sign in again" : "Sign in with Twitch";
+        TwitchLogoutButton.IsVisible = session.LoggedIn;
+
+        // The card cannot publish without a session, so say so rather than letting the toggle look
+        // like it is doing something.
+        TwitchCardToggle.IsEnabled = session.LoggedIn;
+        if (!session.LoggedIn && TwitchCardToggle.IsChecked == true) TwitchCardToggle.IsChecked = false;
+    }
+
+    /// <summary>
+    /// Renders the snapshot that would go out right now, straight from the publisher's own mapper, so
+    /// the preview cannot drift from what viewers actually get.
+    /// </summary>
+    private void UpdateTwitchPreview()
+    {
+        if (_dashboard?.TwitchCard is not { } card)
+        {
+            TwitchPreview.Text = "No engine is running, so there is nothing to preview yet.";
+            return;
+        }
+
+        // Previewing the *saved* visibility would be misleading while the commander is still ticking
+        // boxes, so map against what the toggles say right now.
+        TwitchPreview.Text = DescribeSnapshot(card.Preview(TwitchSectionsFromToggles().ToVisibility()));
+    }
+
+    private static string DescribeSnapshot(StreamCardSnapshot snapshot)
+    {
+        var lines = new List<string> { snapshot.Headline };
+        if (!string.IsNullOrWhiteSpace(snapshot.Subline)) lines.Add(snapshot.Subline!);
+
+        var shown = new List<string>();
+        if (snapshot.Commander is not null) shown.Add(snapshot.Commander.Credits is null ? "commander" : "commander + credits");
+        if (snapshot.Ship is not null) shown.Add("ship");
+        if (snapshot.Location is not null) shown.Add("location");
+        if (snapshot.Carrier is not null) shown.Add("fleet carrier");
+        if (snapshot.Exobiology is not null) shown.Add("exobiology");
+        if (snapshot.Mining is not null) shown.Add("mining");
+        if (snapshot.Missions is not null) shown.Add("missions");
+        if (snapshot.Cargo is not null) shown.Add($"cargo ({snapshot.Cargo.Count})");
+
+        lines.Add("");
+        lines.Add(shown.Count > 0
+            ? "Sections: " + string.Join(", ", shown)
+            : "Sections: none — viewers would see only the line above.");
+        return string.Join(Environment.NewLine, lines);
+    }
+
+    private void OnTwitchRefreshPreview(object? sender, RoutedEventArgs e) => UpdateTwitchPreview();
+
+    /// <summary>A section toggle only changes the preview; it is persisted on Save like everything else.</summary>
+    private void OnTwitchSectionToggled(object? sender, RoutedEventArgs e) => UpdateTwitchPreview();
+
+    private void OnTwitchCardToggled(object? sender, RoutedEventArgs e) => UpdateTwitchPreview();
+
+    private async void OnTwitchLogin(object? sender, RoutedEventArgs e)
+    {
+        if (_boot is null) return;
+
+        _twitchLogin?.Cancel();
+        _twitchLogin = new CancellationTokenSource();
+
+        TwitchLoginButton.IsEnabled = false;
+        ShowTwitchAuthStatus("Waiting for you to approve EDNexus in your browser…");
+        try
+        {
+            var result = await _boot.Twitch.LoginAsync(_twitchLogin.Token);
+            ShowTwitchAuthStatus(result.Status switch
+            {
+                TwitchAuthStatus.Success => $"Signed in as {result.Username}.",
+                TwitchAuthStatus.Denied => "Sign-in was declined on Twitch.",
+                TwitchAuthStatus.Timeout => "Sign-in timed out — the browser page was never completed.",
+                TwitchAuthStatus.Cancelled => "Sign-in cancelled.",
+                _ => $"Sign-in failed: {result.Error}",
+            });
+
+            // A successful sign-in is the one moment where turning the card on is what the commander
+            // came here to do — but it is still their call, so only the toggle is unlocked.
+            UpdateTwitchAccountLine();
+            UpdateTwitchPreview();
+            // If the card was already switched on, the new token is what was missing: publish now
+            // rather than waiting for the next journal event.
+            if (result.IsSuccess) _dashboard?.TwitchCard?.RequestPublish();
+        }
+        catch (Exception ex)
+        {
+            ShowTwitchAuthStatus($"Sign-in failed: {ex.Message}");
+        }
+        finally
+        {
+            TwitchLoginButton.IsEnabled = true;
+        }
+    }
+
+    private async void OnTwitchLogout(object? sender, RoutedEventArgs e)
+    {
+        if (_boot is null) return;
+
+        TwitchLogoutButton.IsEnabled = false;
+        try
+        {
+            await _boot.Twitch.LogoutAsync();
+            // Signing out must also stop publishing, or the card would keep going on the next login.
+            TwitchCardToggle.IsChecked = false;
+            _boot.ApplyTwitchChoice(false, TwitchSectionsFromToggles(), TwitchEbsBox.Text);
+            ShowTwitchAuthStatus("Signed out.");
+            UpdateTwitchAccountLine();
+            UpdateTwitchPreview();
+        }
+        finally
+        {
+            TwitchLogoutButton.IsEnabled = true;
+        }
+    }
+
+    private void ShowTwitchAuthStatus(string message)
+    {
+        TwitchAuthLine.Text = message;
+        TwitchAuthLine.IsVisible = true;
+    }
+
+    private void OnTwitchPublishCompleted(StreamStatePublishResult result) =>
+        Dispatcher.UIThread.Post(() =>
+        {
+            TwitchPublishStatus.Text = result.Status switch
+            {
+                StreamStatePublishStatus.Published => $"Last published at {DateTime.Now:HH:mm:ss}.",
+                StreamStatePublishStatus.Unauthorized => "The backend rejected this machine's credential — sign in again.",
+                StreamStatePublishStatus.TooLarge => "The last card was too large for Twitch — try hiding a section.",
+                StreamStatePublishStatus.RateLimited => "Publishing is being rate-limited; updates are slowing down.",
+                _ => $"Could not publish: {result.Error}",
+            };
+        });
+
+    private void OnTwitchReauthRequired() =>
+        Dispatcher.UIThread.Post(() =>
+        {
+            ShowTwitchAuthStatus("Your Twitch authorization is no longer valid — sign in again to resume.");
+            UpdateTwitchAccountLine();
+        });
+
+    protected override void OnClosed(EventArgs e)
+    {
+        _twitchLogin?.Cancel();
+        _twitchLogin?.Dispose();
+        if (_dashboard?.TwitchCard is { } card)
+        {
+            card.PublishCompleted -= OnTwitchPublishCompleted;
+            card.ReauthRequired -= OnTwitchReauthRequired;
+        }
+        base.OnClosed(e);
     }
 
     // --- Dashboard layout ---

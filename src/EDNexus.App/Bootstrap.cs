@@ -2,6 +2,7 @@ using System.Globalization;
 using EDNexus.App.Telemetry;
 using EDNexus.Core.Mining;
 using EDNexus.Core.Settings;
+using EDNexus.Core.Twitch;
 using IOverlay = EDNexus.Core.Overlay.IOverlay;
 using IVoice = EDNexus.Core.Voice.IVoice;
 
@@ -23,11 +24,19 @@ public sealed class Bootstrap
     /// <summary>Spoken callouts — Windows SAPI, or a no-op elsewhere.</summary>
     public IVoice Voice { get; } = Services.Voice.VoiceFactory.Create();
 
+    /// <summary>
+    /// The desktop side of the Twitch login flow. Standalone — it talks only to the EBS, and only
+    /// when the commander presses Log in. Rebuilt whenever the configured EBS changes, since the
+    /// endpoints it calls are derived from that base URL.
+    /// </summary>
+    public TwitchAuthService Twitch { get; private set; }
+
     public Bootstrap(SettingsStore store, AppSettings settings, CrashReporting crash)
     {
         Store = store;
         Settings = settings;
         Crash = crash;
+        Twitch = BuildTwitchAuth();
 
         // Apply the saved voice choice up front so the very first callout already uses it.
         Voice.SetVoice(Settings.Voice.VoiceName);
@@ -220,4 +229,43 @@ public sealed class Bootstrap
         Voice.SetVoice(Settings.Voice.VoiceName);
         Voice.SetVolume(Settings.Voice.Volume);
     }
+
+    /// <summary>
+    /// Persist the Twitch stream-card choices. The engine's publisher reads all of these live, so a
+    /// change takes effect on its next publish rather than the next launch.
+    /// </summary>
+    /// <param name="enabled">Whether to publish to viewers at all.</param>
+    /// <param name="sections">Which sections the broadcaster agrees to show.</param>
+    /// <param name="ebsBaseUrl">
+    /// The EBS to publish to and log in against. Blank restores the shipped default rather than
+    /// leaving the app with no endpoint at all.
+    /// </param>
+    public void ApplyTwitchChoice(bool enabled, TwitchCardSections sections, string? ebsBaseUrl)
+    {
+        var trimmed = (ebsBaseUrl ?? string.Empty).Trim().TrimEnd('/');
+        var previousBaseUrl = Settings.Twitch.EbsBaseUrl;
+
+        Settings.Twitch.StreamCardEnabled = enabled;
+        Settings.Twitch.Card = sections;
+        Settings.Twitch.EbsBaseUrl = trimmed.Length > 0 ? trimmed : new TwitchSettings().EbsBaseUrl;
+        Store.Save(Settings);
+
+        if (!string.Equals(previousBaseUrl, Settings.Twitch.EbsBaseUrl, StringComparison.OrdinalIgnoreCase))
+        {
+            // A token minted by one EBS means nothing to another, so pointing at a different instance
+            // ends the session rather than leaving the UI claiming to be signed in while every publish
+            // comes back 401. Cleared locally only — the old EBS may not even be reachable.
+            Settings.Twitch.Token = null;
+            Settings.Twitch.ChannelId = null;
+            Settings.Twitch.Username = null;
+            Store.Save(Settings);
+
+            // The auth service derives its endpoints from the base URL at construction, so a changed
+            // EBS needs a new one — otherwise the next sign-in would still go to the old instance.
+            Twitch = BuildTwitchAuth();
+        }
+    }
+
+    private TwitchAuthService BuildTwitchAuth() =>
+        new(Settings, Store, new TwitchOAuthOptions { EbsBaseUrl = Settings.Twitch.EbsBaseUrl });
 }
