@@ -155,8 +155,9 @@ public static class PluginPackage
     }
 
     /// <summary>
-    /// Reads the "total entries" field from the zip's End Of Central Directory record (following
-    /// the Zip64 locator when the classic field is saturated), without parsing the directory.
+    /// Reads the "total entries" field from the zip's End Of Central Directory record, without
+    /// parsing the directory. Like <see cref="ZipArchive"/>, it follows the Zip64 locator when
+    /// the disk number, entry count, or central-directory offset is saturated.
     /// Returns <see langword="null"/> when no unambiguous EOCD record is found: none at all, or
     /// the last one's comment length doesn't end exactly at the end of the stream (a decoy
     /// signature inside the comment, or trailing bytes). Callers must reject the package then.
@@ -167,8 +168,6 @@ public static class PluginPackage
         const int EocdSize = 22;
         const int MaxCommentLength = ushort.MaxValue;
         const uint EocdSignature = 0x06054B50;
-        const uint Zip64LocatorSignature = 0x07064B50;
-        const uint Zip64EocdSignature = 0x06064B50;
 
         var origin = stream.Position;
         try
@@ -194,30 +193,24 @@ public static class PluginPackage
                 if (BinaryPrimitives.ReadUInt16LittleEndian(tail.AsSpan(i + 20)) != tailLength - i - EocdSize)
                     return null;
 
+                var diskNumber = BinaryPrimitives.ReadUInt16LittleEndian(tail.AsSpan(i + 4));
                 long count = BinaryPrimitives.ReadUInt16LittleEndian(tail.AsSpan(i + 10));
-                if (count != ushort.MaxValue)
+                var directoryOffset = BinaryPrimitives.ReadUInt32LittleEndian(tail.AsSpan(i + 16));
+
+                // Follow the Zip64 record under exactly the conditions ZipArchive does — any of
+                // these fields saturated — so both readers settle on the same entry count.
+                var zip64Signalled = diskNumber == ushort.MaxValue
+                    || count == ushort.MaxValue
+                    || directoryOffset == uint.MaxValue;
+                if (!zip64Signalled)
                     return count;
 
-                // Zip64: a 20-byte locator sits immediately before the EOCD record.
-                var eocdPosition = length - tailLength + i;
-                if (eocdPosition < 20)
-                    return count;
-                var locator = new byte[20];
-                stream.Position = eocdPosition - 20;
-                stream.ReadExactly(locator);
-                if (BinaryPrimitives.ReadUInt32LittleEndian(locator) != Zip64LocatorSignature)
-                    return count;
-
-                var zip64Position = BinaryPrimitives.ReadUInt64LittleEndian(locator.AsSpan(8));
-                if (zip64Position > (ulong)(length - 56))
-                    return long.MaxValue; // points outside the file: treat as hostile
-                var zip64 = new byte[56];
-                stream.Position = (long)zip64Position;
-                stream.ReadExactly(zip64);
-                if (BinaryPrimitives.ReadUInt32LittleEndian(zip64) != Zip64EocdSignature)
-                    return long.MaxValue;
-                var total = BinaryPrimitives.ReadUInt64LittleEndian(zip64.AsSpan(32));
-                return total > long.MaxValue ? long.MaxValue : (long)total;
+                var zip64Count = TryReadZip64EntryCount(stream, length, length - tailLength + i);
+                if (zip64Count is not null)
+                    return zip64Count;
+                // No readable Zip64 record: the classic count stands unless it is itself the
+                // "see Zip64" placeholder, in which case the true count is unknowable.
+                return count != ushort.MaxValue ? count : null;
             }
             return null;
         }
@@ -225,6 +218,40 @@ public static class PluginPackage
         {
             stream.Position = origin;
         }
+    }
+
+    /// <summary>
+    /// Reads the total entry count from the Zip64 End Of Central Directory record, located via
+    /// the 20-byte Zip64 locator immediately before the classic EOCD at
+    /// <paramref name="eocdPosition"/>. Returns <see langword="null"/> when there is no locator
+    /// or the record it points at is missing, out of range, or has the wrong signature.
+    /// </summary>
+    private static long? TryReadZip64EntryCount(Stream stream, long length, long eocdPosition)
+    {
+        const uint Zip64LocatorSignature = 0x07064B50;
+        const uint Zip64EocdSignature = 0x06064B50;
+        const int LocatorSize = 20;
+        const int Zip64EocdMinSize = 56;
+
+        if (eocdPosition < LocatorSize)
+            return null;
+        var locator = new byte[LocatorSize];
+        stream.Position = eocdPosition - LocatorSize;
+        stream.ReadExactly(locator);
+        if (BinaryPrimitives.ReadUInt32LittleEndian(locator) != Zip64LocatorSignature)
+            return null;
+
+        var zip64Position = BinaryPrimitives.ReadUInt64LittleEndian(locator.AsSpan(8));
+        if (length < Zip64EocdMinSize || zip64Position > (ulong)(length - Zip64EocdMinSize))
+            return null;
+        var zip64 = new byte[Zip64EocdMinSize];
+        stream.Position = (long)zip64Position;
+        stream.ReadExactly(zip64);
+        if (BinaryPrimitives.ReadUInt32LittleEndian(zip64) != Zip64EocdSignature)
+            return null;
+
+        var total = BinaryPrimitives.ReadUInt64LittleEndian(zip64.AsSpan(32));
+        return total > long.MaxValue ? long.MaxValue : (long)total;
     }
 
     private sealed record Analysis(

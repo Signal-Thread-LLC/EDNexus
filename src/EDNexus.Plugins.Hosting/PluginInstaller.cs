@@ -186,9 +186,16 @@ public static class PluginInstaller
         foreach (var (path, id) in backups)
         {
             var target = Path.Combine(root, id!);
-            if (System.IO.Directory.Exists(target) || File.Exists(target))
+            if (System.IO.Directory.Exists(target))
             {
                 Remove(path); // the replacement completed; this is the superseded version
+                continue;
+            }
+            if (File.Exists(target))
+            {
+                // A stray file is not proof the replace finished, and this may be the only copy
+                // of the plugin: keep the backup and let the user sort it out.
+                errors.Add($"could not restore '{path}': a file is in the way at '{target}'; the backup was kept");
                 continue;
             }
 

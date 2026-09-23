@@ -193,6 +193,27 @@ public class PluginInstallerTests(Xunit.Abstractions.ITestOutputHelper output)
     }
 
     [Fact]
+    public void RecoverInterrupted_StrayFileAtTarget_KeepsTheBackupAndReportsIt()
+    {
+        using var dir = new TempDir();
+        var root = Path.Combine(dir.Path, "plugins");
+        var backup = Path.Combine(root, PluginInstaller.BackupName(Id));
+        Directory.CreateDirectory(backup);
+        File.WriteAllText(Path.Combine(backup, "v1.txt"), "only copy");
+        File.WriteAllText(Path.Combine(root, Id), "stray file, not a plugin folder");
+
+        var recovery = PluginInstaller.RecoverInterrupted(root);
+
+        Assert.Empty(recovery.Restored);
+        Assert.Empty(recovery.Removed);
+        var error = Assert.Single(recovery.Errors);
+        Assert.Contains("a file is in the way", error);
+        Assert.Contains(backup, error);
+        Assert.Equal("only copy", File.ReadAllText(Path.Combine(backup, "v1.txt")));
+        Assert.Equal("stray file, not a plugin folder", File.ReadAllText(Path.Combine(root, Id)));
+    }
+
+    [Fact]
     public void RecoverInterrupted_LeavesUnrelatedFoldersAlone()
     {
         using var dir = new TempDir();

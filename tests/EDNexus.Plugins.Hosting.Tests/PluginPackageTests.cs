@@ -482,6 +482,79 @@ public class PluginPackageTests
         Assert.False(Inspect(zip, new PluginPackageLimits { MaxEntries = 2 }).IsValid);
     }
 
+    [Theory]
+    [InlineData(ClassicField.CentralDirectoryOffset, 5)]
+    [InlineData(ClassicField.DiskNumber, 5)]
+    [InlineData(ClassicField.EntryCount, ushort.MaxValue)]
+    public void ReadDeclaredEntryCount_FollowsZip64_WhenAnyTriggerFieldIsSaturated(ClassicField saturated, ushort classicCount)
+    {
+        // The classic record claims few entries (or the Zip64 placeholder); the Zip64 record that
+        // ZipArchive would follow says 2502.
+        var zip = WithZip64Record(Valid(), classicCount, zip64Count: 2502, saturated, includeZip64: true);
+
+        Assert.Equal(2502, PluginPackage.ReadDeclaredEntryCount(new MemoryStream(zip)));
+        AssertRejected(Inspect(zip), "declares 2502 entries");
+    }
+
+    [Theory]
+    [InlineData(ClassicField.CentralDirectoryOffset)]
+    [InlineData(ClassicField.DiskNumber)]
+    public void ReadDeclaredEntryCount_SaturatedFieldWithoutZip64Record_FallsBackToClassicCount(ClassicField saturated)
+    {
+        var zip = WithZip64Record(Valid(), classicCount: 5, zip64Count: 0, saturated, includeZip64: false);
+        Assert.Equal(5, PluginPackage.ReadDeclaredEntryCount(new MemoryStream(zip)));
+    }
+
+    [Fact]
+    public void ReadDeclaredEntryCount_SaturatedCountWithoutZip64Record_IsUnknowable()
+    {
+        var zip = WithZip64Record(Valid(), classicCount: ushort.MaxValue, zip64Count: 0, ClassicField.EntryCount, includeZip64: false);
+
+        Assert.Null(PluginPackage.ReadDeclaredEntryCount(new MemoryStream(zip)));
+        AssertRejected(Inspect(zip), "no unambiguous end of central directory record");
+    }
+
+    public enum ClassicField { DiskNumber, EntryCount, CentralDirectoryOffset }
+
+    /// <summary>
+    /// Rewrites the classic EOCD (count, one saturated trigger field) and, optionally, splices a
+    /// Zip64 EOCD record + locator in front of it. Only the fields ReadDeclaredEntryCount reads
+    /// are meaningful; the result is not a fully consistent archive.
+    /// </summary>
+    private static byte[] WithZip64Record(byte[] zip, ushort classicCount, ulong zip64Count, ClassicField saturated, bool includeZip64)
+    {
+        var eocd = -1;
+        for (var i = zip.Length - 22; i >= 0 && eocd < 0; i--)
+            if (BinaryPrimitives.ReadUInt32LittleEndian(zip.AsSpan(i)) == 0x06054B50) eocd = i;
+        Assert.True(eocd >= 0, "no EOCD record");
+
+        var classic = zip[eocd..].ToArray();
+        BinaryPrimitives.WriteUInt16LittleEndian(classic.AsSpan(8), classicCount);
+        BinaryPrimitives.WriteUInt16LittleEndian(classic.AsSpan(10), classicCount);
+        switch (saturated)
+        {
+            case ClassicField.DiskNumber: BinaryPrimitives.WriteUInt16LittleEndian(classic.AsSpan(4), ushort.MaxValue); break;
+            case ClassicField.CentralDirectoryOffset: BinaryPrimitives.WriteUInt32LittleEndian(classic.AsSpan(16), uint.MaxValue); break;
+            case ClassicField.EntryCount: break; // already saturated by the caller's classicCount
+        }
+
+        if (!includeZip64)
+            return [.. zip[..eocd], .. classic];
+
+        var record = new byte[56];
+        BinaryPrimitives.WriteUInt32LittleEndian(record, 0x06064B50);
+        BinaryPrimitives.WriteUInt64LittleEndian(record.AsSpan(4), 44);          // size of the rest of the record
+        BinaryPrimitives.WriteUInt64LittleEndian(record.AsSpan(24), zip64Count); // entries on this disk
+        BinaryPrimitives.WriteUInt64LittleEndian(record.AsSpan(32), zip64Count); // total entries
+
+        var locator = new byte[20];
+        BinaryPrimitives.WriteUInt32LittleEndian(locator, 0x07064B50);
+        BinaryPrimitives.WriteUInt64LittleEndian(locator.AsSpan(8), (ulong)eocd); // record sits where the EOCD was
+        BinaryPrimitives.WriteUInt32LittleEndian(locator.AsSpan(16), 1);
+
+        return [.. zip[..eocd], .. record, .. locator, .. classic];
+    }
+
     // --- Helpers ---------------------------------------------------------------------------------
 
     private static void SetEocdEntryCount(byte[] zip, ushort count)
