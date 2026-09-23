@@ -2,6 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:EDNexus.App.ViewModels"
         xmlns:controls="clr-namespace:EDNexus.App.Controls"
+        xmlns:radio="clr-namespace:EDNexus.Core.Radio;assembly=EDNexus.Core"
         x:Class="EDNexus.App.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Title="EDNexus — Commander Console"
@@ -111,6 +112,36 @@
       <Setter Property="CornerRadius" Value="4" />
       <Setter Property="FontSize" Value="12" />
     </Style>
+    <!-- Space Radio: the status badge picks its colour from the playback state, and the LIVE dot
+         pulses while audio is actually playing. -->
+    <Style Selector="TextBlock.radioStatus">
+      <Setter Property="Foreground" Value="{StaticResource InkDim}" />
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="LetterSpacing" Value="2" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="TextBlock.radioStatus.live">
+      <Setter Property="Foreground" Value="{StaticResource Good}" />
+    </Style>
+    <Style Selector="TextBlock.radioStatus.buffering">
+      <Setter Property="Foreground" Value="{StaticResource AmberBrush}" />
+    </Style>
+    <Style Selector="TextBlock.radioStatus.error">
+      <Setter Property="Foreground" Value="{StaticResource Bad}" />
+    </Style>
+    <Style Selector="Border.liveDot">
+      <Style.Animations>
+        <Animation Duration="0:0:0.9" IterationCount="INFINITE" PlaybackDirection="Alternate">
+          <KeyFrame Cue="0%">
+            <Setter Property="Opacity" Value="1" />
+          </KeyFrame>
+          <KeyFrame Cue="100%">
+            <Setter Property="Opacity" Value="0.2" />
+          </KeyFrame>
+        </Animation>
+      </Style.Animations>
+    </Style>
   </Window.Styles>
 
   <DockPanel LastChildFill="True">
@@ -131,8 +162,10 @@
                     HorizontalAlignment="Right" VerticalAlignment="Center">
 
           <!-- Compact radio transport: previous / play-pause / next, with the tuned station name
-               underneath. Deliberately not a dashboard card — this is meant to stay reachable from
-               anywhere, the same way the physical media keys it'll eventually wire up to (#124) do. -->
+               underneath. Kept in the title bar so it stays reachable from anywhere, the same way the
+               physical media keys it'll eventually wire up to (#124) do; the Space Radio card has the
+               full player (station picker, volume, mute). Drives the same player as the card: the
+               simulation while developer mode is on, tagged SIM. -->
           <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center"
                       ToolTip.Tip="{Binding RadioTooltip}">
             <Button Command="{Binding RadioPreviousCommand}" Content="⏮" FontSize="13"
@@ -150,6 +183,12 @@
             <TextBlock Text="{Binding RadioStationName}" Foreground="{StaticResource InkDim}"
                        FontSize="11" VerticalAlignment="Center" MaxWidth="120"
                        TextTrimming="CharacterEllipsis" Margin="6,0,0,0" />
+            <Border IsVisible="{Binding RadioIsSimulated}" Background="#1E1712" CornerRadius="4"
+                    Padding="4,1" Margin="4,0,0,0" VerticalAlignment="Center"
+                    ToolTip.Tip="{Binding RadioSimTooltip}">
+              <TextBlock Text="SIM" FontSize="10" FontWeight="SemiBold" LetterSpacing="1"
+                         Foreground="{StaticResource AmberBrush}" />
+            </Border>
           </StackPanel>
 
           <StackPanel VerticalAlignment="Center">
@@ -1507,6 +1546,84 @@
                     <Button Grid.Column="3" Classes="mini" Content="Read all"
                             Command="{Binding OpenReaderCommand}"
                             ToolTip.Tip="Open the Galnet reader in its own window" />
+                  </Grid>
+                </StackPanel>
+              </StackPanel>
+            </Border>
+          </DataTemplate>
+
+          <!-- Space Radio — the full player: status (pulsing LIVE dot, BUFFERING, OFFLINE with the
+               reason), transport, station picker and volume/mute. In developer mode it and the title bar
+               drive an in-memory simulation (tagged SIMULATED) that the 🎲 steps through every state; no audio. -->
+          <DataTemplate DataType="vm:RadioCardViewModel">
+            <Border Classes="card">
+              <StackPanel>
+                <Grid ColumnDefinitions="*,Auto,Auto,Auto">
+                  <TextBlock Grid.Column="0" Classes="cardHeader" Text="{Binding Title}" />
+                  <Border Grid.Column="1" IsVisible="{Binding IsSimulated}" Background="#1E1712"
+                          CornerRadius="4" Padding="6,1" Margin="0,0,8,0" VerticalAlignment="Top"
+                          ToolTip.Tip="Developer mode: this card shows a simulated player. No audio plays and nothing is saved.">
+                    <TextBlock Text="SIMULATED" FontSize="10" FontWeight="SemiBold" LetterSpacing="1"
+                               Foreground="{StaticResource AmberBrush}" />
+                  </Border>
+                  <Button Grid.Column="2" Classes="dice" Content="🎲" Margin="0,0,6,0"
+                          IsVisible="{Binding $parent[ItemsControl].((vm:MainWindowViewModel)DataContext).DevMode}"
+                          Command="{Binding $parent[ItemsControl].((vm:MainWindowViewModel)DataContext).RandomizeCardCommand}"
+                          CommandParameter="{Binding Id}" />
+                  <Button Grid.Column="3" Classes="collapse" Content="{Binding CollapseGlyph}"
+                          Command="{Binding ToggleCollapseCommand}" />
+                </Grid>
+                <StackPanel IsVisible="{Binding !IsCollapsed}">
+
+                  <!-- Status: badge + the station blurb, the error, or a hint. -->
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Border Classes="liveDot" Width="8" Height="8" CornerRadius="4"
+                            Background="{StaticResource Bad}" VerticalAlignment="Center"
+                            IsVisible="{Binding IsLive}" />
+                    <TextBlock Classes="radioStatus" Text="{Binding StatusLabel}"
+                               Classes.live="{Binding IsLive}" Classes.buffering="{Binding IsBuffering}"
+                               Classes.error="{Binding IsError}" />
+                  </StackPanel>
+                  <TextBlock Classes="label" Text="{Binding StatusDetail}" TextWrapping="Wrap" Margin="0,4,0,0" />
+
+                  <!-- Transport -->
+                  <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,12,0,0">
+                    <Button Classes="mini" Content="⏮" MinWidth="36" HorizontalContentAlignment="Center"
+                            Command="{Binding PreviousStationCommand}" ToolTip.Tip="Previous station" />
+                    <Button Classes="action" Content="{Binding PlayPauseGlyph}" MinWidth="52"
+                            HorizontalContentAlignment="Center"
+                            Command="{Binding PlayPauseCommand}" ToolTip.Tip="{Binding PlayPauseTooltip}" />
+                    <Button Classes="mini" Content="⏭" MinWidth="36" HorizontalContentAlignment="Center"
+                            Command="{Binding NextStationCommand}" ToolTip.Tip="Next station" />
+                  </StackPanel>
+
+                  <!-- Station picker: choosing one tunes to it. -->
+                  <TextBlock Classes="label" Text="STATION" Margin="0,12,0,2" />
+                  <ComboBox ItemsSource="{Binding Stations}" SelectedItem="{Binding SelectedStation}"
+                            HorizontalAlignment="Stretch" PlaceholderText="Choose a station">
+                    <ComboBox.ItemTemplate>
+                      <DataTemplate x:DataType="radio:RadioStation">
+                        <StackPanel>
+                          <TextBlock Text="{Binding Name}" Foreground="{StaticResource Ink}" FontSize="13" />
+                          <TextBlock Text="{Binding Description}" Foreground="{StaticResource InkDim}"
+                                     FontSize="11" TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                      </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                  </ComboBox>
+
+                  <!-- Volume + mute -->
+                  <TextBlock Classes="label" Text="VOLUME" Margin="0,12,0,2" />
+                  <Grid ColumnDefinitions="Auto,*,Auto">
+                    <Button Grid.Column="0" Classes="mini" Content="{Binding MuteGlyph}" MinWidth="36"
+                            HorizontalContentAlignment="Center" VerticalAlignment="Center"
+                            Command="{Binding ToggleMuteCommand}" ToolTip.Tip="{Binding MuteTooltip}" />
+                    <Slider Grid.Column="1" Minimum="0" Maximum="100" TickFrequency="1"
+                            IsSnapToTickEnabled="True" Value="{Binding Volume}"
+                            Margin="10,0" VerticalAlignment="Center"
+                            Foreground="{StaticResource AmberBrush}" />
+                    <TextBlock Grid.Column="2" Classes="value" FontSize="13" Text="{Binding VolumeText}"
+                               MinWidth="28" TextAlignment="Right" VerticalAlignment="Center" />
                   </Grid>
                 </StackPanel>
               </StackPanel>

@@ -10,6 +10,10 @@ public sealed class SettingsStore
     private readonly string _path;
     private readonly bool _migrateLegacy;
 
+    // Several owners save the one shared settings object (the app's Apply* calls, the radio's
+    // debounced volume write). Serialize them so two writes can't collide on the file.
+    private readonly object _writeGate = new();
+
     public SettingsStore(string? path = null)
     {
         _path = path ?? DefaultPath();
@@ -99,17 +103,28 @@ public sealed class SettingsStore
         }
     }
 
-    public void Save(AppSettings settings)
+    public void Save(AppSettings settings) => TrySave(settings);
+
+    /// <summary>
+    /// Like <see cref="Save"/>, but reports whether the write succeeded, so a caller that saves on a
+    /// delay can try again rather than silently lose the change. Never throws.
+    /// </summary>
+    public bool TrySave(AppSettings settings)
     {
-        try
+        lock (_writeGate)
         {
-            var dir = System.IO.Path.GetDirectoryName(_path);
-            if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
-            File.WriteAllText(_path, JsonSerializer.Serialize(settings, Options));
-        }
-        catch
-        {
-            // Best-effort; a failed save must not crash the app.
+            try
+            {
+                var dir = System.IO.Path.GetDirectoryName(_path);
+                if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+                File.WriteAllText(_path, JsonSerializer.Serialize(settings, Options));
+                return true;
+            }
+            catch
+            {
+                // Best-effort; a failed save must not crash the app.
+                return false;
+            }
         }
     }
 }

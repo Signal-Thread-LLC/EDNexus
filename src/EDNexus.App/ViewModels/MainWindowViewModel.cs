@@ -29,12 +29,25 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     private readonly DeveloperMode _dev = new();
     private readonly Random _rng = new();
     private readonly DashboardContext _context;
+
+    // The radio lives as long as the app, not the engine host: it isn't journal-driven, and the host
+    // is rebuilt on "reset to live" / leaving developer mode, which must not stop the music.
+    private readonly RadioPlayerService _radioService;
+    private readonly RadioPlayerSelector _radio;
+
     private EngineHost _host;
     private DispatcherTimer? _timer;
 
     public MainWindowViewModel(Bootstrap boot)
     {
         _boot = boot;
+        // The delayed volume save runs on the UI thread, where the rest of the app edits the same
+        // settings object, so the two never serialize and mutate it at once.
+        _radioService = new RadioPlayerService(_boot.Settings, _boot.Store,
+            postSave: save => Dispatcher.UIThread.Post(save));
+        _radio = new RadioPlayerSelector(_radioService, () => _boot.Dev.Enabled);
+        // Stream events arrive off the UI thread, independent of the 250 ms refresh tick.
+        _radio.Changed += () => Dispatcher.UIThread.Post(RefreshRadio);
         _host = BuildHost();
         // Reads `_host` at event time, so a host swapped in by ResetToLive() is the one updated.
         _boot.DiscordSettingsChanged += OnDiscordSettingsChanged;
@@ -52,7 +65,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             prices => _boot.LearnCommodityPrices(prices),
             now => _boot.EnsureMiningSessionDate(now),
             (when, credits) => _boot.RecordMiningRefined(when, credits),
-            (unit, price) => _boot.RecordMiningSpot(unit, price));
+            (unit, price) => _boot.RecordMiningSpot(unit, price),
+            _radio);
         Cards = new ObservableCollection<CardViewModel>
         {
             new LocationCardViewModel(_context),
@@ -71,6 +85,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             new CommunityGoalsCardViewModel(_context),
             new RanksCardViewModel(_context),
             new GalnetCardViewModel(_context),
+            new RadioCardViewModel(_context),
         };
 
         ApplySavedLayout();
@@ -217,8 +232,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         // While developer mode is on, reporting is paused so fabricated events never reach EDDN/Inara.
         var host = new EngineHost(
             settings: _boot.Settings,
-            reportingSuppressed: () => _boot.Dev.Enabled,
-            settingsStore: _boot.Store);
+            reportingSuppressed: () => _boot.Dev.Enabled);
         _boot.Crash.Attach(host.Bus); // report journal handler errors
 
         // The stream card talks to a network service and can fail in several distinct ways. Without
@@ -236,12 +250,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         }
         host.VoiceCallouts.CalloutRaised += OnVoiceCalloutRaised;
 
-        // The radio plays in the background independent of the 250ms state-refresh tick, so it gets
-        // its own event → UI-thread hop instead of waiting to be picked up by Refresh(). Captures
-        // `host` (rather than reading the `_host` field) so a stale handler from a host that
-        // ResetToLive() has since replaced can't clobber the current one's state.
-        host.Radio.Changed += () => Dispatcher.UIThread.Post(() => RefreshRadio(host.Radio.Snapshot));
-        RefreshRadio(host.Radio.Snapshot);
+        // The dev-mode radio simulation listens on this host's bus, where the 🎲 publishes.
+        _radio.AttachSimulation(host.Bus);
         return host;
     }
 
@@ -258,7 +268,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     {
         _host.Start();
         if (_boot.Settings.Overlay.Enabled) _boot.Overlay.Show();
-        _ = _host.Radio.RestoreAsync(); // fire-and-forget: resumes the last station off the UI thread
+        _ = _radioService.RestoreAsync(); // fire-and-forget: resumes the last station off the UI thread
         _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
         _timer.Tick += (_, _) => Refresh();
         _timer.Start();
@@ -269,7 +279,14 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     {
         _boot.DiscordSettingsChanged -= OnDiscordSettingsChanged;
         _boot.Overlay.Hide();
-        _host.Dispose();
+        try
+        {
+            _radioService.Dispose(); // also flushes a debounced volume save
+        }
+        finally
+        {
+            _host.Dispose();
+        }
     }
 
     /// <summary>Push saved Discord Rich Presence settings onto the live engine (connect/disconnect, privacy).</summary>
@@ -287,41 +304,50 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string _updatePath = "";
 
     // --- Radio: a compact title-bar transport (play/pause, next, previous). Stations and their
-    // stream URLs live in RadioStationCatalog; the actual streaming happens in EngineHost.Radio. ---
+    // stream URLs live in RadioStationCatalog; the streaming happens in the app-lifetime
+    // RadioPlayerService. Controls act on _radio.Active, the same player the Space Radio card
+    // drives (the simulation while developer mode is on). ---
 
     [ObservableProperty] private string _radioStationName = "Radio off";
     [ObservableProperty] private string _radioPlayPauseGlyph = "▶";
     [ObservableProperty] private string _radioTooltip = "Play the radio";
 
-    /// <summary>Mirror a <see cref="RadioPlayerSnapshot"/> onto the bindable properties above.</summary>
-    private void RefreshRadio(RadioPlayerSnapshot s)
+    /// <summary>True while the transport drives the developer-mode simulation (shows a SIM marker).</summary>
+    [ObservableProperty] private bool _radioIsSimulated;
+
+    /// <summary>Tooltip on the SIM marker; warns when the real radio is still playing underneath.</summary>
+    [ObservableProperty] private string _radioSimTooltip = RadioDisplay.SimulationTooltip;
+
+    /// <summary>Mirror the active player's snapshot onto the bindable properties above.</summary>
+    private void RefreshRadio()
     {
+        // Same wording as the Space Radio card: both come from RadioDisplay. The glyph shows what
+        // clicking will do (see RadioPlayerService.ToggleActionFor).
+        var s = _radio.Active.Snapshot;
+        var d = RadioDisplay.From(s);
+        RadioIsSimulated = _radio.IsSimulated;
+        RadioSimTooltip = RadioDisplay.SimulationNote(_radio.Real.Snapshot);
         RadioStationName = s.Station?.Name ?? "No station tuned";
-        // The glyph shows what clicking will do (see RadioPlayerService.ToggleActionFor).
-        RadioPlayPauseGlyph = RadioPlayerService.ToggleActionFor(s.Status) switch
-        {
-            RadioToggleAction.Pause => "⏸",
-            RadioToggleAction.Stop => "⏹",
-            _ => "▶",
-        };
-        RadioTooltip = s.Status switch
-        {
-            RadioPlaybackStatus.Error => $"{s.LastError ?? "Radio error"} — click to stop",
-            RadioPlaybackStatus.Buffering => $"Buffering {s.Station?.Name}… — click to stop",
-            RadioPlaybackStatus.Playing => $"Playing {s.Station?.Name}",
-            RadioPlaybackStatus.Paused => $"Paused — {s.Station?.Name}",
-            _ => s.Station is null ? "Play the radio" : $"Play {s.Station.Name}",
-        };
+        RadioPlayPauseGlyph = d.PlayPauseGlyph;
+        RadioTooltip = d.PlayPauseTooltip;
     }
 
-    [RelayCommand]
-    private Task RadioPlayPause() => _host.Radio.TogglePlayPauseAsync();
+    /// <summary>
+    /// Turn the radio feature on or off from Settings. Turning it off stops playback and clears the
+    /// resume-on-launch intent (see <see cref="RadioPlayerService.SetEnabledAsync"/>). Always the
+    /// real player, because this is a saved preference, not developer-mode state. The dialog only
+    /// calls it when the commander actually changed the checkbox.
+    /// </summary>
+    public void ApplyRadioEnabled(bool enabled) => _ = _radioService.SetEnabledAsync(enabled);
 
     [RelayCommand]
-    private Task RadioNext() => _host.Radio.NextStationAsync();
+    private Task RadioPlayPause() => _radio.Active.TogglePlayPauseAsync();
 
     [RelayCommand]
-    private Task RadioPrevious() => _host.Radio.PreviousStationAsync();
+    private Task RadioNext() => _radio.Active.NextStationAsync();
+
+    [RelayCommand]
+    private Task RadioPrevious() => _radio.Active.PreviousStationAsync();
 
     [RelayCommand]
     private async Task OpenSettings()
@@ -360,6 +386,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         }
 
         DevMode = _boot.Dev.Enabled;
+        RefreshRadio(); // the transport switches between the real player and the simulation
     }
 
     [RelayCommand]
@@ -465,6 +492,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         LastUpdated = s.LastUpdated == default ? "—" : s.LastUpdated.LocalDateTime.ToString("HH:mm:ss");
 
         foreach (var card in Cards) card.Update(s);
+        RefreshRadio();
 
         if (_boot.Settings.Overlay.Enabled)
         {

@@ -23,6 +23,7 @@ public sealed class DeveloperMode
         new RanksSampleSource(),
         new MiningSampleSource(),
         new OverlayVoiceSampleSource(),
+        new RadioSampleSource(),
     };
 
     /// <summary>
