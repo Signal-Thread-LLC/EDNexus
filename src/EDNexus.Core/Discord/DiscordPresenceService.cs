@@ -141,10 +141,16 @@ public sealed class DiscordPresenceService : IDisposable
     }
 
     /// <summary>
-    /// Re-evaluate the suppression predicate now. Call when it may have flipped (developer mode switched
-    /// on) so the last real presence is cleared straight away rather than on the next state change; and
-    /// when it flips back off, so the real presence is pushed again.
+    /// Re-evaluate the suppression predicate now. Call when it may have flipped on (developer mode
+    /// switched on) so the last real presence is cleared straight away rather than on the next state
+    /// change.
     /// </summary>
+    /// <remarks>
+    /// If suppression has since lifted, this pushes whatever <see cref="CommanderState"/> currently
+    /// holds — which, on the same engine, may still be fabricated. Restoring the real presence after
+    /// developer mode is the app's job: it rebuilds the engine (a fresh service re-warmed from the
+    /// journal) rather than calling this.
+    /// </remarks>
     public void Refresh()
     {
         lock (_gate)

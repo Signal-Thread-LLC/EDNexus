@@ -238,15 +238,23 @@ public class DiscordPresenceServicePrivacyTests
     [Fact]
     public async Task A_system_change_queued_in_the_throttle_window_never_leaks_after_hiding_the_system()
     {
+        // A frozen clock guarantees the system change lands inside the throttle window however slow
+        // the machine is, so it is always queued rather than sent.
+        var now = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
         var state = new CommanderState { StarSystem = "Sol" };
         var client = new FakeDiscordRpcClient();
-        using var service = new DiscordPresenceService(state, client, TimeSpan.FromMilliseconds(150));
+        using var service = new DiscordPresenceService(
+            state, client, TimeSpan.FromMilliseconds(50), clock: () => now);
 
-        // Inside the window opened by the constructor's push: this is queued as a trailing send.
         state.StarSystem = "Colonia";
+        Assert.DoesNotContain(client.Sent, p => p.State?.Contains("Colonia") == true);   // queued, not sent
+
         service.UpdatePrivacy(new DiscordPrivacyOptions(ShowSystem: false, ShowCommander: true));
 
-        await Task.Delay(500);   // well past when the queued send would have fired
+        // Open the throttle so the queued send would be allowed through if it hadn't been superseded,
+        // then give its (real, 50 ms) delay ample time to fire.
+        now = now.AddMinutes(1);
+        await Task.Delay(300);
 
         Assert.DoesNotContain(client.Sent, p =>
             p.State?.Contains("Colonia") == true || p.Buttons.Any(b => b.Url.Contains("Colonia")));
@@ -304,7 +312,7 @@ public class DiscordPresenceServicePrivacyTests
     }
 
     [Fact]
-    public void Leaving_suppression_re_pushes_the_real_presence()
+    public void Leaving_suppression_re_pushes_the_current_presence()
     {
         var suppressed = true;
         var now = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);

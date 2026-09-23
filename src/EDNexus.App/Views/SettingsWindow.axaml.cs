@@ -177,7 +177,10 @@ public partial class SettingsWindow : Window
                 DiscordToggle.IsChecked == true,
                 DiscordShowSystemToggle.IsChecked == true,
                 DiscordShowCommanderToggle.IsChecked == true);
-            _boot.Dev.Enabled = DevModeToggle.IsChecked == true; // runtime-only; not persisted
+            // Runtime-only; not persisted. The dashboard owns the switch so leaving dev mode can tear
+            // down the fabricated engine before reporting is un-suppressed.
+            if (_dashboard is not null) _dashboard.SetDeveloperMode(DevModeToggle.IsChecked == true);
+            else _boot.Dev.Enabled = DevModeToggle.IsChecked == true;
             UpdateStatus();
             UpdateVersionAndUpdateLine();
             System.Diagnostics.Trace.TraceInformation("Settings: saved by user");
