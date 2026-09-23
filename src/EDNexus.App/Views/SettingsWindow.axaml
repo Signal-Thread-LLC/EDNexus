@@ -188,6 +188,19 @@
           </Border>
         </StackPanel>
 
+        <!-- Radio player — the on/off switch. Station, volume and mute live on the Space Radio card and
+             the title-bar transport, and are saved as they change. -->
+        <StackPanel Spacing="8">
+          <TextBlock Text="RADIO PLAYER" Foreground="#F07100" FontSize="12" FontWeight="SemiBold" LetterSpacing="2" />
+          <Border Background="#0F1114" CornerRadius="6" Padding="16">
+            <StackPanel Spacing="10">
+              <CheckBox x:Name="RadioToggle" Content="Enable the radio player" Foreground="#E7E9EE" />
+              <TextBlock Foreground="#8A909C" FontSize="12" TextWrapping="Wrap"
+                         Text="Streams community and ambient space radio stations in the background. Turning this off stops playback and keeps the radio silent on the next launch. Pick a station, volume and mute from the Space Radio card or the title-bar controls; pressing play there turns the radio back on." />
+            </StackPanel>
+          </Border>
+        </StackPanel>
+
         <!-- Discord Rich Presence — a local IPC link to the commander's own Discord client. Applied
              live on Save: off disconnects, the privacy toggles re-push the presence immediately. -->
         <StackPanel Spacing="8">

@@ -57,6 +57,8 @@ public partial class SettingsWindow : Window
         ScanCompleteToggle.IsChecked = !boot.Settings.Voice.DisabledCallouts.Contains(nameof(EDNexus.Core.Voice.VoiceCalloutKind.ScanComplete));
         ShoppingListToggle.IsChecked = !boot.Settings.Voice.DisabledCallouts.Contains(nameof(EDNexus.Core.Voice.VoiceCalloutKind.ShoppingListItemAcquired));
 
+        RadioToggle.IsChecked = boot.Settings.Radio.RadioEnabled;
+
         DiscordToggle.IsChecked = boot.Settings.Discord.Enabled;
         DiscordShowSystemToggle.IsChecked = boot.Settings.Discord.ShowSystem;
         DiscordShowCommanderToggle.IsChecked = boot.Settings.Discord.ShowCommander;
@@ -173,6 +175,8 @@ public partial class SettingsWindow : Window
                 VoiceNameCombo.SelectedItem as string,
                 (int)VoiceVolumeSlider.Value,
                 DisabledCalloutNames());
+            // The radio player owns its own persistence; the dashboard routes this to the live player.
+            _dashboard?.ApplyRadioEnabled(RadioToggle.IsChecked == true);
             _boot.ApplyDiscordChoice(
                 DiscordToggle.IsChecked == true,
                 DiscordShowSystemToggle.IsChecked == true,

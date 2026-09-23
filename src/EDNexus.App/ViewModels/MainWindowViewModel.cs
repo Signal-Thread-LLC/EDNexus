@@ -71,6 +71,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             new CommunityGoalsCardViewModel(_context),
             new RanksCardViewModel(_context),
             new GalnetCardViewModel(_context),
+            new RadioCardViewModel(_context),
         };
 
         ApplySavedLayout();
@@ -275,22 +276,23 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     /// <summary>Mirror a <see cref="RadioPlayerSnapshot"/> onto the bindable properties above.</summary>
     private void RefreshRadio(RadioPlayerSnapshot s)
     {
+        // Same wording as the Space Radio card: both come from RadioDisplay. The glyph shows what
+        // clicking will do (see RadioPlayerService.ToggleActionFor).
+        var d = RadioDisplay.From(s);
         RadioStationName = s.Station?.Name ?? "No station tuned";
-        // The glyph shows what clicking will do (see RadioPlayerService.ToggleActionFor).
-        RadioPlayPauseGlyph = RadioPlayerService.ToggleActionFor(s.Status) switch
-        {
-            RadioToggleAction.Pause => "⏸",
-            RadioToggleAction.Stop => "⏹",
-            _ => "▶",
-        };
-        RadioTooltip = s.Status switch
-        {
-            RadioPlaybackStatus.Error => $"{s.LastError ?? "Radio error"} — click to stop",
-            RadioPlaybackStatus.Buffering => $"Buffering {s.Station?.Name}… — click to stop",
-            RadioPlaybackStatus.Playing => $"Playing {s.Station?.Name}",
-            RadioPlaybackStatus.Paused => $"Paused — {s.Station?.Name}",
-            _ => s.Station is null ? "Play the radio" : $"Play {s.Station.Name}",
-        };
+        RadioPlayPauseGlyph = d.PlayPauseGlyph;
+        RadioTooltip = d.PlayPauseTooltip;
+    }
+
+    /// <summary>
+    /// Turn the radio feature on or off from Settings. Turning it off stops playback and clears the
+    /// resume-on-launch intent (see <see cref="RadioPlayerService.SetEnabledAsync"/>). Always the
+    /// real player — this is a saved preference, not developer-mode state.
+    /// </summary>
+    public void ApplyRadioEnabled(bool enabled)
+    {
+        if (_host.Radio.Snapshot.Enabled == enabled) return;
+        _ = _host.Radio.SetEnabledAsync(enabled);
     }
 
     [RelayCommand]

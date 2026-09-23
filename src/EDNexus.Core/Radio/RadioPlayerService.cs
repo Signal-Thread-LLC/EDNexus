@@ -17,7 +17,7 @@ namespace EDNexus.Core.Radio;
 /// cannot throw even if no native VLC runtime is present on the machine — a missing/broken native
 /// library surfaces as <see cref="RadioPlaybackStatus.Error"/> instead of a crash.
 /// </remarks>
-public sealed class RadioPlayerService : IDisposable, IAsyncDisposable
+public sealed class RadioPlayerService : IRadioPlayer, IDisposable, IAsyncDisposable
 {
     private readonly object _gate = new();
     private readonly AppSettings? _settings;
