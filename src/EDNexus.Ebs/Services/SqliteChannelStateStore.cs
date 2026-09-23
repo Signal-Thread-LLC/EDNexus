@@ -53,4 +53,14 @@ public sealed class SqliteChannelStateStore : IChannelStateStore
         state = document.RootElement.Clone();
         return true;
     }
+
+    /// <inheritdoc />
+    public void Remove(string channelId)
+    {
+        using var connection = _database.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = "DELETE FROM channel_state WHERE channel_id = $channel;";
+        command.Parameters.AddWithValue("$channel", channelId);
+        command.ExecuteNonQuery();
+    }
 }

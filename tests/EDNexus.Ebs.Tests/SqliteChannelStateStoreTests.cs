@@ -32,6 +32,17 @@ public sealed class SqliteChannelStateStoreTests : IDisposable
     }
 
     [Fact]
+    public void Remove_is_durable()
+    {
+        _data.CreateChannelStateStore().Set("channel-1", JsonSerializer.SerializeToElement(new { system = "Sol" }));
+
+        _data.CreateChannelStateStore().Remove("channel-1");
+        _data.CreateChannelStateStore().Remove("never-published"); // no-op, not an error
+
+        Assert.False(_data.CreateChannelStateStore().TryGet("channel-1", out _));
+    }
+
+    [Fact]
     public void Returned_state_outlives_the_underlying_document()
     {
         var store = _data.CreateChannelStateStore();

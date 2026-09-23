@@ -37,4 +37,13 @@ public sealed class TwitchOAuthOptions
     /// viewers over Twitch Extensions PubSub.
     /// </summary>
     public string UpdateStateEndpoint => $"{EbsBaseUrl.TrimEnd('/')}/api/update-state";
+
+    /// <summary>
+    /// True for an address the long-lived bearer token may be sent to: <c>https</c>, or plain
+    /// <c>http</c> only to this machine (a local EBS during development). Anything else would put
+    /// the token on the wire in cleartext. The extension enforces the same rule on the viewer side.
+    /// </summary>
+    public static bool IsSecureEbsUrl(string? url) =>
+        Uri.TryCreate(url, UriKind.Absolute, out var uri)
+        && (uri.Scheme == Uri.UriSchemeHttps || (uri.Scheme == Uri.UriSchemeHttp && uri.IsLoopback));
 }

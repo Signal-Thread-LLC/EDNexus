@@ -17,4 +17,7 @@ public sealed class InMemoryChannelStateStore : IChannelStateStore
 
     /// <inheritdoc />
     public bool TryGet(string channelId, out JsonElement state) => _state.TryGetValue(channelId, out state);
+
+    /// <inheritdoc />
+    public void Remove(string channelId) => _state.TryRemove(channelId, out _);
 }
