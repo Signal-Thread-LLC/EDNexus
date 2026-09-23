@@ -1,0 +1,83 @@
+/* Broadcaster config page. Rendered inside the Twitch dashboard, which uses a dark surface. */
+
+:root {
+  --ednx-orange: #ff7100;
+  --ednx-ink: #f4f1ea;
+  --ednx-ink-soft: rgba(244, 241, 234, 0.64);
+  --ednx-bg: #0e0f12;
+  --ednx-raised: rgba(255, 255, 255, 0.04);
+  --ednx-line: rgba(255, 255, 255, 0.12);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 20px;
+  background: var(--ednx-bg);
+  color: var(--ednx-ink);
+  font-family: "Inter", "Segoe UI", Roboto, system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.wrap { max-width: 520px; margin: 0 auto; }
+
+h1 { margin: 0 0 4px; font-size: 18px; }
+h2 { margin: 0 0 6px; font-size: 13px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ednx-ink-soft); }
+
+.lede { margin: 0 0 18px; color: var(--ednx-ink-soft); }
+
+.panel {
+  margin-bottom: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--ednx-line);
+  border-left: 3px solid var(--ednx-orange);
+  border-radius: 6px;
+  background: var(--ednx-raised);
+}
+
+.hint { margin: 0 0 10px; font-size: 12.5px; color: var(--ednx-ink-soft); }
+
+code {
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 12px;
+}
+
+.field { display: block; }
+.field__label { display: block; margin-bottom: 4px; font-size: 12px; color: var(--ednx-ink-soft); }
+
+input[type="url"] {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--ednx-line);
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--ednx-ink);
+  font: inherit;
+}
+
+input[type="url"]:focus { outline: 2px solid var(--ednx-orange); outline-offset: 1px; }
+
+.actions { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
+
+.button {
+  padding: 7px 16px;
+  border: 0;
+  border-radius: 5px;
+  background: var(--ednx-orange);
+  color: #12100d;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.button:hover { filter: brightness(1.08); }
+.button:focus-visible { outline: 2px solid var(--ednx-ink); outline-offset: 2px; }
+
+.status { font-size: 12.5px; }
+.status--ok { color: #6cc070; }
+.status--error { color: #e0563c; }
