@@ -10,55 +10,31 @@ namespace EDNexus.Core.Twitch;
 /// <c>StateTracker</c> does that (see AGENTS.md, "one writer").
 /// </summary>
 /// <remarks>
-/// <para>
-/// Journal events arrive in bursts — a single hyperspace jump touches system, body, fuel and cargo —
-/// while Twitch's PubSub quota (and the EBS's own per-channel rate limit) allows roughly one message
-/// every couple of seconds. So updates are coalesced rather than dropped: change notifications only
-/// mark the card dirty, and a single pump loop publishes the newest snapshot at most once per
-/// <see cref="MinInterval"/>. Viewers always converge on current state without the app ever exceeding
-/// the quota.
-/// </para>
-/// <para>
-/// Nothing is published unless the commander has logged in and switched the card on — both are read
-/// through the token callback, so either one going away simply leaves the pump idle. A <c>401</c>
-/// stops publishing and raises <see cref="ReauthRequired"/>: a revoked grant will never recover by
-/// retrying, and hammering the EBS with a dead token is exactly what its rate limiter exists to
-/// punish. Publishing resumes on its own once a different token is offered — i.e. once the commander
-/// has logged in again.
-/// </para>
+/// A journal burst (one jump touches system, body, fuel and cargo) far outpaces Twitch's PubSub
+/// quota, so changes are coalesced rather than dropped: they mark the card dirty and one pump
+/// publishes the newest snapshot per <see cref="MinInterval"/>. A <c>401</c> stops publishing and
+/// raises <see cref="ReauthRequired"/> — a revoked grant never recovers by retrying — and resumes
+/// once a different token appears.
 /// </remarks>
 public sealed class TwitchStreamCardService : IDisposable
 {
     /// <summary>
-    /// Floor between two publishes. The EBS defaults to one state update per channel every two
-    /// seconds; five leaves headroom for a commander whose EBS is configured tighter, and is still far
-    /// faster than a viewer can read the card.
+    /// Floor between two publishes. The EBS allows one every two seconds; five leaves headroom and is
+    /// still faster than a viewer can read the card.
     /// </summary>
     public static readonly TimeSpan DefaultMinInterval = TimeSpan.FromSeconds(5);
 
     /// <summary>
-    /// How many times a failed publish is retried before the pump goes back to sleep waiting for the
-    /// commander to actually do something.
+    /// Retries after a failed publish. The pump only wakes on a state change, so without this an EBS
+    /// that was not yet listening at startup silences the card for the whole session. Bounded, so one
+    /// that is simply down is not polled forever.
     /// </summary>
-    /// <remarks>
-    /// Without this a single transient failure is permanent: the pump only wakes on a state change,
-    /// so if the EBS was not yet listening when the app started — and the game is closed, as it is
-    /// whenever someone is setting this up — nothing would ever trigger another attempt. Bounded
-    /// rather than infinite so an EBS that is simply down does not get polled forever.
-    /// </remarks>
     public const int MaxPublishRetries = 5;
 
-    /// <summary>
-    /// Joins the parts of the publish deduplication key. A unit separator cannot occur in a URL, a
-    /// token or serialized JSON, so no combination of parts can collide with a different one.
-    /// </summary>
+    /// <summary>Cannot occur in a URL, token or JSON, so no two key part combinations collide.</summary>
     private const string KeySeparator = "\u001f";
 
-    /// <summary>
-    /// <see cref="CommanderState"/> properties worth a republish. Deliberately not every property:
-    /// <c>LastUpdated</c> ticks on virtually every journal line and would defeat the deduplication
-    /// below.
-    /// </summary>
+    /// <summary>Not every property: <c>LastUpdated</c> ticks on virtually every journal line.</summary>
     private static readonly string[] RelevantProperties =
     {
         nameof(CommanderState.Name),
@@ -115,23 +91,12 @@ public sealed class TwitchStreamCardService : IDisposable
     /// <param name="state">The live commander picture to mirror. Never written to.</param>
     /// <param name="sources">Feature trackers the richer card sections are drawn from.</param>
     /// <param name="client">Transport to the EBS.</param>
-    /// <param name="updateStateEndpoint">
-    /// Reads the absolute URL of the EBS's <c>/api/update-state</c>. A live callback, like the two
-    /// below, so pointing the app at a different EBS does not need a restart.
-    /// </param>
-    /// <param name="token">
-    /// Reads the current EBS-issued broadcaster token. A live callback rather than a value so logging
-    /// in or out — or switching the card off — takes effect without rebuilding the service; null or
-    /// blank means "nothing to publish", and the pump stays idle.
-    /// </param>
-    /// <param name="visibility">
-    /// Reads what the broadcaster currently agrees to show. Also a live callback so toggling a section
-    /// off in settings takes effect on the next publish.
-    /// </param>
-    /// <param name="isSuppressed">
-    /// Optional live predicate; while it returns true nothing is computed or published. Wired to
-    /// developer mode so fabricated sample data never reaches a real audience.
-    /// </param>
+    /// <remarks>
+    /// The endpoint, token and visibility are callbacks rather than values so signing in, switching
+    /// the card off or repointing the EBS takes effect without rebuilding the service; a blank token
+    /// simply leaves the pump idle. <paramref name="isSuppressed"/> is wired to developer mode, so
+    /// fabricated sample data never reaches a real audience.
+    /// </remarks>
     public TwitchStreamCardService(
         CommanderState state,
         StreamCardSources sources,
@@ -173,10 +138,8 @@ public sealed class TwitchStreamCardService : IDisposable
 
         _pump = Task.Run(() => PumpAsync(_cts.Token));
 
-        // Deliberately no publish here. This is constructed before the journal has been replayed, so
-        // publishing now would send "In the black" with no sections and leave that as the EBS's
-        // initial state until the warmed snapshot follows a MinInterval later. The host calls
-        // RequestPublish() once the replay has finished instead.
+        // No publish here: constructed before the journal replay, so this would make "In the black"
+        // the EBS's initial state. The host calls RequestPublish() once the replay is done.
     }
 
     /// <summary>The floor between two publishes this service was built with.</summary>
@@ -189,16 +152,10 @@ public sealed class TwitchStreamCardService : IDisposable
     public bool StoppedForReauth => Volatile.Read(ref _stoppedForReauth);
 
     /// <summary>
-    /// Publish the current card as soon as the rate limit allows, without waiting for a journal
-    /// event to arrive.
+    /// Publish without waiting for a journal event. Signing in or switching the card on changes what
+    /// would be published without changing the commander picture, and with the game closed no journal
+    /// event is coming — so the caller has to ask.
     /// </summary>
-    /// <remarks>
-    /// The pump is woken by state and tracker changes, which is the right trigger while the game is
-    /// running but leaves a hole everywhere else: switching the card on, or logging in, changes what
-    /// <em>would</em> be published without changing the commander picture at all. With the game
-    /// closed no journal event will ever follow, so without this the card would never go out. Call
-    /// this whenever the token or the visibility changes underneath the callbacks.
-    /// </remarks>
     public void RequestPublish() => MarkDirty();
 
     /// <summary>
@@ -292,13 +249,8 @@ public sealed class TwitchStreamCardService : IDisposable
 
         var snapshot = StreamCardMapper.Map(_state, _sources, _visibility(), _clock());
 
-        // Deduplicate on content, not on the timestamp the snapshot carries — otherwise a journal
-        // line that changes nothing a viewer can see would still spend a publish from the quota.
-        //
-        // Scoped to the destination and credential as well, because an identical card still has to go
-        // out when either changes: pointing at a different EBS, or signing in again after a restart
-        // wiped the in-memory token store, leaves a brand new service with no state at all. With the
-        // game closed the card would otherwise never change, so viewers would see nothing.
+        // Keyed on destination and credential too: an unchanged card still has to reach a different
+        // EBS, or the same one after a restart wiped its in-memory tokens.
         var endpoint = _endpoint();
         var key = string.Join(KeySeparator, endpoint, token, snapshot.ContentFingerprint());
         if (key == _lastPublishedKey) return null;
