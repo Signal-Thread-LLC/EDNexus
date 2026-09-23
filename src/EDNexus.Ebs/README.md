@@ -35,6 +35,9 @@ applies.
 | `Ebs:UpdateStateRateLimit` / `Ebs:UpdateStateRateLimitWindowSeconds` | `Ebs__UpdateStateRateLimit` / `Ebs__UpdateStateRateLimitWindowSeconds` | Per-channel rate limit applied to `POST /api/update-state`. Default 1 request / 2 seconds. |
 | `Ebs:OAuthSessionTtlMinutes` | `Ebs__OAuthSessionTtlMinutes` | How long a commander has to complete the Twitch consent page before the login session expires. Default 10 minutes. |
 | `Ebs:OAuthCodeTtlSeconds` | `Ebs__OAuthCodeTtlSeconds` | How long the one-time authorization code handed to the desktop client is redeemable at `/oauth/token`. Default 60 seconds. |
+| `Ebs:StorageProvider` | `Ebs__StorageProvider` | `Sqlite` (default) persists state across restarts; `InMemory` is for tests and throwaway local runs only. |
+| `Ebs:DataDirectory` | `Ebs__DataDirectory` | Directory holding the SQLite database `ebs.db`. Relative paths resolve against the content root. Default `data` (`/data` in the container). |
+| `Ebs:DataProtectionKeysDirectory` | `Ebs__DataProtectionKeysDirectory` | Data Protection key ring used to encrypt Twitch tokens at rest. Default `{DataDirectory}/keys`. |
 | `Ebs:TwitchTokenRefreshIntervalMinutes` / `Ebs:TwitchTokenRefreshBufferMinutes` | `Ebs__TwitchTokenRefreshIntervalMinutes` / `Ebs__TwitchTokenRefreshBufferMinutes` | How often the background loop checks broadcasters' Twitch grants, and how far ahead of expiry it refreshes them. Defaults 30 / 60 minutes. |
 
 ## OAuth login flow
@@ -90,17 +93,40 @@ Called by the extension frontend on load so it doesn't have to wait for the next
 Returns the last state payload published for that channel, or `404` if none has been published yet.
 Unauthenticated but rate-limited per caller IP.
 
+### `GET /`
+
+Redirects to the project site, https://signal-thread-llc.github.io/EDNexus/.
+
 ### `GET /healthz`
 
 Liveness probe for container/serverless hosting.
 
+## Persistence
+
+State that has to survive a crash, restart, redeploy or host reboot is kept in a single SQLite file,
+`{Ebs:DataDirectory}/ebs.db` (WAL mode, `synchronous=FULL`):
+
+| State | Stored | Notes |
+|---|---|---|
+| Broadcaster tokens + the Twitch grants they wrap | `broadcaster_tokens` | The EBS bearer token is stored only as a SHA-256 hash; Twitch access/refresh tokens are ASP.NET Core Data Protection ciphertext. |
+| Each channel's last published state | `channel_state` | So `GET /api/initial-state/{channelId}` still answers after a restart. |
+| Pending `/oauth/authorize` sessions and one-time auth codes | memory only | Minutes/seconds-lived. A restart mid-login just means clicking "Log in" again. |
+
+The Data Protection key ring (`Ebs:DataProtectionKeysDirectory`, default `{DataDirectory}/keys`)
+must persist alongside the database. If it's lost, stored grants can't be decrypted: those
+broadcasters get `401` and have to log in again, and the EBS keeps running. For real separation
+put the key ring on a different volume or secret mount than the database. The keys are **not**
+encrypted at rest on Linux, so protect that directory's permissions.
+
+The schema version is stamped in `PRAGMA user_version`; the EBS migrates older files on startup and
+refuses to start against a file from a newer build.
+
 ## Deployment
 
 A `Dockerfile` is included for containerized hosting; the service is also small enough to host on
-a serverless container platform (Azure Container Apps, Fly.io, etc.). **Production caveat:** both
-`IChannelStateStore` and `IBroadcasterTokenStore` currently ship with in-memory implementations,
-sufficient for a single EBS instance and for local development/testing. A multi-instance deployment
-— or any deployment where losing broadcaster tokens on a restart is unacceptable — needs a real
-persistent, shared backing store (e.g. a database or Redis) for `IBroadcasterTokenStore` in
-particular, since it holds the long-lived credentials and Twitch refresh tokens broadcasters rely on
-to stay logged in across days.
+a serverless container platform (Azure Container Apps, Fly.io, etc.). Mount a persistent volume at
+`/data` (see [Persistence](#persistence)).
+
+**Production caveat:** SQLite suits the single EBS instance we deploy. A multi-instance
+(horizontally scaled) deployment needs a shared backing store, e.g. Postgres or Redis, behind
+`IBroadcasterTokenStore` / `IChannelStateStore`, plus a shared Data Protection key ring.

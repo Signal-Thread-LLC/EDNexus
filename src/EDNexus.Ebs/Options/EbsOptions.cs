@@ -56,4 +56,44 @@ public sealed class EbsOptions
     /// Developer Rig (typically <c>https://localhost:8080</c>) during local extension development.
     /// </summary>
     public string[] AdditionalAllowedFrontendOrigins { get; set; } = [];
+
+    /// <summary>
+    /// Where broadcaster tokens and channel state live. <see cref="EbsStorageProvider.Sqlite"/> (the
+    /// default) survives crashes and restarts; <see cref="EbsStorageProvider.InMemory"/> is for
+    /// tests and throwaway local runs only.
+    /// </summary>
+    public EbsStorageProvider StorageProvider { get; set; } = EbsStorageProvider.Sqlite;
+
+    /// <summary>
+    /// Directory holding the SQLite database (<c>ebs.db</c>). Relative paths resolve against the
+    /// content root. Must be on a persistent volume in a container deployment.
+    /// </summary>
+    public string DataDirectory { get; set; } = "data";
+
+    /// <summary>
+    /// Directory holding the ASP.NET Core Data Protection key ring that encrypts Twitch tokens at
+    /// rest. Defaults to <c>{DataDirectory}/keys</c>; point it at a separate volume or secret mount so
+    /// a copy of the database alone can't be decrypted. Losing these keys invalidates every stored
+    /// Twitch grant (broadcasters must log in again).
+    /// </summary>
+    public string? DataProtectionKeysDirectory { get; set; }
+
+    /// <summary>Absolute path of <see cref="DataDirectory"/>, resolved against <paramref name="contentRootPath"/>.</summary>
+    public string ResolveDataDirectory(string contentRootPath) => Path.GetFullPath(DataDirectory, contentRootPath);
+
+    /// <summary>Absolute path of the Data Protection key ring directory, resolved against <paramref name="contentRootPath"/>.</summary>
+    public string ResolveDataProtectionKeysDirectory(string contentRootPath) =>
+        string.IsNullOrWhiteSpace(DataProtectionKeysDirectory)
+            ? Path.Combine(ResolveDataDirectory(contentRootPath), "keys")
+            : Path.GetFullPath(DataProtectionKeysDirectory, contentRootPath);
+}
+
+/// <summary>Backing store for the EBS's durable state. See <see cref="EbsOptions.StorageProvider"/>.</summary>
+public enum EbsStorageProvider
+{
+    /// <summary>A single SQLite file under <see cref="EbsOptions.DataDirectory"/>; survives restarts.</summary>
+    Sqlite,
+
+    /// <summary>Process-local only; everything is lost on restart.</summary>
+    InMemory,
 }

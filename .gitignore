@@ -1,4 +1,6 @@
 # Build output
+# EBS local SQLite database + Data Protection key ring (holds broadcaster credentials)
+src/EDNexus.Ebs/data/
 [Bb]in/
 [Oo]bj/
 [Oo]ut/

@@ -9,7 +9,11 @@
 #     -e Twitch__ExtensionId=<extension-id> \
 #     -e Twitch__ExtensionSecret=<base64-extension-secret> \
 #     -e Ebs__Port=8787 \
+#     -v ednexus-ebs-data:/data \
 #     ednexus-ebs
+#
+# Broadcaster tokens, encrypted Twitch grants and the Data Protection key ring live under /data —
+# mount a persistent volume there or every restart logs every broadcaster out.
 
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
@@ -25,6 +29,8 @@ WORKDIR /app
 COPY --from=build /app .
 
 ENV Ebs__Port=8787
+ENV Ebs__DataDirectory=/data
+VOLUME /data
 EXPOSE 8787
 
 ENTRYPOINT ["dotnet", "EDNexus.Ebs.dll"]

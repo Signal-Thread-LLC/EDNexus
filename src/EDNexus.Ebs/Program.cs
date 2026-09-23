@@ -5,6 +5,9 @@ using EDNexus.Ebs.Models;
 using EDNexus.Ebs.Options;
 using EDNexus.Ebs.Security;
 using EDNexus.Ebs.Services;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.DataProtection.KeyManagement;
+using Microsoft.AspNetCore.DataProtection.Repositories;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
 
@@ -29,8 +32,43 @@ builder.Services.AddSingleton(TimeProvider.System);
 // via the EBS-issued long-lived broadcaster token (IBroadcasterTokenStore) instead of a Twitch
 // Extension JWT.
 builder.Services.AddSingleton<ITwitchExtensionJwtService, TwitchExtensionJwtService>();
-builder.Services.AddSingleton<IChannelStateStore, InMemoryChannelStateStore>();
-builder.Services.AddSingleton<IBroadcasterTokenStore, InMemoryBroadcasterTokenStore>();
+
+// Durable state (see EbsOptions.StorageProvider): broadcaster tokens + Twitch grants and each
+// channel's last published state live in one SQLite file so a crash/restart/redeploy doesn't log
+// every broadcaster out. Twitch tokens are encrypted with Data Protection, whose key ring must
+// itself be persisted — otherwise every restart would mint a fresh key and orphan the ciphertext.
+// Everything resolves through IOptions (not builder.Configuration) so test/host overrides applied
+// after this point are honoured.
+builder.Services.AddDataProtection().SetApplicationName("EDNexus.Ebs");
+builder.Services
+    .AddOptions<KeyManagementOptions>()
+    .Configure<IOptions<EbsOptions>, IHostEnvironment, ILoggerFactory>((keys, ebs, env, loggerFactory) =>
+    {
+        if (ebs.Value.StorageProvider != EbsStorageProvider.Sqlite)
+            return; // in-memory state dies with the process anyway; the default key ring is fine.
+
+        var keysDirectory = Directory.CreateDirectory(ebs.Value.ResolveDataProtectionKeysDirectory(env.ContentRootPath));
+        keys.XmlRepository = new FileSystemXmlRepository(keysDirectory, loggerFactory);
+    });
+builder.Services.AddSingleton(sp =>
+{
+    var ebs = sp.GetRequiredService<IOptions<EbsOptions>>().Value;
+    var dataDirectory = Directory.CreateDirectory(ebs.ResolveDataDirectory(sp.GetRequiredService<IHostEnvironment>().ContentRootPath));
+    return new EbsDatabase(Path.Combine(dataDirectory.FullName, EbsDatabase.FileName));
+});
+builder.Services.AddSingleton<IChannelStateStore>(sp =>
+    sp.GetRequiredService<IOptions<EbsOptions>>().Value.StorageProvider == EbsStorageProvider.Sqlite
+        ? new SqliteChannelStateStore(sp.GetRequiredService<EbsDatabase>(), sp.GetRequiredService<TimeProvider>())
+        : new InMemoryChannelStateStore());
+builder.Services.AddSingleton<IBroadcasterTokenStore>(sp =>
+    sp.GetRequiredService<IOptions<EbsOptions>>().Value.StorageProvider == EbsStorageProvider.Sqlite
+        ? new SqliteBroadcasterTokenStore(
+            sp.GetRequiredService<EbsDatabase>(),
+            sp.GetRequiredService<IDataProtectionProvider>(),
+            sp.GetRequiredService<TimeProvider>(),
+            sp.GetRequiredService<ILogger<SqliteBroadcasterTokenStore>>())
+        : new InMemoryBroadcasterTokenStore(sp.GetRequiredService<TimeProvider>()));
+
 builder.Services.AddHttpClient<ITwitchPubSubClient, TwitchPubSubClient>(client =>
 {
     // A hanging Helix call shouldn't be able to tie up a request indefinitely (the default
@@ -104,6 +142,11 @@ if (!urlsAlreadyConfigured && !builder.Environment.IsEnvironment("Testing"))
 
 var app = builder.Build();
 
+// Open the database (creating the data directory and migrating the schema) now, so a bad
+// Ebs:DataDirectory or an unreadable/too-new database fails the deploy instead of the first request.
+app.Services.GetRequiredService<IBroadcasterTokenStore>();
+app.Services.GetRequiredService<IChannelStateStore>();
+
 app.UseCors("extension-frontend");
 
 // Authenticates /api/update-state (via the EBS-issued long-lived broadcaster token — see
@@ -131,6 +174,10 @@ app.Use(async (context, next) =>
 });
 
 app.UseRateLimiter();
+
+// Anyone who lands on the bare EBS host (e.g. following the OAuth redirect URI's origin) gets the
+// project site rather than a 404.
+app.MapGet("/", () => Results.Redirect("https://signal-thread-llc.github.io/EDNexus/"));
 
 app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
 

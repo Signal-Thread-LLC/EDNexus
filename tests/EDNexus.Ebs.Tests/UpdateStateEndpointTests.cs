@@ -141,6 +141,8 @@ public class UpdateStateEndpointTests : IClassFixture<UpdateStateEndpointTests.F
                 ["Twitch:ExtensionSecret"] = "c3VwZXItc2VjcmV0LWV4dGVuc2lvbi1rZXktMTIzNA==",
                 ["Twitch:ClientId"] = "test-client-id",
                 ["Twitch:ExtensionId"] = "test-extension-id",
+                // Keep the shared fixture off disk; the restart-survival tests opt into Sqlite explicitly.
+                ["Ebs:StorageProvider"] = "InMemory",
                 // Generous by default so unrelated tests sharing this fixture's single server instance
                 // don't throttle each other (they'd otherwise all share one "unknown" IP bucket for
                 // any request that never reaches a valid channel id). The dedicated rate-limit test
