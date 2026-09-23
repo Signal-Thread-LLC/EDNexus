@@ -42,7 +42,6 @@ public sealed class EngineHost : IDisposable
     private readonly DiscordPresenceService? _discordPresence;
     private readonly TwitchStreamCardService? _twitchCard;
     private readonly StreamStateApiClient? _twitchCardClient;
-    private readonly DiscordPresenceController? _discordPresence;
     private readonly HttpClient _http;
     private Task? _runTask;
 
