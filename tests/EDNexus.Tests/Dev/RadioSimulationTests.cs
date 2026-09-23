@@ -163,33 +163,56 @@ public class RadioSimulationTests
     [Fact]
     public async Task Playing_a_station_buffers_before_it_goes_live()
     {
-        var sim = new SimulatedRadioPlayer(connectDelay: TimeSpan.FromMilliseconds(50));
+        // The connect completes only when the test says so, so each state check is deterministic.
+        var connected = new TaskCompletionSource();
+        var sim = new SimulatedRadioPlayer(() => connected.Task);
         var seen = new List<RadioPlaybackStatus>();
-        var live = new TaskCompletionSource();
-        sim.Changed += () =>
-        {
-            var status = sim.Snapshot.Status;
-            lock (seen) seen.Add(status);
-            if (status == RadioPlaybackStatus.Playing) live.TrySetResult();
-        };
+        sim.Changed += () => seen.Add(sim.Snapshot.Status);
 
         await sim.PlayAsync(RadioStationCatalog.Stations[0].Id);
         Assert.Equal(RadioPlaybackStatus.Buffering, sim.Snapshot.Status);   // returns while still connecting
 
-        await live.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        lock (seen) Assert.Equal(new[] { RadioPlaybackStatus.Buffering, RadioPlaybackStatus.Playing }, seen);
+        connected.SetResult();
+        await sim.LastConnect;
+
+        Assert.Equal(RadioPlaybackStatus.Playing, sim.Snapshot.Status);
+        Assert.Equal(new[] { RadioPlaybackStatus.Buffering, RadioPlaybackStatus.Playing }, seen);
     }
 
     [Fact]
     public async Task Stopping_while_buffering_is_not_overridden_by_the_late_connect()
     {
-        var sim = new SimulatedRadioPlayer(connectDelay: TimeSpan.FromMilliseconds(50));
+        var connected = new TaskCompletionSource();
+        var sim = new SimulatedRadioPlayer(() => connected.Task);
 
         await sim.PlayAsync(RadioStationCatalog.Stations[0].Id);
         await sim.TogglePlayPauseAsync();   // Buffering → Stop
-        await Task.Delay(200);
+        connected.SetResult();              // the stale connect lands afterwards
+        await sim.LastConnect;
 
         Assert.Equal(RadioPlaybackStatus.Stopped, sim.Snapshot.Status);
+    }
+
+    [Fact]
+    public async Task Retuning_while_buffering_only_the_latest_connect_goes_live()
+    {
+        var first = new TaskCompletionSource();
+        var second = new TaskCompletionSource();
+        var gates = new Queue<Task>(new[] { first.Task, second.Task });
+        var sim = new SimulatedRadioPlayer(() => gates.Dequeue());
+
+        await sim.PlayAsync(RadioStationCatalog.Stations[0].Id);
+        var firstConnect = sim.LastConnect;
+        await sim.PlayAsync(RadioStationCatalog.Stations[1].Id);
+
+        first.SetResult();   // the superseded connect must not flip the new station live
+        await firstConnect;
+        Assert.Equal(RadioPlaybackStatus.Buffering, sim.Snapshot.Status);
+
+        second.SetResult();
+        await sim.LastConnect;
+        Assert.Equal(RadioPlaybackStatus.Playing, sim.Snapshot.Status);
+        Assert.Equal(RadioStationCatalog.Stations[1], sim.Snapshot.Station);
     }
 }
 

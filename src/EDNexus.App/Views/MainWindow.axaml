@@ -185,7 +185,7 @@
                        TextTrimming="CharacterEllipsis" Margin="6,0,0,0" />
             <Border IsVisible="{Binding RadioIsSimulated}" Background="#1E1712" CornerRadius="4"
                     Padding="4,1" Margin="4,0,0,0" VerticalAlignment="Center"
-                    ToolTip.Tip="Developer mode: the radio controls drive a simulation. No audio plays and nothing is saved.">
+                    ToolTip.Tip="{Binding RadioSimTooltip}">
               <TextBlock Text="SIM" FontSize="10" FontWeight="SemiBold" LetterSpacing="1"
                          Foreground="{StaticResource AmberBrush}" />
             </Border>

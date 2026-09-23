@@ -41,7 +41,10 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     public MainWindowViewModel(Bootstrap boot)
     {
         _boot = boot;
-        _radioService = new RadioPlayerService(_boot.Settings, _boot.Store);
+        // The delayed volume save runs on the UI thread, where the rest of the app edits the same
+        // settings object, so the two never serialize and mutate it at once.
+        _radioService = new RadioPlayerService(_boot.Settings, _boot.Store,
+            postSave: save => Dispatcher.UIThread.Post(save));
         _radio = new RadioPlayerSelector(_radioService, () => _boot.Dev.Enabled);
         // Stream events arrive off the UI thread, independent of the 250 ms refresh tick.
         _radio.Changed += () => Dispatcher.UIThread.Post(RefreshRadio);
@@ -276,8 +279,14 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     {
         _boot.DiscordSettingsChanged -= OnDiscordSettingsChanged;
         _boot.Overlay.Hide();
-        _host.Dispose();
-        _radioService.Dispose(); // also flushes a debounced volume save
+        try
+        {
+            _radioService.Dispose(); // also flushes a debounced volume save
+        }
+        finally
+        {
+            _host.Dispose();
+        }
     }
 
     /// <summary>Push saved Discord Rich Presence settings onto the live engine (connect/disconnect, privacy).</summary>
@@ -306,6 +315,9 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     /// <summary>True while the transport drives the developer-mode simulation (shows a SIM marker).</summary>
     [ObservableProperty] private bool _radioIsSimulated;
 
+    /// <summary>Tooltip on the SIM marker; warns when the real radio is still playing underneath.</summary>
+    [ObservableProperty] private string _radioSimTooltip = RadioDisplay.SimulationTooltip;
+
     /// <summary>Mirror the active player's snapshot onto the bindable properties above.</summary>
     private void RefreshRadio()
     {
@@ -314,6 +326,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         var s = _radio.Active.Snapshot;
         var d = RadioDisplay.From(s);
         RadioIsSimulated = _radio.IsSimulated;
+        RadioSimTooltip = RadioDisplay.SimulationNote(_radio.Real.Snapshot);
         RadioStationName = s.Station?.Name ?? "No station tuned";
         RadioPlayPauseGlyph = d.PlayPauseGlyph;
         RadioTooltip = d.PlayPauseTooltip;

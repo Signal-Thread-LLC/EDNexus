@@ -126,6 +126,90 @@ public class RadioPlayerServiceTests
     }
 
     [Fact]
+    public async Task The_delayed_volume_save_runs_on_the_settings_owner_not_the_timer_thread()
+    {
+        using var temp = new TempRadioSettings(wasPlaying: false);
+        var posted = new System.Collections.Concurrent.ConcurrentQueue<Action>();
+        using var radio = new RadioPlayerService(temp.Settings, temp.Store,
+            saveDelay: TimeSpan.FromMilliseconds(10), postSave: posted.Enqueue);
+
+        await radio.SetVolumeAsync(64);
+
+        // The timer fires, but only hands the save to the owner; nothing is written from its thread.
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (posted.IsEmpty && DateTime.UtcNow < deadline) await Task.Delay(10);
+        Assert.True(posted.TryDequeue(out var save));
+        Assert.Equal(50, temp.Reload().RadioVolume);
+
+        save!();   // the owner (the UI thread, in the app) runs it
+        Assert.Equal(64, temp.Reload().RadioVolume);
+    }
+
+    [Fact]
+    public async Task A_failed_delayed_save_is_retried_rather_than_dropped()
+    {
+        // Point the store at a path that is currently a directory, so every write fails.
+        var path = Path.Combine(Path.GetTempPath(), $"ednexus-radio-test-{Guid.NewGuid():N}.json");
+        Directory.CreateDirectory(path);
+        try
+        {
+            var store = new SettingsStore(path);
+            var settings = new AppSettings();
+            var posted = new System.Collections.Concurrent.ConcurrentQueue<Action>();
+            using var radio = new RadioPlayerService(settings, store,
+                saveDelay: TimeSpan.FromMilliseconds(10), postSave: posted.Enqueue);
+
+            await radio.SetVolumeAsync(42);
+
+            var deadline = DateTime.UtcNow.AddSeconds(10);
+            while (posted.IsEmpty && DateTime.UtcNow < deadline) await Task.Delay(10);
+            Assert.True(posted.TryDequeue(out var firstTry));
+            firstTry!();   // fails: the path is a directory
+            Assert.False(File.Exists(path));
+
+            // The write became possible again; the save must still be pending and re-armed.
+            Directory.Delete(path);
+            deadline = DateTime.UtcNow.AddSeconds(10);
+            while (!File.Exists(path) && DateTime.UtcNow < deadline)
+            {
+                if (posted.TryDequeue(out var retry)) retry();
+                else await Task.Delay(10);
+            }
+
+            Assert.Equal(42, new SettingsStore(path).Load().Radio.RadioVolume);
+        }
+        finally
+        {
+            if (Directory.Exists(path)) Directory.Delete(path);
+            if (File.Exists(path)) File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void Concurrent_saves_to_one_store_are_serialized()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"ednexus-settings-test-{Guid.NewGuid():N}.json");
+        try
+        {
+            var store = new SettingsStore(path);
+            var settings = new AppSettings();
+            var failures = 0;
+
+            Parallel.For(0, 200, new ParallelOptions { MaxDegreeOfParallelism = 8 }, _ =>
+            {
+                if (!store.TrySave(settings)) Interlocked.Increment(ref failures);
+            });
+
+            Assert.Equal(0, failures);
+            Assert.NotNull(new SettingsStore(path).Load());
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
     public async Task An_immediate_save_also_covers_a_pending_volume_change()
     {
         using var temp = new TempRadioSettings(wasPlaying: false);

@@ -89,4 +89,26 @@ public class RadioDisplayTests
         Assert.Equal(glyph, d.MuteGlyph);
         Assert.Equal(tooltip, d.MuteTooltip);
     }
+
+    [Theory]
+    [InlineData(RadioPlaybackStatus.Playing, true)]
+    [InlineData(RadioPlaybackStatus.Buffering, true)]
+    [InlineData(RadioPlaybackStatus.Paused, false)]
+    [InlineData(RadioPlaybackStatus.Stopped, false)]
+    [InlineData(RadioPlaybackStatus.Error, false)]
+    public void Simulation_note_warns_only_when_the_real_radio_is_still_audible(RadioPlaybackStatus real, bool warns)
+    {
+        var note = RadioDisplay.SimulationNote(Snap(real, Station));
+
+        if (warns)
+        {
+            Assert.Contains("still playing", note);
+            Assert.Contains(Station.Name, note);
+            Assert.Contains("Settings", note);
+        }
+        else
+        {
+            Assert.Equal(RadioDisplay.SimulationTooltip, note);
+        }
+    }
 }

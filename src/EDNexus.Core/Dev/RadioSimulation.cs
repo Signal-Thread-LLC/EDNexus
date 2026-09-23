@@ -73,7 +73,7 @@ public sealed class SimulatedRadioPlayer : IRadioPlayer
     private static readonly TimeSpan DefaultConnectDelay = TimeSpan.FromMilliseconds(800);
 
     private readonly object _gate = new();
-    private readonly TimeSpan _connectDelay;
+    private readonly Func<Task>? _connect;   // null: connect synchronously
     private int _generation; // bumped by every state change, so a stale "connected" can't overwrite a newer state
     private RadioStation? _station;
     private RadioPlaybackStatus _status = RadioPlaybackStatus.Stopped;
@@ -87,7 +87,18 @@ public sealed class SimulatedRadioPlayer : IRadioPlayer
     /// connects synchronously, which keeps tests deterministic.
     /// </param>
     public SimulatedRadioPlayer(TimeSpan? connectDelay = null)
-        => _connectDelay = connectDelay ?? DefaultConnectDelay;
+        : this(DelayedConnect(connectDelay ?? DefaultConnectDelay))
+    {
+    }
+
+    private static Func<Task>? DelayedConnect(TimeSpan delay)
+        => delay > TimeSpan.Zero ? () => Task.Delay(delay) : null;
+
+    /// <summary>Test hook: the station reports Playing once <paramref name="connect"/> completes.</summary>
+    internal SimulatedRadioPlayer(Func<Task>? connect) => _connect = connect;
+
+    /// <summary>Test hook: the most recent play's connect, which completes once it has gone live (or been superseded).</summary>
+    internal Task LastConnect { get; private set; } = Task.CompletedTask;
 
     /// <inheritdoc />
     public event Action? Changed;
@@ -166,13 +177,13 @@ public sealed class SimulatedRadioPlayer : IRadioPlayer
         }
         RaiseChanged();
 
-        _ = ConnectAsync(generation);
+        LastConnect = ConnectAsync(generation);
         return Task.CompletedTask;
     }
 
     private async Task ConnectAsync(int generation)
     {
-        if (_connectDelay > TimeSpan.Zero) await Task.Delay(_connectDelay).ConfigureAwait(false);
+        if (_connect is not null) await _connect().ConfigureAwait(false);
 
         lock (_gate)
         {
