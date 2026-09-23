@@ -238,7 +238,13 @@ static bool TryAuthenticateBroadcaster(HttpRequest request, IBroadcasterTokenSto
     var token = header["Bearer ".Length..].Trim();
     if (!tokenStore.TryGetByToken(token, out var record))
     {
-        failure = Results.Unauthorized();
+        // Say which kind of 401 this is. The token store is in-memory, so the overwhelmingly common
+        // cause is that this EBS process has restarted since the client logged in — an empty 401
+        // sends people hunting through their Twitch console configuration instead.
+        failure = Results.Problem(
+            "This token is not known to the service. If the service has restarted, log in again — "
+            + "broadcaster tokens are held in memory and do not survive a restart.",
+            statusCode: StatusCodes.Status401Unauthorized);
         return false;
     }
 

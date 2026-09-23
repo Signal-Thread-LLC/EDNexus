@@ -26,6 +26,10 @@ dotnet run --project src/EDNexus.Cli -- --once
 # Omit the blueprint id to list every plannable blueprint.
 dotnet run --project src/EDNexus.Cli -- --once --plan fsd_increased_range 5 3
 
+# Print the exact payload the Twitch extension would show viewers, from the live journal.
+# Add --show-credits to include the balance (withheld by default, as in the app).
+dotnet run --project src/EDNexus.Cli -- --twitch-card
+
 # Unit tests (xUnit).
 dotnet test EDNexus.slnx
 ```
@@ -46,6 +50,8 @@ Journal.*.log + *.json  ──►  JournalWatcher  ──►  JournalEventBus  �
 | `src/EDNexus.Core` | Engine + feature services. No UI dependencies. |
 | `src/EDNexus.App` | Avalonia 12 desktop UI (MVVM via CommunityToolkit.Mvvm). |
 | `src/EDNexus.Cli` | Headless harness for validation. |
+| `src/EDNexus.Ebs` | Twitch Extension Backend Service: relays commander state to viewers. |
+| `extension/` | The Twitch extension frontend (vanilla HTML/CSS/JS, no build step). |
 
 Key types live in `src/EDNexus.Core`: `JournalWatcher`, `JournalEntry`, `JournalEventBus`,
 `StateTracker`, `CommanderState`, `EngineHost`.

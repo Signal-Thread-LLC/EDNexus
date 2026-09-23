@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EDNexus — Commander Card</title>
+  <link rel="stylesheet" href="css/card.css">
+</head>
+<!--
+  The overlay iframe covers the whole player, so the body itself must never intercept clicks —
+  only the handle and the open panel do (see .ednx-root in card.css). Everything starts collapsed
+  so a viewer who never opens the card sees nothing but a small tab.
+-->
+<body class="ednx-body">
+  <div class="ednx-root" id="root" data-open="false" data-state="waiting">
+
+    <!-- Collapsed state: the only thing on screen until a viewer asks for more. -->
+    <button type="button" class="ednx-handle" id="handle" aria-expanded="false" aria-controls="panel">
+      <span class="ednx-handle__mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="9"></circle>
+          <path d="M12 3v18M3 12h18"></path>
+        </svg>
+      </span>
+      <span class="ednx-handle__text">
+        <span class="ednx-handle__headline" id="handle-headline">Connecting…</span>
+        <span class="ednx-handle__sub" id="handle-sub"></span>
+      </span>
+      <span class="ednx-handle__chevron" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 18l6-6-6-6"></path>
+        </svg>
+      </span>
+    </button>
+
+    <!-- Expanded state: the card proper. Hidden from assistive tech while collapsed. -->
+    <section class="ednx-panel" id="panel" aria-label="Commander information" hidden>
+      <header class="ednx-panel__head">
+        <div class="ednx-panel__title">
+          <span class="ednx-panel__cmdr" id="cmdr-name">CMDR</span>
+          <span class="ednx-panel__where" id="cmdr-where"></span>
+        </div>
+        <button type="button" class="ednx-close" id="close" aria-label="Hide commander card">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 6L6 18M6 6l12 12"></path>
+          </svg>
+        </button>
+      </header>
+
+      <!-- Sections are written by js/card.js; each one removes itself when the broadcaster
+           has hidden it or the game has not reported anything for it yet. -->
+      <div class="ednx-sections" id="sections"></div>
+
+      <footer class="ednx-panel__foot">
+        <span class="ednx-stale" id="stale" hidden>Waiting for an update…</span>
+        <a class="ednx-brand" href="https://github.com/Signal-Thread-LLC/EDNexus" target="_blank" rel="noopener noreferrer">EDNexus</a>
+      </footer>
+    </section>
+  </div>
+
+  <!-- Twitch's extension helper. Must load before our own scripts: it defines window.Twitch.ext,
+       which carries auth, the configuration service and the PubSub subscription. -->
+  <script src="https://extension-files.twitch.tv/helper/v1/twitch-ext.min.js"></script>
+  <script src="js/state.js"></script>
+  <script src="js/card.js"></script>
+</body>
+</html>

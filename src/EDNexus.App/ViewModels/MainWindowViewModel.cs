@@ -110,6 +110,13 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     /// <summary>The dashboard cards, in display order.</summary>
     public ObservableCollection<CardViewModel> Cards { get; }
 
+    /// <summary>
+    /// The live Twitch stream-card publisher of the current host, for the settings dialog's preview
+    /// and publish-status line. Read through the field rather than cached, since
+    /// <see cref="ResetToLive"/> replaces the host.
+    /// </summary>
+    public EDNexus.Core.Twitch.TwitchStreamCardService? TwitchCard => _host.TwitchCard;
+
     // --- Dashboard layout: order, visibility, width and collapse, persisted per card. ---
 
     private IEnumerable<CardDefaults> CardDefaults() => Cards.Select(c => new CardDefaults(c.Id, c.DefaultWidth));
@@ -224,6 +231,20 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             settings: _boot.Settings,
             reportingSuppressed: () => _boot.Dev.Enabled);
         _boot.Crash.Attach(host.Bus); // report journal handler errors
+
+        // The stream card talks to a network service and can fail in several distinct ways. Without
+        // this the only feedback is a label in the settings dialog, so a commander whose card never
+        // appears has nothing to send us and nothing to read.
+        if (host.TwitchCard is { } twitchCard)
+        {
+            twitchCard.PublishCompleted += result =>
+            {
+                if (result.IsSuccess) Trace.TraceInformation("Twitch: stream card published.");
+                else Trace.TraceWarning($"Twitch: stream card publish failed ({result.Status}) — {result.Error}");
+            };
+            twitchCard.ReauthRequired += () =>
+                Trace.TraceWarning("Twitch: the backend rejected this machine's token; publishing stopped until re-login.");
+        }
         host.VoiceCallouts.CalloutRaised += OnVoiceCalloutRaised;
 
         // The dev-mode radio simulation listens on this host's bus, where the 🎲 publishes.

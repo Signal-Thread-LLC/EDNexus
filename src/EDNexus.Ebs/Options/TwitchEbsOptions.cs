@@ -49,7 +49,7 @@ public sealed class TwitchEbsOptions
     /// exactly match what's configured in the Twitch developer console (e.g.
     /// <c>https://ebs.example.com/oauth/callback</c>).
     /// </summary>
-    public string OAuthRedirectUri { get; set; } = "http://localhost:8787/oauth/callback";
+    public string OAuthRedirectUri { get; set; } = "https://ednexus.signal-and-thread.com/oauth/callback";
 
     /// <summary>Scopes requested from Twitch during login — the minimal set needed to identify the broadcaster.</summary>
     public IReadOnlyList<string> OAuthScopes { get; set; } = new[] { "user:read:email" };

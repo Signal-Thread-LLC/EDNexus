@@ -7,7 +7,10 @@ using EDNexus.Core.Market;
 using EDNexus.Core.Materials;
 using EDNexus.Core.Overlay;
 using EDNexus.Core.Ranks;
+using EDNexus.Core.Mining;
+using EDNexus.Core.Missions;
 using EDNexus.Core.State;
+using EDNexus.Core.Twitch;
 using EDNexus.Core.Voice;
 
 // EDNexus.Cli — a headless harness for the journal engine.
@@ -17,6 +20,10 @@ using EDNexus.Core.Voice;
 //   --plan <blueprint-id> [grade] [rolls]
 //               cost an engineering roll against the live inventory and print the shopping list.
 //               With no blueprint id, lists what can be planned.
+//   --twitch-card [--show-credits]
+//               print the StreamCardSnapshot the Twitch extension would show viewers, exactly as
+//               it goes on the wire. Credits are withheld unless --show-credits is passed, matching
+//               the app's own default. Implies --once.
 
 string? dir = null;
 string? planId = null;
@@ -33,6 +40,11 @@ for (var i = 0; i < args.Length; i++)
     }
 }
 
+// --twitch-card emits a payload meant to be piped into a file or a POST body, so its progress
+// lines go to stderr — on stdout they would sit in front of the JSON and every parser would reject it.
+var twitchCardOnly = args.Contains("--twitch-card");
+var status = twitchCardOnly ? Console.Error : Console.Out;
+
 dir ??= JournalPaths.Resolve();
 if (dir is null)
 {
@@ -41,7 +53,7 @@ if (dir is null)
     return 1;
 }
 
-Console.WriteLine($"Journal directory: {dir}");
+status.WriteLine($"Journal directory: {dir}");
 
 var bus = new JournalEventBus();
 var state = new CommanderState();
@@ -51,6 +63,8 @@ var market = new MarketTracker(bus, state);
 var exobio = new ExobiologyTracker(bus, state);
 var engineering = new EngineeringTracker(bus);
 var ranks = new RankTracker(bus);
+var mining = new MiningTracker(bus);
+var missions = new MissionTracker(bus);
 var voiceCallouts = new VoiceCalloutTracker(bus, state, exobio, colonisation);
 
 var liveCounts = new SortedDictionary<string, int>();
@@ -65,8 +79,24 @@ voiceCallouts.CalloutRaised += callout => voiceLog.Add($"[{callout.Kind}] {callo
 bus.HandlerError += (e, ex) => Console.Error.WriteLine($"  [handler error on {e.Event}] {ex.Message}");
 
 var watcher = new JournalWatcher(dir, bus);
-Console.WriteLine("Replaying latest journal to warm up state...\n");
+status.WriteLine("Replaying latest journal to warm up state...\n");
 watcher.Replay();
+
+// --twitch-card is a payload dump, not a state dump: print just the JSON the extension would
+// receive, so it can be piped straight into a file or a POST body, then stop.
+if (twitchCardOnly)
+{
+    var cardVisibility = args.Contains("--show-credits")
+        ? StreamCardVisibility.Default with { Credits = true }
+        : StreamCardVisibility.Default;
+    var card = StreamCardMapper.Map(
+        state, new StreamCardSources(ranks, exobio, mining, missions), cardVisibility);
+    Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(
+        card,
+        new System.Text.Json.JsonSerializerOptions(StreamCardSnapshot.SerializerOptions) { WriteIndented = true }));
+    return 0;
+}
+
 PrintState(state);
 PrintColonisation(colonisation, state);
 PrintMarket(market, state);
