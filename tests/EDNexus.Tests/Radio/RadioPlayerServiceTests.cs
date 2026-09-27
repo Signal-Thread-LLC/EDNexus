@@ -639,4 +639,54 @@ public class RadioPlayerServiceTests
         Assert.True(saved.RadioWasPlaying);
         Assert.True(RadioPlayerService.ShouldResumeOnLaunch(saved)); // next launch as if dev mode never happened
     }
+
+    [Fact]
+    public async Task Dispose_does_not_hang_when_the_native_teardown_is_wedged()
+    {
+        // #144: stand in for a LibVLC call stuck behind its event thread by holding the lock the
+        // teardown needs on another thread. Dispose must still flush settings and return in bound.
+        using var temp = new TempRadioSettings();
+        var radio = new RadioPlayerService(temp.Settings, temp.Store, TimeSpan.FromMinutes(1), postSave: null,
+            nativeTeardownTimeout: TimeSpan.FromMilliseconds(200));
+        await radio.SetVolumeAsync(17);
+
+        using var held = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        var wedge = new Thread(() =>
+        {
+            lock (radio.TransportGateForTest) { held.Set(); release.Wait(); }
+        }) { IsBackground = true };
+        wedge.Start();
+        held.Wait();
+
+        try
+        {
+            var dispose = Task.Run(radio.Dispose);
+            var finished = await Task.WhenAny(dispose, Task.Delay(TimeSpan.FromSeconds(10)));
+            Assert.Same(dispose, finished); // returned despite the wedge
+        }
+        finally
+        {
+            release.Set();
+        }
+
+        Assert.Equal(17, temp.Reload().RadioVolume); // the debounced save still went out
+    }
+
+    [Fact]
+    public async Task Transport_calls_after_dispose_are_harmless()
+    {
+        using var temp = new TempRadioSettings();
+        var radio = new RadioPlayerService(temp.Settings, temp.Store);
+        radio.Dispose();
+
+        await radio.PauseAsync();
+        await radio.StopAsync();
+        await radio.SetVolumeAsync(30);
+        await radio.SetMuteAsync(true);
+        await radio.PlayAsync(RadioStationCatalog.Stations[0].Id);
+
+        Assert.Null(radio.Snapshot.LastError);
+        Assert.Equal(RadioPlaybackStatus.Stopped, radio.Snapshot.Status); // no engine brought back up
+    }
 }

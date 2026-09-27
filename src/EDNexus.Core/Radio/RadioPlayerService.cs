@@ -36,10 +36,19 @@ public sealed class RadioPlayerService : IRadioPlayer, IDisposable, IAsyncDispos
     private bool _suspended; // audio stopped for developer mode; resume on leaving it
     private int _pendingPlays; // plays queued but not yet through PlayStationCore (status still stale)
 
-    // Serializes "start a stream" against "stop it for developer mode" so a play that was already
-    // queued can't slip in after the suspend. LibVLC event handlers never take it (they only take
-    // _gate), so it adds no path to the #144 shutdown deadlock.
+    // Serializes every call into the native player (play, pause, stop, volume, mute, teardown), so a
+    // play that was already queued can't slip in after a suspend and the player is never freed while
+    // another call is using it. LibVLC event handlers never take it (they only take _gate).
+    //
+    // #144: LibVLC raises its events synchronously on its own threads, and Stop() joins those
+    // threads. Our handlers take _gate, so _gate must never be held across a native call; callers
+    // snapshot what they need under _gate, release it, and only then call into LibVLC.
     private readonly object _transportGate = new();
+
+    // How long Dispose waits for LibVLC to stop and release before giving up on it: a wedged native
+    // teardown must not hang app exit.
+    private static readonly TimeSpan DefaultNativeTeardownTimeout = TimeSpan.FromSeconds(3);
+    private readonly TimeSpan _nativeTeardownTimeout;
 
     // Volume changes arrive in bursts (a slider drag fires one per step). They apply to the player
     // and the in-memory settings immediately, but the disk write is coalesced: one save once the
@@ -75,10 +84,22 @@ public sealed class RadioPlayerService : IRadioPlayer, IDisposable, IAsyncDispos
         SettingsStore? store = null,
         TimeSpan? saveDelay = null,
         Action<Action>? postSave = null)
+        : this(settings, store, saveDelay, postSave, DefaultNativeTeardownTimeout)
+    {
+    }
+
+    /// <summary>Test seam: as the public constructor, with a custom bound on the native teardown in <see cref="Dispose"/>.</summary>
+    internal RadioPlayerService(
+        AppSettings? settings,
+        SettingsStore? store,
+        TimeSpan? saveDelay,
+        Action<Action>? postSave,
+        TimeSpan nativeTeardownTimeout)
     {
         _settings = settings;
         _store = store;
         _saveDelay = saveDelay ?? DefaultSaveDelay;
+        _nativeTeardownTimeout = nativeTeardownTimeout;
         _postSave = postSave ?? PostTo(SynchronizationContext.Current);
 
         var radio = settings?.Radio;
@@ -234,7 +255,12 @@ public sealed class RadioPlayerService : IRadioPlayer, IDisposable, IAsyncDispos
         {
             try
             {
-                lock (_gate) _mediaPlayer?.Pause();
+                lock (_transportGate)
+                {
+                    MediaPlayer? player;
+                    lock (_gate) player = _mediaPlayer;
+                    player?.Pause(); // outside _gate (#144)
+                }
             }
             catch (Exception ex)
             {
@@ -254,10 +280,12 @@ public sealed class RadioPlayerService : IRadioPlayer, IDisposable, IAsyncDispos
         {
             try
             {
-                lock (_gate)
+                lock (_transportGate)
                 {
-                    _mediaPlayer?.Stop();
-                    _status = RadioPlaybackStatus.Stopped;
+                    MediaPlayer? player;
+                    lock (_gate) player = _mediaPlayer;
+                    player?.Stop(); // outside _gate (#144): Stop waits for LibVLC's event threads
+                    lock (_gate) _status = RadioPlaybackStatus.Stopped;
                 }
                 RaiseChanged();
             }
@@ -373,9 +401,13 @@ public sealed class RadioPlayerService : IRadioPlayer, IDisposable, IAsyncDispos
             {
                 // Read the latest level rather than `clamped`: these tasks can run out of order
                 // during a slider drag, and the player must end on the value the snapshot shows.
-                lock (_gate)
+                // _transportGate keeps read-then-apply atomic, so the last task to run applies it.
+                lock (_transportGate)
                 {
-                    if (_mediaPlayer is not null) _mediaPlayer.Volume = _volume;
+                    MediaPlayer? player;
+                    int level;
+                    lock (_gate) { player = _mediaPlayer; level = _volume; }
+                    if (player is not null) player.Volume = level; // outside _gate (#144)
                 }
                 RaiseChanged();
             }
@@ -396,9 +428,12 @@ public sealed class RadioPlayerService : IRadioPlayer, IDisposable, IAsyncDispos
         {
             try
             {
-                lock (_gate)
+                lock (_transportGate)
                 {
-                    if (_mediaPlayer is not null) _mediaPlayer.Mute = muted;
+                    MediaPlayer? player;
+                    bool mute;
+                    lock (_gate) { player = _mediaPlayer; mute = _muted; }
+                    if (player is not null) player.Mute = mute; // outside _gate (#144)
                 }
                 RaiseChanged();
             }
@@ -597,14 +632,34 @@ public sealed class RadioPlayerService : IRadioPlayer, IDisposable, IAsyncDispos
         FlushPendingSave();
         lock (_saveGate) _saveTimer?.Dispose();
 
-        // _transportGate first (same order as PlayStationCore and the developer-mode suspend), so
-        // the engine isn't freed while one of them is between reading the player and using it.
+        // Stopping and releasing LibVLC happens off this thread with a bounded wait: if the native
+        // side wedges, app exit carries on and the process teardown reclaims it.
+        var teardown = Task.Run(TeardownEngine);
+        try { teardown.Wait(_nativeTeardownTimeout); } catch { /* best effort */ }
+    }
+
+    /// <summary>
+    /// Stops and frees the native engine. Takes <see cref="_transportGate"/> so the engine isn't
+    /// freed while another transport call is between reading the player and using it; detaches the
+    /// fields under <see cref="_gate"/> but calls LibVLC outside it (#144), since its event handlers
+    /// take <see cref="_gate"/>.
+    /// </summary>
+    private void TeardownEngine()
+    {
+        MediaPlayer? player;
+        LibVLC? libVlc;
         lock (_transportGate)
-        lock (_gate)
         {
-            try { _mediaPlayer?.Stop(); } catch { /* best effort */ }
-            _mediaPlayer?.Dispose();
-            _libVlc?.Dispose();
+            lock (_gate)
+            {
+                player = _mediaPlayer;
+                libVlc = _libVlc;
+                _mediaPlayer = null;
+                _libVlc = null;
+            }
+            try { player?.Stop(); } catch { /* best effort */ }
+            try { player?.Dispose(); } catch { /* best effort */ }
+            try { libVlc?.Dispose(); } catch { /* best effort */ }
         }
     }
 
