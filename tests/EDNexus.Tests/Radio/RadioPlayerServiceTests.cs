@@ -470,4 +470,100 @@ public class RadioPlayerServiceTests
         Assert.True(settings.Radio.RadioWasPlaying);
         Assert.True(RadioPlayerService.ShouldResumeOnLaunch(settings.Radio));
     }
+
+    // --- Developer mode suspends the real radio without touching its saved resume intent. ---
+    // No native libvlc under test, so the "playing" stream is faked with SetStatusForTest and a
+    // resume shows up as a play attempt (Buffering/Playing, or Error when libvlc is missing).
+
+    /// <summary>A radio playing station 0 with a resume-on-launch intent, whose settings file is then deleted so any write shows.</summary>
+    private static RadioPlayerService PlayingRadio(TempRadioSettings temp, RadioPlaybackStatus status)
+    {
+        var radio = new RadioPlayerService(temp.Settings, temp.Store);
+        radio.SetStatusForTest(status);
+        File.Delete(temp.Store.Path);
+        return radio;
+    }
+
+    [Theory]
+    [InlineData(RadioPlaybackStatus.Playing)]
+    [InlineData(RadioPlaybackStatus.Buffering)]
+    public async Task Entering_developer_mode_silences_an_audible_stream_but_keeps_and_does_not_persist_the_intent(
+        RadioPlaybackStatus status)
+    {
+        using var temp = new TempRadioSettings();
+        using var radio = PlayingRadio(temp, status);
+
+        await radio.SuspendForDeveloperModeAsync();
+
+        Assert.True(radio.IsSuspendedForDeveloperMode);
+        Assert.Equal(RadioPlaybackStatus.Stopped, radio.Snapshot.Status);
+        Assert.True(temp.Settings.Radio.RadioWasPlaying);   // in-memory intent untouched
+        Assert.False(File.Exists(temp.Store.Path));          // and nothing written
+    }
+
+    [Fact]
+    public async Task Leaving_developer_mode_resumes_a_stream_it_suspended()
+    {
+        using var temp = new TempRadioSettings();
+        using var radio = PlayingRadio(temp, RadioPlaybackStatus.Playing);
+
+        await radio.SuspendForDeveloperModeAsync();
+        await radio.ResumeAfterDeveloperModeAsync();
+
+        Assert.False(radio.IsSuspendedForDeveloperMode);
+        Assert.NotEqual(RadioPlaybackStatus.Stopped, radio.Snapshot.Status); // a play was attempted
+        Assert.Equal(RadioStationCatalog.Stations[0].Id, radio.Snapshot.Station?.Id);
+        Assert.True(temp.Settings.Radio.RadioWasPlaying);
+        Assert.False(File.Exists(temp.Store.Path));
+    }
+
+    [Theory]
+    [InlineData(RadioPlaybackStatus.Paused)]
+    [InlineData(RadioPlaybackStatus.Stopped)]
+    [InlineData(RadioPlaybackStatus.Error)]
+    public async Task A_quiet_radio_is_left_alone_on_entering_and_leaving_developer_mode(RadioPlaybackStatus status)
+    {
+        using var temp = new TempRadioSettings(wasPlaying: status == RadioPlaybackStatus.Error);
+        var wasPlaying = temp.Settings.Radio.RadioWasPlaying;
+        using var radio = PlayingRadio(temp, status);
+
+        await radio.SuspendForDeveloperModeAsync();
+        Assert.False(radio.IsSuspendedForDeveloperMode);
+        Assert.Equal(status, radio.Snapshot.Status);
+
+        await radio.ResumeAfterDeveloperModeAsync();
+        Assert.Equal(status, radio.Snapshot.Status);   // nothing restarted
+        Assert.Equal(wasPlaying, temp.Settings.Radio.RadioWasPlaying);
+        Assert.False(File.Exists(temp.Store.Path));
+    }
+
+    [Fact]
+    public async Task Pausing_or_stopping_during_developer_mode_cancels_the_resume()
+    {
+        using var temp = new TempRadioSettings();
+        using var radio = PlayingRadio(temp, RadioPlaybackStatus.Playing);
+
+        await radio.SuspendForDeveloperModeAsync();
+        await radio.SetEnabledAsync(false);             // Settings → Radio off while in dev mode
+        await radio.ResumeAfterDeveloperModeAsync();
+
+        Assert.False(radio.IsSuspendedForDeveloperMode);
+        Assert.Equal(RadioPlaybackStatus.Stopped, radio.Snapshot.Status);
+        Assert.False(temp.Reload().RadioWasPlaying);
+    }
+
+    [Fact]
+    public async Task Closing_the_app_while_suspended_keeps_the_saved_resume_flag()
+    {
+        using var temp = new TempRadioSettings();
+        var radio = new RadioPlayerService(temp.Settings, temp.Store);
+        radio.SetStatusForTest(RadioPlaybackStatus.Playing);
+
+        await radio.SuspendForDeveloperModeAsync();
+        radio.Dispose();
+
+        var saved = temp.Reload();
+        Assert.True(saved.RadioWasPlaying);
+        Assert.True(RadioPlayerService.ShouldResumeOnLaunch(saved)); // next launch as if dev mode never happened
+    }
 }

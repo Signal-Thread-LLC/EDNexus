@@ -43,24 +43,13 @@ public sealed record RadioDisplay(
     /// <summary>Speaker glyph at half volume and above.</summary>
     public const string LoudGlyph = "🔊";
 
-    /// <summary>Tooltip for the developer-mode SIM marker while the real radio is quiet.</summary>
-    public const string SimulationTooltip =
-        "Developer mode: the radio controls drive a simulation. No audio plays and nothing is saved.";
-
     /// <summary>
-    /// Tooltip for the developer-mode SIM marker, given the <em>real</em> player's snapshot. If the
-    /// real stream is still playing or connecting, say so and how to stop it. Dev mode deliberately
-    /// leaves it running: pausing it would clear the saved resume-on-launch intent.
+    /// Tooltip for the developer-mode SIM marker. Entering developer mode suspends the real radio
+    /// (<see cref="RadioPlayerService.SuspendForDeveloperModeAsync"/>), so nothing real is audible.
     /// </summary>
-    public static string SimulationNote(RadioPlayerSnapshot real)
-    {
-        if (real.Status is not (RadioPlaybackStatus.Playing or RadioPlaybackStatus.Buffering))
-            return SimulationTooltip;
-
-        var what = real.Station?.Name is { } name ? name : "a station";
-        return $"Developer mode: the radio controls drive a simulation. The real radio is still playing {what} — "
-               + "stop it in Settings → Radio player, or leave developer mode to control it.";
-    }
+    public const string SimulationTooltip =
+        "Developer mode: the radio controls drive a simulation. No audio plays and nothing is saved; "
+        + "a station that was playing resumes when you leave developer mode.";
 
     /// <summary>Describe <paramref name="s"/> for display.</summary>
     public static RadioDisplay From(RadioPlayerSnapshot s)

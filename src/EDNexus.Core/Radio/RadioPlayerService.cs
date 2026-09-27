@@ -33,6 +33,12 @@ public sealed class RadioPlayerService : IRadioPlayer, IDisposable, IAsyncDispos
     private bool _wantsPlayback; // user intent: last transport action was play (vs pause/stop)
     private string? _lastError;
     private bool _disposed;
+    private bool _suspended; // audio stopped for developer mode; resume on leaving it
+
+    // Serializes "start a stream" against "stop it for developer mode" so a play that was already
+    // queued can't slip in after the suspend. LibVLC event handlers never take it (they only take
+    // _gate), so it adds no path to the #144 shutdown deadlock.
+    private readonly object _transportGate = new();
 
     // Volume changes arrive in bursts (a slider drag fires one per step). They apply to the player
     // and the in-memory settings immediately, but the disk write is coalesced: one save once the
@@ -155,6 +161,7 @@ public sealed class RadioPlayerService : IRadioPlayer, IDisposable, IAsyncDispos
             _station = station;
             _enabled = true;
             _wantsPlayback = true;
+            _suspended = false; // an explicit play takes over from a developer-mode suspend
         }
         Persist();
 
@@ -264,10 +271,84 @@ public sealed class RadioPlayerService : IRadioPlayer, IDisposable, IAsyncDispos
     {
         lock (_gate)
         {
+            _suspended = false; // an explicit pause/stop: leaving developer mode must not resume
             if (!_wantsPlayback) return;
             _wantsPlayback = false;
         }
         Persist();
+    }
+
+    /// <summary>True while audio is stopped by <see cref="SuspendForDeveloperModeAsync"/> and not yet resumed.</summary>
+    public bool IsSuspendedForDeveloperMode
+    {
+        get { lock (_gate) return _suspended; }
+    }
+
+    /// <summary>
+    /// Silences the real radio while developer mode is on, where the UI drives a simulation and so
+    /// can't reach this player. Unlike <see cref="PauseAsync"/>/<see cref="StopAsync"/> this keeps
+    /// the resume-on-launch intent and writes nothing to disk: closing the app while suspended
+    /// leaves the saved settings exactly as they were before developer mode. Only a stream that is
+    /// playing or connecting is suspended (stopped rather than paused, since a paused live stream
+    /// would resume stale); paused, stopped, or failed playback is left alone. Idempotent.
+    /// </summary>
+    public Task SuspendForDeveloperModeAsync(CancellationToken ct = default)
+    {
+        lock (_gate)
+        {
+            if (_suspended || _disposed) return Task.CompletedTask;
+            if (_status is not (RadioPlaybackStatus.Playing or RadioPlaybackStatus.Buffering)) return Task.CompletedTask;
+            _suspended = true;
+        }
+
+        return Task.Run(() =>
+        {
+            try
+            {
+                lock (_transportGate)
+                {
+                    MediaPlayer? player;
+                    lock (_gate)
+                    {
+                        if (!_suspended || _disposed) return; // an explicit play/stop got here first
+                        player = _mediaPlayer;
+                        _status = RadioPlaybackStatus.Stopped;
+                    }
+                    // Stop outside _gate: LibVLC can wait on its event thread, whose handlers take _gate (#144).
+                    player?.Stop();
+                }
+                RaiseChanged();
+            }
+            catch (Exception ex)
+            {
+                SetError(ex.Message);
+            }
+        }, ct);
+    }
+
+    /// <summary>
+    /// Undoes <see cref="SuspendForDeveloperModeAsync"/>: restarts the tuned station, but only if
+    /// that call actually silenced it and nothing since (an explicit play/pause/stop, or turning the
+    /// radio off) has changed what the user wants. Otherwise a no-op. Writes nothing to disk.
+    /// </summary>
+    public Task ResumeAfterDeveloperModeAsync(CancellationToken ct = default)
+    {
+        RadioStation? station;
+        lock (_gate)
+        {
+            if (!_suspended) return Task.CompletedTask;
+            _suspended = false;
+            station = _station;
+            if (_disposed || !_enabled || !_wantsPlayback || station is null) return Task.CompletedTask;
+        }
+
+        return Task.Run(() => PlayStationCore(station), ct);
+    }
+
+    /// <summary>Test seam: pretend LibVLC reported <paramref name="status"/> (there's no native runtime under test).</summary>
+    internal void SetStatusForTest(RadioPlaybackStatus status)
+    {
+        lock (_gate) _status = status;
     }
 
     /// <summary>Sets output volume (0-100), applying it immediately if the engine is initialized.</summary>
@@ -324,14 +405,23 @@ public sealed class RadioPlayerService : IRadioPlayer, IDisposable, IAsyncDispos
     {
         try
         {
-            var player = EnsureEngine();
-            if (player is null) return; // EnsureEngine already recorded the error.
+            lock (_transportGate)
+            {
+                // A play queued before developer mode suspended the radio must not start audio now.
+                lock (_gate)
+                {
+                    if (_suspended) return;
+                }
 
-            lock (_gate) _status = RadioPlaybackStatus.Buffering;
-            RaiseChanged();
+                var player = EnsureEngine();
+                if (player is null) return; // EnsureEngine already recorded the error.
 
-            using var media = new Media(_libVlc!, new Uri(station.StreamUrl));
-            player.Play(media);
+                lock (_gate) _status = RadioPlaybackStatus.Buffering;
+                RaiseChanged();
+
+                using var media = new Media(_libVlc!, new Uri(station.StreamUrl));
+                player.Play(media);
+            }
         }
         catch (Exception ex)
         {
