@@ -1,0 +1,5 @@
+# The EBS image restores inside the container. A host obj/project.assets.json copied over that
+# restore points at the host's NuGet cache (e.g. /home/runner/.nuget/packages in CI), and
+# `dotnet publish --no-restore` then fails with NETSDK1064.
+**/bin/
+**/obj/
