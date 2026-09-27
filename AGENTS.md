@@ -56,6 +56,21 @@ Journal.*.log + *.json  ──►  JournalWatcher  ──►  JournalEventBus  �
 Key types live in `src/EDNexus.Core`: `JournalWatcher`, `JournalEntry`, `JournalEventBus`,
 `StateTracker`, `CommanderState`, `EngineHost`.
 
+## Design system
+
+The palette, type scale, spacing/radius, component patterns and icon/logo assets shared by the
+desktop app and the Twitch extension are documented in the **EDNexus design system**:
+<https://claude.ai/artifact/8G7pW33gGu6SFvVockTpcd>. It is the source of truth for both surfaces —
+consult it before adding a color, font size, spacing value, or icon, rather than picking a new one
+ad hoc. The actual token values live in code, not just the doc:
+
+- Desktop: `src/EDNexus.App/Themes/Theme.axaml` (a global `ResourceDictionary` merged in
+  `App.axaml`) — reference brushes with `{StaticResource ...}`, never a literal hex color.
+- Extension: `extension/css/tokens.css`, imported by both `extension/css/card.css` and
+  `extension/css/config.css` — reference `var(--ednx-...)`, never a literal hex color.
+- Brand assets (logo, app icon, the overlay's outline icon set) live under `assets/` in this repo
+  and are mirrored into the design system doc as real files, not descriptions.
+
 ## Conventions (do not violate without discussion)
 
 1. **One writer.** Only `StateTracker` mutates `CommanderState`. Feature modules and the UI *read*
@@ -76,6 +91,9 @@ Key types live in `src/EDNexus.Core`: `JournalWatcher`, `JournalEntry`, `Journal
    Options** (off every launch, not persisted) and the whole subsystem is gated by
    `FeatureFlags.DeveloperTools` — set the `DISABLE_DEVTOOLS` build symbol or `EDNEXUS_DEVTOOLS=false`
    to strip it. Keep dev tooling behind that flag.
+8. **No hardcoded colors.** Every color in `src/EDNexus.App` comes from `Themes/Theme.axaml` via
+   `{StaticResource ...}`; every color in `extension/` comes from `extension/css/tokens.css` via
+   `var(--ednx-...)`. See **Design system** above before introducing a new one.
 
 ## How work is organised
 
