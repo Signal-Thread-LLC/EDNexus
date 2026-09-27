@@ -315,8 +315,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     /// <summary>True while the transport drives the developer-mode simulation (shows a SIM marker).</summary>
     [ObservableProperty] private bool _radioIsSimulated;
 
-    /// <summary>Tooltip on the SIM marker; warns when the real radio is still playing underneath.</summary>
-    [ObservableProperty] private string _radioSimTooltip = RadioDisplay.SimulationTooltip;
+    /// <summary>Tooltip on the SIM marker.</summary>
+    public string RadioSimTooltip => RadioDisplay.SimulationTooltip;
 
     /// <summary>Mirror the active player's snapshot onto the bindable properties above.</summary>
     private void RefreshRadio()
@@ -326,7 +326,6 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         var s = _radio.Active.Snapshot;
         var d = RadioDisplay.From(s);
         RadioIsSimulated = _radio.IsSimulated;
-        RadioSimTooltip = RadioDisplay.SimulationNote(_radio.Real.Snapshot);
         RadioStationName = s.Station?.Name ?? "No station tuned";
         RadioPlayPauseGlyph = d.PlayPauseGlyph;
         RadioTooltip = d.PlayPauseTooltip;
@@ -367,6 +366,11 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     {
         var wasDev = _boot.Dev.Enabled;
 
+        // While developer mode is on the radio UI drives a simulation and can't reach the real
+        // player, so silence a real stream on the way in (keeping its resume-on-launch intent and
+        // writing nothing) and restart it on the way out, but only if entering is what stopped it.
+        if (!wasDev && enabled) _ = _radioService.SuspendForDeveloperModeAsync();
+
         if (wasDev && !enabled)
         {
             // Leaving developer mode has to discard the fabricated state as well as the banner: those
@@ -386,6 +390,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         }
 
         DevMode = _boot.Dev.Enabled;
+        if (wasDev && !DevMode) _ = _radioService.ResumeAfterDeveloperModeAsync();
         RefreshRadio(); // the transport switches between the real player and the simulation
     }
 
