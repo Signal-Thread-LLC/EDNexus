@@ -36,6 +36,13 @@ public sealed class JournalEventBus
     /// observer outside the engine (the plugin bridge) wants. Errors are isolated like any other
     /// handler's. Dispose the result to remove it again.
     /// </summary>
+    /// <remarks>
+    /// Ordering is only guaranteed per publishing thread: entries published from different threads
+    /// (e.g. the watcher and a developer-mode source) reach completed handlers in whatever order those
+    /// calls interleave. A handler that itself calls <see cref="Publish"/> nests: the inner entry's
+    /// completed handlers run before the outer entry's, so they see the outer entry fully applied only
+    /// if the nested publish happened after it.
+    /// </remarks>
     public IDisposable SubscribeCompleted(Action<JournalEntry> handler)
     {
         ArgumentNullException.ThrowIfNull(handler);

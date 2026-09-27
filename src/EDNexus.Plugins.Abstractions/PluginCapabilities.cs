@@ -7,7 +7,10 @@ namespace EDNexus.Plugins.Abstractions;
 /// </summary>
 public static class PluginCapabilities
 {
-    /// <summary>Subscribe to the journal event feed (<see cref="IPluginContext.Events"/>).</summary>
+    /// <summary>
+    /// Subscribe to the journal event feed (<see cref="IPluginContext.Events"/>). Data-equivalent
+    /// to <see cref="State"/>: the feed carries everything the commander state is derived from.
+    /// </summary>
     public const string Events = "events";
 
     /// <summary>Read the live commander state (<see cref="IPluginContext.State"/>).</summary>

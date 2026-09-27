@@ -5,21 +5,24 @@ namespace EDNexus.Plugins.Hosting.Bridge;
 
 /// <summary>
 /// One plugin's <see cref="IPluginEvents"/>. Hooks the engine bus through
-/// <see cref="JournalEventBus.SubscribeCompleted"/> (so the event is already folded into
-/// <c>CommanderState</c>) and does nothing on the journal thread but wrap the entry and enqueue it.
-/// A dedicated background thread per plugin drains the queue and runs the plugin's handlers one at
-/// a time, in order, each inside its own try/catch.
+/// <see cref="JournalEventBus.SubscribeCompleted"/> (so the event is already folded into state) and
+/// does nothing on the journal thread but check whether any handler wants the event, wrap it and
+/// enqueue it. A dedicated background thread per plugin drains the queue and runs the plugin's
+/// handlers one at a time, in order, each inside its own try/catch.
 /// </summary>
 /// <remarks>
 /// <para>
 /// Why a thread per plugin rather than the pool: plugin handlers are third-party code and may block.
 /// A blocked pool thread starves the rest of the app; a blocked plugin thread only stalls that
-/// plugin. The thread and the bus hook are only created on the first subscription, so a plugin that
-/// never subscribes costs nothing.
+/// plugin. The thread is started with <see cref="Thread.UnsafeStart()"/> so the subscribing
+/// plugin's <see cref="ExecutionContext"/> (and any <c>AsyncLocal</c> values it holds) does not
+/// flow into — and stay pinned by — a host thread. The thread and the bus hook are only created on
+/// the first subscription, so a plugin that never subscribes costs nothing.
 /// </para>
 /// <para>
-/// The queue is bounded at <see cref="PluginBridgeOptions.QueueCapacity"/>; when a plugin falls that
-/// far behind, the oldest undelivered event is dropped and counted in <see cref="DroppedEventCount"/>.
+/// Only events some handler matches are queued, so the queue — bounded at
+/// <see cref="PluginBridgeOptions.QueueCapacity"/>, dropping the oldest when full — and
+/// <see cref="DroppedEventCount"/> reflect events the plugin actually asked for.
 /// </para>
 /// </remarks>
 internal sealed class PluginEvents : IPluginEvents, IDisposable
@@ -33,10 +36,12 @@ internal sealed class PluginEvents : IPluginEvents, IDisposable
 
     private readonly object _gate = new();
     private readonly List<Registration> _registrations = [];
+    private readonly Dictionary<string, int> _namedCounts = new(StringComparer.Ordinal);
+    private int _anyCount;
     private readonly Queue<IJournalEvent> _queue = new();
     private IDisposable? _busHook;
     private Thread? _worker;
-    private bool _disposed;
+    private volatile bool _disposed;
     private long _dropped;
     private long _handlerErrors;
 
@@ -56,7 +61,7 @@ internal sealed class PluginEvents : IPluginEvents, IDisposable
         _capacity = capacity;
     }
 
-    /// <summary>Events dropped because this plugin's queue was full.</summary>
+    /// <summary>Wanted events dropped because this plugin's queue was full.</summary>
     public long DroppedEventCount => Interlocked.Read(ref _dropped);
 
     /// <summary>Handler invocations that threw.</summary>
@@ -84,6 +89,11 @@ internal sealed class PluginEvents : IPluginEvents, IDisposable
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
             _registrations.Add(registration);
+            if (registration.EventName is { } name)
+                _namedCounts[name] = _namedCounts.GetValueOrDefault(name) + 1;
+            else
+                _anyCount++;
+
             if (_worker is null)
             {
                 _worker = new Thread(Pump)
@@ -91,7 +101,7 @@ internal sealed class PluginEvents : IPluginEvents, IDisposable
                     IsBackground = true,
                     Name = $"EDNexus plugin: {_pluginId}",
                 };
-                _worker.Start();
+                _worker.UnsafeStart();
                 _busHook = _bus.SubscribeCompleted(OnPublished);
             }
         }
@@ -100,12 +110,30 @@ internal sealed class PluginEvents : IPluginEvents, IDisposable
 
     private void Remove(Registration registration)
     {
-        lock (_gate) _registrations.Remove(registration);
+        lock (_gate)
+        {
+            if (!_registrations.Remove(registration)) return;   // already cleared by Dispose
+            if (registration.EventName is { } name)
+            {
+                var left = _namedCounts[name] - 1;
+                if (left == 0) _namedCounts.Remove(name);
+                else _namedCounts[name] = left;
+            }
+            else
+            {
+                _anyCount--;
+            }
+        }
     }
 
     /// <summary>Runs on the journal thread: must stay cheap and must never call plugin code.</summary>
     private void OnPublished(JournalEntry entry)
     {
+        lock (_gate)
+        {
+            if (_disposed || (_anyCount == 0 && !_namedCounts.ContainsKey(entry.Event))) return;
+        }
+
         var simulated = _isSimulated();
         if (simulated && _withholdSimulated) return;
 
@@ -139,6 +167,9 @@ internal sealed class PluginEvents : IPluginEvents, IDisposable
 
             foreach (var registration in handlers)
             {
+                // Re-checked per handler: once Dispose returns, no further handler starts (one
+                // already running cannot be interrupted).
+                if (_disposed) return;
                 if (!registration.Matches(next)) continue;
                 try { registration.Handler(next); }
                 catch (Exception ex) { Report(next, ex); }
@@ -155,8 +186,8 @@ internal sealed class PluginEvents : IPluginEvents, IDisposable
 
     /// <summary>
     /// Unhooks from the bus, drops every handler and anything still queued, and lets the worker exit.
-    /// Does not wait for a handler that is mid-flight: that would hand plugin code a way to hang
-    /// whoever is unloading it.
+    /// No handler starts after this returns. It does not wait for a handler that is mid-flight: that
+    /// would hand plugin code a way to hang whoever is unloading it (see <see cref="WaitForExit"/>).
     /// </summary>
     public void Dispose()
     {
@@ -165,7 +196,10 @@ internal sealed class PluginEvents : IPluginEvents, IDisposable
         {
             if (_disposed) return;
             _disposed = true;
+            foreach (var registration in _registrations) registration.MarkRemoved();
             _registrations.Clear();
+            _namedCounts.Clear();
+            _anyCount = 0;
             _queue.Clear();
             hook = _busHook;
             _busHook = null;
@@ -174,7 +208,10 @@ internal sealed class PluginEvents : IPluginEvents, IDisposable
         hook?.Dispose();
     }
 
-    /// <summary>Waits for the worker thread to exit, for tests and orderly shutdown.</summary>
+    /// <summary>
+    /// Waits for the worker thread to exit. False means a handler is still running: the plugin's
+    /// code is live on the stack, so its <c>AssemblyLoadContext</c> cannot be unloaded.
+    /// </summary>
     public bool WaitForExit(TimeSpan timeout)
     {
         Thread? worker;
@@ -186,11 +223,15 @@ internal sealed class PluginEvents : IPluginEvents, IDisposable
     {
         private volatile bool _removed;
 
+        public string? EventName { get; } = eventName;
+
         public Action<IJournalEvent> Handler { get; } = handler;
 
         // Ordinal, as IPluginEvents documents — deliberately stricter than the engine bus.
         public bool Matches(IJournalEvent journalEvent)
-            => !_removed && (eventName is null || string.Equals(eventName, journalEvent.Event, StringComparison.Ordinal));
+            => !_removed && (EventName is null || string.Equals(EventName, journalEvent.Event, StringComparison.Ordinal));
+
+        public void MarkRemoved() => _removed = true;
 
         public void Dispose()
         {
