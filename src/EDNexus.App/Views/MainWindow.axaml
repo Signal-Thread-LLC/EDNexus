@@ -8,18 +8,12 @@
         Title="EDNexus — Commander Console"
         Icon="/Assets/ednexus.png"
         Width="980" Height="660" MinWidth="720" MinHeight="480"
-        Background="#0A0A0C">
+        Background="{StaticResource Surface0}">
 
   <Window.Resources>
-    <Color x:Key="Amber">#FFF07100</Color>
-    <SolidColorBrush x:Key="AmberBrush" Color="#FFF07100" />
-    <SolidColorBrush x:Key="AmberDim" Color="#66F07100" />
-    <SolidColorBrush x:Key="CardBg" Color="#14161A" />
-    <SolidColorBrush x:Key="CardBorder" Color="#242830" />
-    <SolidColorBrush x:Key="Ink" Color="#E7E9EE" />
-    <SolidColorBrush x:Key="InkDim" Color="#8A909C" />
-    <SolidColorBrush x:Key="Good" Color="#FF5FD08B" />
-    <SolidColorBrush x:Key="Bad" Color="#FFE0654F" />
+    <!-- One-off banner backgrounds not part of the shared design-system palette. -->
+    <SolidColorBrush x:Key="DevModeBarBg" Color="#FF141013" />
+    <SolidColorBrush x:Key="UpdateBarBg" Color="#FF112322" />
   </Window.Resources>
 
   <Window.Styles>
@@ -59,7 +53,7 @@
       <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
     <Style Selector="Button.dice">
-      <Setter Property="Background" Value="#1B1E24" />
+      <Setter Property="Background" Value="{StaticResource SurfaceRaised}" />
       <Setter Property="Foreground" Value="{StaticResource Ink}" />
       <Setter Property="Width" Value="26" />
       <Setter Property="Height" Value="22" />
@@ -71,7 +65,7 @@
       <Setter Property="ToolTip.Tip" Value="Randomize this card" />
     </Style>
     <Style Selector="Button.collapse">
-      <Setter Property="Background" Value="#1B1E24" />
+      <Setter Property="Background" Value="{StaticResource SurfaceRaised}" />
       <Setter Property="Foreground" Value="{StaticResource InkDim}" />
       <Setter Property="Width" Value="26" />
       <Setter Property="Height" Value="22" />
@@ -83,12 +77,12 @@
       <Setter Property="ToolTip.Tip" Value="Collapse / expand" />
     </Style>
     <Style Selector="Button.devbar">
-      <Setter Property="Background" Value="#1B1E24" />
+      <Setter Property="Background" Value="{StaticResource SurfaceRaised}" />
       <Setter Property="Foreground" Value="{StaticResource Ink}" />
       <Setter Property="Padding" Value="12,6" />
     </Style>
     <Style Selector="TextBox.field">
-      <Setter Property="Background" Value="#0E1013" />
+      <Setter Property="Background" Value="{StaticResource SurfaceField}" />
       <Setter Property="Foreground" Value="{StaticResource Ink}" />
       <Setter Property="BorderBrush" Value="{StaticResource CardBorder}" />
       <Setter Property="CornerRadius" Value="4" />
@@ -97,7 +91,7 @@
     </Style>
     <Style Selector="Button.action">
       <Setter Property="Background" Value="{StaticResource AmberBrush}" />
-      <Setter Property="Foreground" Value="#101216" />
+      <Setter Property="Foreground" Value="{StaticResource OnBrand}" />
       <Setter Property="FontWeight" Value="SemiBold" />
       <Setter Property="Padding" Value="14,6" />
       <Setter Property="CornerRadius" Value="4" />
@@ -106,7 +100,7 @@
       <Setter Property="Background" Value="{StaticResource AmberDim}" />
     </Style>
     <Style Selector="Button.mini">
-      <Setter Property="Background" Value="#1B1E24" />
+      <Setter Property="Background" Value="{StaticResource SurfaceRaised}" />
       <Setter Property="Foreground" Value="{StaticResource Ink}" />
       <Setter Property="Padding" Value="8,4" />
       <Setter Property="CornerRadius" Value="4" />
@@ -147,7 +141,7 @@
   <DockPanel LastChildFill="True">
 
     <!-- Header -->
-    <Border DockPanel.Dock="Top" Background="#101216" BorderBrush="{StaticResource CardBorder}"
+    <Border DockPanel.Dock="Top" Background="{StaticResource Surface100}" BorderBrush="{StaticResource CardBorder}"
             BorderThickness="0,0,0,1" Padding="20,14">
       <Grid ColumnDefinitions="Auto,*,Auto">
         <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
@@ -171,19 +165,19 @@
             <Button Command="{Binding RadioPreviousCommand}" Content="⏮" FontSize="13"
                     Width="28" Height="28" Padding="0" VerticalAlignment="Center"
                     HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
-                    Background="#1B1E24" Foreground="{StaticResource Ink}" ToolTip.Tip="Previous station" />
+                    Background="{StaticResource SurfaceRaised}" Foreground="{StaticResource Ink}" ToolTip.Tip="Previous station" />
             <Button Command="{Binding RadioPlayPauseCommand}" Content="{Binding RadioPlayPauseGlyph}" FontSize="13"
                     Width="28" Height="28" Padding="0" VerticalAlignment="Center"
                     HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
-                    Background="#1B1E24" Foreground="{StaticResource AmberBrush}" />
+                    Background="{StaticResource SurfaceRaised}" Foreground="{StaticResource AmberBrush}" />
             <Button Command="{Binding RadioNextCommand}" Content="⏭" FontSize="13"
                     Width="28" Height="28" Padding="0" VerticalAlignment="Center"
                     HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
-                    Background="#1B1E24" Foreground="{StaticResource Ink}" ToolTip.Tip="Next station" />
+                    Background="{StaticResource SurfaceRaised}" Foreground="{StaticResource Ink}" ToolTip.Tip="Next station" />
             <TextBlock Text="{Binding RadioStationName}" Foreground="{StaticResource InkDim}"
                        FontSize="11" VerticalAlignment="Center" MaxWidth="120"
                        TextTrimming="CharacterEllipsis" Margin="6,0,0,0" />
-            <Border IsVisible="{Binding RadioIsSimulated}" Background="#1E1712" CornerRadius="4"
+            <Border IsVisible="{Binding RadioIsSimulated}" Background="{StaticResource AmberChipBg}" CornerRadius="4"
                     Padding="4,1" Margin="4,0,0,0" VerticalAlignment="Center"
                     ToolTip.Tip="{Binding RadioSimTooltip}">
               <TextBlock Text="SIM" FontSize="10" FontWeight="SemiBold" LetterSpacing="1"
@@ -200,13 +194,13 @@
           <Button Command="{Binding OpenSettingsCommand}" Content="⚙" FontSize="16"
                   Width="36" Height="36" Padding="0" VerticalAlignment="Center"
                   HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
-                  Background="#1B1E24" Foreground="{StaticResource Ink}" ToolTip.Tip="Settings" />
+                  Background="{StaticResource SurfaceRaised}" Foreground="{StaticResource Ink}" ToolTip.Tip="Settings" />
         </StackPanel>
       </Grid>
     </Border>
 
     <!-- Developer mode action bar -->
-    <Border DockPanel.Dock="Top" Background="#141013" BorderBrush="{StaticResource CardBorder}"
+    <Border DockPanel.Dock="Top" Background="{StaticResource DevModeBarBg}" BorderBrush="{StaticResource CardBorder}"
             BorderThickness="0,0,0,1" Padding="20,10" IsVisible="{Binding DevMode}">
       <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
         <TextBlock Text="DEV MODE" Foreground="{StaticResource AmberBrush}" FontSize="11"
@@ -219,7 +213,7 @@
     </Border>
 
     <!-- Update bar (appears when an update has been downloaded) -->
-    <Border DockPanel.Dock="Bottom" Background="#112322" BorderBrush="{StaticResource CardBorder}"
+    <Border DockPanel.Dock="Bottom" Background="{StaticResource UpdateBarBg}" BorderBrush="{StaticResource CardBorder}"
             BorderThickness="0,0,0,1" Padding="12" IsVisible="{Binding UpdateAvailable}">
       <Grid ColumnDefinitions="*,Auto">
         <TextBlock Text="An update was downloaded" Foreground="{StaticResource Ink}" VerticalAlignment="Center" />
@@ -231,7 +225,7 @@
     </Border>
 
     <!-- Footer / status bar -->
-    <Border DockPanel.Dock="Bottom" Background="#101216" BorderBrush="{StaticResource CardBorder}"
+    <Border DockPanel.Dock="Bottom" Background="{StaticResource Surface100}" BorderBrush="{StaticResource CardBorder}"
             BorderThickness="0,1,0,0" Padding="20,8">
       <Grid ColumnDefinitions="*,Auto,Auto">
         <TextBlock Grid.Column="0" Text="{Binding JournalStatus}" Classes="label"
@@ -315,7 +309,7 @@
                   <Grid ColumnDefinitions="*,Auto">
                     <ProgressBar Grid.Column="0" Minimum="0" Maximum="1" Value="{Binding FuelFraction}"
                                  Height="8" Foreground="{StaticResource AmberBrush}"
-                                 Background="#22262E" VerticalAlignment="Center" />
+                                 Background="{StaticResource SurfaceRaised}" VerticalAlignment="Center" />
                     <TextBlock Grid.Column="1" Classes="value" FontSize="13" Margin="12,0,0,0"
                                Text="{Binding Fuel}" />
                   </Grid>
@@ -360,7 +354,7 @@
                   <TextBlock Classes="label" Text="{Binding MaterialsSummary}" Margin="0,10,0,0" />
 
                   <!-- Materials at their cap are silently discarding pickups: say so. -->
-                  <Border IsVisible="{Binding HasCapWarning}" Background="#1E1712" CornerRadius="4"
+                  <Border IsVisible="{Binding HasCapWarning}" Background="{StaticResource AmberChipBg}" CornerRadius="4"
                           Padding="8,6" Margin="0,10,0,0">
                     <TextBlock Text="{Binding CapWarning}" Foreground="{StaticResource AmberBrush}"
                                FontSize="12" TextWrapping="Wrap" />
@@ -389,7 +383,7 @@
                               <StackPanel Grid.Column="0" Margin="0,0,8,0" VerticalAlignment="Center">
                                 <TextBlock Text="{Binding Name}" Classes="value" FontSize="13" />
                                 <ProgressBar Minimum="0" Maximum="1" Value="{Binding Fraction}" Height="4"
-                                             Foreground="{StaticResource AmberDim}" Background="#1B1E24"
+                                             Foreground="{StaticResource AmberDim}" Background="{StaticResource SurfaceRaised}"
                                              Margin="0,3,0,0" />
                               </StackPanel>
                               <TextBlock Grid.Column="1" Text="{Binding Grade}" Classes="label" FontSize="12"
@@ -508,7 +502,7 @@
                     </Grid>
 
                     <!-- Engineer -->
-                    <Border Background="#0E1013" BorderBrush="{StaticResource CardBorder}" BorderThickness="1"
+                    <Border Background="{StaticResource SurfaceField}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1"
                             CornerRadius="6" Padding="12,10" Margin="0,10,0,10"
                             ToolTip.Tip="{Binding EngineerUnlock}">
                       <Grid ColumnDefinitions="*,Auto">
@@ -542,7 +536,7 @@
                         <ItemsControl.ItemTemplate>
                           <DataTemplate x:DataType="vm:MaterialRow">
                             <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,4" ToolTip.Tip="{Binding Source}">
-                              <Border Grid.Column="0" Background="#22262E" CornerRadius="4" Padding="6,2" MinWidth="44"
+                              <Border Grid.Column="0" Background="{StaticResource SurfaceRaised}" CornerRadius="4" Padding="6,2" MinWidth="44"
                                       VerticalAlignment="Top" Margin="0,2,0,0">
                                 <TextBlock Text="{Binding CategoryTag}" Foreground="{StaticResource InkDim}"
                                            FontSize="10" HorizontalAlignment="Center" />
@@ -550,7 +544,7 @@
                               <StackPanel Grid.Column="1" Margin="10,0,8,0" VerticalAlignment="Center">
                                 <TextBlock Text="{Binding Name}" Classes="value" FontSize="13" TextWrapping="Wrap" />
                                 <ProgressBar Minimum="0" Maximum="1" Value="{Binding Fraction}" Height="4"
-                                             Foreground="{StaticResource AmberDim}" Background="#1B1E24"
+                                             Foreground="{StaticResource AmberDim}" Background="{StaticResource SurfaceRaised}"
                                              Margin="0,3,0,0" />
                                 <TextBlock Text="{Binding TradeHint}" Classes="label" FontSize="10" Margin="0,2,0,0"
                                            IsVisible="{Binding TradeHint, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
@@ -634,7 +628,7 @@
                           <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:OnFootMaterialRow">
                               <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,4" ToolTip.Tip="{Binding Source}">
-                                <Border Grid.Column="0" Background="#22262E" CornerRadius="4" Padding="6,2" MinWidth="44">
+                                <Border Grid.Column="0" Background="{StaticResource SurfaceRaised}" CornerRadius="4" Padding="6,2" MinWidth="44">
                                   <TextBlock Text="{Binding CategoryTag}" Foreground="{StaticResource InkDim}"
                                              FontSize="10" HorizontalAlignment="Center" />
                                 </Border>
@@ -661,7 +655,7 @@
                         <ItemsControl ItemsSource="{Binding OnFootMods}">
                           <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:ModRow">
-                              <Border Background="#0E1013" BorderBrush="{StaticResource CardBorder}" BorderThickness="1"
+                              <Border Background="{StaticResource SurfaceField}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1"
                                       CornerRadius="6" Padding="10,8" Margin="0,4" ToolTip.Tip="{Binding EngineerUnlock}">
                                 <StackPanel>
                                   <TextBlock Text="{Binding Name}" Classes="value" FontSize="13" FontWeight="SemiBold" />
@@ -710,7 +704,7 @@
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:CargoLine">
                           <Grid ColumnDefinitions="Auto,*" Margin="0,3">
-                            <Border Grid.Column="0" Background="#22262E" CornerRadius="4"
+                            <Border Grid.Column="0" Background="{StaticResource SurfaceRaised}" CornerRadius="4"
                                     Padding="8,2" MinWidth="44">
                               <TextBlock Text="{Binding Count}" Foreground="{StaticResource AmberBrush}"
                                          FontWeight="SemiBold" FontSize="13" HorizontalAlignment="Center" />
@@ -776,7 +770,7 @@
                   <StackPanel IsVisible="{Binding RouteHasPlan}" Margin="0,8,0,0">
                     <TextBlock Classes="label" Text="{Binding RouteSummary}" Margin="0,0,0,10" />
 
-                    <Border Background="#0E1013" BorderBrush="{StaticResource CardBorder}" BorderThickness="1"
+                    <Border Background="{StaticResource SurfaceField}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1"
                             CornerRadius="6" Padding="12,10" Margin="0,0,0,10">
                       <Grid ColumnDefinitions="*,Auto,Auto">
                         <StackPanel Grid.Column="0" VerticalAlignment="Center">
@@ -918,7 +912,7 @@
                     <TextBlock Classes="big" Text="{Binding ColonisationTitle}" TextWrapping="Wrap" />
                     <Grid ColumnDefinitions="*,Auto" Margin="0,10,0,4">
                       <ProgressBar Grid.Column="0" Minimum="0" Maximum="1" Value="{Binding ColonisationProgress}"
-                                   Height="10" Foreground="{StaticResource AmberBrush}" Background="#22262E"
+                                   Height="10" Foreground="{StaticResource AmberBrush}" Background="{StaticResource SurfaceRaised}"
                                    VerticalAlignment="Center" />
                       <TextBlock Grid.Column="1" Classes="value" FontSize="15" Margin="12,0,0,0"
                                  Text="{Binding ColonisationStatus}" Foreground="{StaticResource AmberBrush}"
@@ -928,7 +922,7 @@
 
                     <!-- Shared totals, when the build is registered on a tracker other commanders
                          also deliver to. Hidden entirely for a solo build, which is most of them. -->
-                    <Border IsVisible="{Binding HasShared}" Background="#0F1114" CornerRadius="4"
+                    <Border IsVisible="{Binding HasShared}" Background="{StaticResource SurfaceField}" CornerRadius="4"
                             Padding="12,10" Margin="0,0,0,12">
                       <Grid ColumnDefinitions="*,Auto">
                         <StackPanel Grid.Column="0" Spacing="2">
@@ -960,7 +954,7 @@
                               <StackPanel Grid.Column="0" Margin="0,0,12,0" VerticalAlignment="Center">
                                 <TextBlock Text="{Binding Name}" Classes="value" FontSize="13" />
                                 <ProgressBar Minimum="0" Maximum="1" Value="{Binding Fraction}" Height="4"
-                                             Foreground="{StaticResource AmberDim}" Background="#1B1E24"
+                                             Foreground="{StaticResource AmberDim}" Background="{StaticResource SurfaceRaised}"
                                              Margin="0,4,0,0" />
                               </StackPanel>
                               <TextBlock Grid.Column="1" Text="{Binding Remaining}" Classes="value" FontSize="13"
@@ -1097,7 +1091,7 @@
                     <ItemsControl ItemsSource="{Binding Prospects}">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:ProspectRow">
-                          <Border Background="#0F1114" CornerRadius="4" Padding="12,10" Margin="0,0,0,8">
+                          <Border Background="{StaticResource SurfaceField}" CornerRadius="4" Padding="12,10" Margin="0,0,0,8">
                             <StackPanel Spacing="4">
                               <Grid ColumnDefinitions="*,Auto">
                                 <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
@@ -1107,7 +1101,7 @@
                                 <TextBlock Grid.Column="1" Classes="label" Text="{Binding Remaining}" IsVisible="{Binding ShowRemaining}" />
                               </Grid>
 
-                              <Border Background="#1A1408" CornerRadius="4" Padding="8,6" IsVisible="{Binding HasMotherlode}">
+                              <Border Background="{StaticResource AmberChipBg}" CornerRadius="4" Padding="8,6" IsVisible="{Binding HasMotherlode}">
                                 <Grid ColumnDefinitions="*,Auto,Auto">
                                   <TextBlock Grid.Column="0" Classes="value" FontSize="13" Text="{Binding Motherlode.Name}" />
                                   <TextBlock Grid.Column="1" Classes="label" Text="DEEP CORE" Foreground="{StaticResource AmberBrush}" Margin="8,0" VerticalAlignment="Center" />
@@ -1209,7 +1203,7 @@
                                  VerticalAlignment="Center" />
                     </Grid>
                     <ProgressBar Minimum="0" Maximum="1" Value="{Binding ScanFraction}" Height="8"
-                                 Foreground="{StaticResource AmberBrush}" Background="#22262E" Margin="0,6,0,0" />
+                                 Foreground="{StaticResource AmberBrush}" Background="{StaticResource SurfaceRaised}" Margin="0,6,0,0" />
                     <Grid ColumnDefinitions="*,Auto" Margin="0,4,0,0">
                       <TextBlock Grid.Column="0" Classes="label" Text="{Binding ScanValue}" />
                       <TextBlock Grid.Column="1" Classes="label" Margin="10,0,0,0" Text="{Binding ScanDistance}"
@@ -1284,13 +1278,13 @@
                     <ItemsControl ItemsSource="{Binding Engineers}">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:EngineerRow">
-                          <Border Background="#0E1013" CornerRadius="4" Padding="10,8" Margin="0,0,0,6"
+                          <Border Background="{StaticResource SurfaceField}" CornerRadius="4" Padding="10,8" Margin="0,0,0,6"
                                   ToolTip.Tip="{Binding TopGrades}">
                             <StackPanel>
                               <Grid ColumnDefinitions="*,Auto">
                                 <TextBlock Grid.Column="0" Text="{Binding Name}" Classes="value" FontSize="13"
                                            TextWrapping="Wrap" VerticalAlignment="Center" />
-                                <Border Grid.Column="1" Background="#22262E" CornerRadius="3" Padding="6,2"
+                                <Border Grid.Column="1" Background="{StaticResource SurfaceRaised}" CornerRadius="3" Padding="6,2"
                                         VerticalAlignment="Center" MinWidth="56">
                                   <TextBlock Text="{Binding Status}" FontSize="10" FontWeight="SemiBold"
                                              HorizontalAlignment="Center" Foreground="{StaticResource InkDim}" />
@@ -1298,7 +1292,7 @@
                               </Grid>
                               <TextBlock Text="{Binding Location}" Classes="label" FontSize="11" Margin="0,2,0,0" />
                               <ProgressBar Minimum="0" Maximum="1" Value="{Binding Progress}" Height="4"
-                                           Foreground="{StaticResource AmberDim}" Background="#1B1E24"
+                                           Foreground="{StaticResource AmberDim}" Background="{StaticResource SurfaceRaised}"
                                            Margin="0,5,0,0" />
                               <TextBlock Text="{Binding NextStep}" FontSize="11" Margin="0,5,0,0"
                                          TextWrapping="Wrap" Foreground="{StaticResource Ink}" />
@@ -1345,7 +1339,7 @@
                       <ItemsControl ItemsSource="{Binding Stacks}">
                         <ItemsControl.ItemTemplate>
                           <DataTemplate x:DataType="vm:StackLine">
-                            <Border Background="#0F1114" CornerRadius="4" Padding="12,10" Margin="0,0,0,8">
+                            <Border Background="{StaticResource SurfaceField}" CornerRadius="4" Padding="12,10" Margin="0,0,0,8">
                               <StackPanel Spacing="2">
                                 <Grid ColumnDefinitions="*,Auto">
                                   <TextBlock Grid.Column="0" Classes="value" FontSize="14" Text="{Binding Target}"
@@ -1428,7 +1422,7 @@
                     <ItemsControl ItemsSource="{Binding Goals}">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:CommunityGoalLine">
-                          <Border Background="#0F1114" CornerRadius="4" Padding="12,10" Margin="0,0,0,8">
+                          <Border Background="{StaticResource SurfaceField}" CornerRadius="4" Padding="12,10" Margin="0,0,0,8">
                             <StackPanel Spacing="2">
                               <Grid ColumnDefinitions="*,Auto">
                                 <TextBlock Grid.Column="0" Classes="value" FontSize="14" Text="{Binding Title}"
@@ -1471,7 +1465,7 @@
                   <ItemsControl ItemsSource="{Binding Ranks}" Margin="0,8,0,0">
                     <ItemsControl.ItemTemplate>
                       <DataTemplate x:DataType="vm:RankRow">
-                        <Border Background="#0E1013" CornerRadius="4" Padding="10,8" Margin="0,0,0,6">
+                        <Border Background="{StaticResource SurfaceField}" CornerRadius="4" Padding="10,8" Margin="0,0,0,6">
                           <StackPanel>
                             <Grid ColumnDefinitions="Auto,*,Auto">
                               <TextBlock Grid.Column="0" Text="{Binding Label}" Classes="label"
@@ -1488,7 +1482,7 @@
                             </Grid>
                             <ProgressBar Minimum="0" Maximum="1" Value="{Binding Fraction}" Height="4"
                                          IsVisible="{Binding ShowBar}"
-                                         Foreground="{StaticResource AmberDim}" Background="#1B1E24"
+                                         Foreground="{StaticResource AmberDim}" Background="{StaticResource SurfaceRaised}"
                                          Margin="0,5,0,0" />
                           </StackPanel>
                         </Border>
@@ -1509,10 +1503,10 @@
                 <Grid ColumnDefinitions="*,Auto,Auto">
                   <TextBlock Grid.Column="0" Classes="cardHeader" Text="{Binding Title}" />
                   <!-- New-since-last-open count; hidden once every loaded headline has been opened. -->
-                  <Border Grid.Column="1" IsVisible="{Binding HasUnread}" Background="#FFF07100"
+                  <Border Grid.Column="1" IsVisible="{Binding HasUnread}" Background="{StaticResource AmberBrush}"
                           CornerRadius="8" Padding="6,1" Margin="0,0,8,0" VerticalAlignment="Center">
                     <TextBlock Text="{Binding UnreadCount}" FontSize="11" FontWeight="Bold"
-                               Foreground="#0A0A0C" />
+                               Foreground="{StaticResource Surface0}" />
                   </Border>
                   <Button Grid.Column="2" Classes="collapse" Content="{Binding CollapseGlyph}"
                           Command="{Binding ToggleCollapseCommand}" />
@@ -1560,7 +1554,7 @@
               <StackPanel>
                 <Grid ColumnDefinitions="*,Auto,Auto,Auto">
                   <TextBlock Grid.Column="0" Classes="cardHeader" Text="{Binding Title}" />
-                  <Border Grid.Column="1" IsVisible="{Binding IsSimulated}" Background="#1E1712"
+                  <Border Grid.Column="1" IsVisible="{Binding IsSimulated}" Background="{StaticResource AmberChipBg}"
                           CornerRadius="4" Padding="6,1" Margin="0,0,8,0" VerticalAlignment="Top"
                           ToolTip.Tip="Developer mode: this card shows a simulated player. No audio plays and nothing is saved.">
                     <TextBlock Text="SIMULATED" FontSize="10" FontWeight="SemiBold" LetterSpacing="1"

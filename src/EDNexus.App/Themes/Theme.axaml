@@ -1,0 +1,38 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!--
+    EDNexus dark HUD palette — the single source of truth for every window.
+    Mirrors the "EDNexus" design system tokens.json (color family) so the desktop app and the
+    Twitch extension draw from the same reconciled values instead of independently re-picked hex.
+  -->
+
+  <Color x:Key="Amber">#FFF07100</Color>
+  <SolidColorBrush x:Key="AmberBrush" Color="{StaticResource Amber}" />
+  <SolidColorBrush x:Key="AmberDim" Color="#66F07100" />
+  <!-- Low-alpha amber wash for "attention" chip backgrounds (SIM badge, cap-warning notice). -->
+  <SolidColorBrush x:Key="AmberChipBg" Color="#33F07100" />
+
+  <SolidColorBrush x:Key="Surface0" Color="#FF0A0A0C" />
+  <SolidColorBrush x:Key="Surface100" Color="#FF101216" />
+  <!-- Text/icons placed on an Amber fill (e.g. the primary Button.action label). Same value as
+       Surface100, kept as its own token so the two uses don't drift apart independently. -->
+  <SolidColorBrush x:Key="OnBrand" Color="#FF101216" />
+  <SolidColorBrush x:Key="CardBg" Color="#FF14161A" />
+  <!-- Secondary/raised surface: icon buttons, chips, progress-bar tracks, sub-badges. -->
+  <SolidColorBrush x:Key="SurfaceRaised" Color="#FF1B1E24" />
+  <!-- Text-input / form-field surface. -->
+  <SolidColorBrush x:Key="SurfaceField" Color="#FF0E1013" />
+  <SolidColorBrush x:Key="CardBorder" Color="#FF242830" />
+  <!-- Translucent scrim for the always-on-top in-game overlay window. -->
+  <SolidColorBrush x:Key="OverlayScrim" Color="#C8101216" />
+
+  <SolidColorBrush x:Key="Ink" Color="#FFE7E9EE" />
+  <SolidColorBrush x:Key="InkDim" Color="#FF8A909C" />
+
+  <SolidColorBrush x:Key="Good" Color="#FF5FD08B" />
+  <SolidColorBrush x:Key="Bad" Color="#FFE0654F" />
+  <!-- Caution/stale-data state; distinct from Amber so a warning never reads as the brand accent. -->
+  <SolidColorBrush x:Key="Warning" Color="#FFE0A33C" />
+
+</ResourceDictionary>
