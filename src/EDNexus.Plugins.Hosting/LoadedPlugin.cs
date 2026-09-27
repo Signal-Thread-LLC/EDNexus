@@ -65,7 +65,8 @@ public sealed class LoadedPlugin
     /// <summary>
     /// Calls <see cref="IEDNexusPlugin.Shutdown"/> (contained), disposes the plugin's context when
     /// it is <see cref="IDisposable"/>, drops every reference to plugin code and unloads the load
-    /// context. Idempotent.
+    /// context. Idempotent, and never throws for plugin misbehaviour: problems are returned in
+    /// <see cref="PluginUnloadResult.Errors"/>.
     /// </summary>
     [MethodImpl(MethodImplOptions.NoInlining)]
     internal PluginUnloadResult Unload()
@@ -84,21 +85,32 @@ public sealed class LoadedPlugin
         }
 
         var errors = new List<string>();
-        if (instance is not null)
+        var weak = new WeakReference(loadContext);
+        try
         {
+            if (instance is not null)
+                PluginHost.TryShutdown(instance, errors);
+        }
+        catch (Exception ex)
+        {
+            errors.Add(PluginHost.Describe("unloading failed", ex));
+        }
+        finally
+        {
+            // Whatever Shutdown did, the context and load context are always released.
             try
             {
-                instance.Shutdown();
+                PluginHost.DisposeContext(context, errors);
             }
             catch (Exception ex)
             {
-                errors.Add(PluginHost.Describe("Shutdown threw", ex));
+                errors.Add(PluginHost.Describe("disposing the plugin context failed", ex));
+            }
+            finally
+            {
+                loadContext?.Unload();
             }
         }
-        PluginHost.DisposeContext(context, errors);
-
-        var weak = new WeakReference(loadContext);
-        loadContext?.Unload();
         return new PluginUnloadResult(Id, errors, weak);
     }
 }

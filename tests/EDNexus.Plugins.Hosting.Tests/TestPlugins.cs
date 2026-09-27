@@ -77,6 +77,19 @@ internal static class TestPlugins
         }
         """;
 
+    /// <summary>
+    /// A nested <c>EvilException</c> (splice into <c>extraMembers</c>) whose <c>Message</c>,
+    /// <c>StackTrace</c> and <c>ToString</c> all throw — hostile to any host code that describes it.
+    /// </summary>
+    public const string EvilException = """
+        public sealed class EvilException : System.Exception
+        {
+            public override string Message => throw new System.InvalidOperationException("Message getter");
+            public override string? StackTrace => throw new System.InvalidOperationException("StackTrace getter");
+            public override string ToString() => throw new System.InvalidOperationException("ToString");
+        }
+        """;
+
     /// <summary>The standard well-behaved plugin, as <c>&lt;ns&gt;.dll</c>.</summary>
     public static byte[] Standard(string ns) => Compile(ns, PluginSource(ns));
 

@@ -417,6 +417,8 @@ public class PluginHostTests
         Assert.Equal(PluginLoadStatus.Failed, result.Status);
         Assert.Equal("Initialize failed: System.IO.IOException: disk on fire", Assert.Single(result.Reasons));
         Assert.Equal(["com.test.initfail"], contexts.Disposed);
+        // Best-effort Shutdown ran before the context was disposed.
+        Assert.Contains("shutdown com.test.initfail", contexts.Lines);
         Assert.Equal(["com.test.zulu"], host.Loaded.Select(p => p.Id));
     }
 
@@ -581,6 +583,192 @@ public class PluginHostTests
         Assert.Contains("shutdown com.test.alpha", contexts.Lines);
         Assert.Contains("shutdown com.test.beta", contexts.Lines);
         Assert.Throws<ObjectDisposedException>(() => host.LoadAll());
+    }
+
+    // ---- hostile exceptions (Message / ToString throw) -------------------------------------
+
+    [Fact]
+    public void LoadAll_ExceptionWhoseMessageThrows_FromConstructorOrInitialize_IsContained()
+    {
+        using var dir = new TempDir();
+        WriteFolder(dir.Path, "com.test.evilctor", Manifest("com.test.evilctor", "EvilCtor.dll", "EvilCtor.Plugin"),
+            ("EvilCtor.dll", Compile("EvilCtor", PluginSource("EvilCtor", ctorBody: "throw new EvilException();", extraMembers: EvilException))));
+        WriteFolder(dir.Path, "com.test.evilinit", Manifest("com.test.evilinit", "EvilInit.dll", "EvilInit.Plugin"),
+            ("EvilInit.dll", Compile("EvilInit", PluginSource("EvilInit", initBody: "throw new EvilException();", extraMembers: EvilException))));
+        WriteStandard(dir.Path, "com.test.zulu", "Zulu");
+        var contexts = new RecordingContexts();
+        using var host = contexts.Host(dir.Path);
+
+        var report = host.LoadAll(); // must not throw
+
+        Assert.Same(report, host.LastReport);
+        Assert.Equal(
+            "constructing the entry type failed: EvilCtor.Plugin+EvilException: <message unavailable: EvilCtor.Plugin+EvilException>",
+            Assert.Single(Single(report, "com.test.evilctor").Reasons));
+        var init = Single(report, "com.test.evilinit");
+        Assert.Equal(PluginLoadStatus.Failed, init.Status);
+        Assert.Equal(
+            "Initialize failed: EvilInit.Plugin+EvilException: <message unavailable: EvilInit.Plugin+EvilException>",
+            Assert.Single(init.Reasons));
+        Assert.Contains("shutdown com.test.evilinit", contexts.Lines);
+        Assert.Equal(["com.test.evilinit"], contexts.Disposed);
+        Assert.Equal(["com.test.zulu"], host.Loaded.Select(p => p.Id));
+        AssertLoadContextsGone("com.test.evilctor", "com.test.evilinit");
+    }
+
+    [Fact]
+    public void LoadAll_EvilExceptionFromShutdownAfterFailedInitialize_IsContained()
+    {
+        using var dir = new TempDir();
+        WriteFolder(dir.Path, "com.test.doubleevil", Manifest("com.test.doubleevil", "DoubleEvil.dll", "DoubleEvil.Plugin"),
+            ("DoubleEvil.dll", Compile("DoubleEvil", PluginSource("DoubleEvil",
+                initBody: "throw new EvilException();", shutdownBody: "throw new EvilException();", extraMembers: EvilException))));
+        var contexts = new RecordingContexts();
+        using var host = contexts.Host(dir.Path);
+
+        var result = Single(host.LoadAll(), "com.test.doubleevil");
+
+        Assert.Equal(PluginLoadStatus.Failed, result.Status);
+        Assert.Equal(2, result.Reasons.Count);
+        Assert.StartsWith("Shutdown threw: DoubleEvil.Plugin+EvilException: <message unavailable", result.Reasons[1]);
+        Assert.Equal(["com.test.doubleevil"], contexts.Disposed);
+        AssertLoadContextsGone("com.test.doubleevil");
+    }
+
+    [Fact]
+    public void UnloadAll_ExceptionWhoseMessageThrows_FromShutdown_StillUnloadsEveryPlugin()
+    {
+        using var dir = new TempDir();
+        WriteStandard(dir.Path, "com.test.alpha", "Alpha");
+        WriteFolder(dir.Path, "com.test.evilshut", Manifest("com.test.evilshut", "EvilShut.dll", "EvilShut.Plugin"),
+            ("EvilShut.dll", Compile("EvilShut", PluginSource("EvilShut", shutdownBody: "throw new EvilException();", extraMembers: EvilException))));
+        WriteStandard(dir.Path, "com.test.zulu", "Zulu");
+        var contexts = new RecordingContexts();
+        using var host = contexts.Host(dir.Path);
+        Assert.Equal(3, LoadCount(host));
+
+        var results = host.UnloadAll(); // must not throw
+
+        Assert.Equal(["com.test.alpha", "com.test.evilshut", "com.test.zulu"], results.Select(r => r.Id));
+        Assert.Empty(results[0].Errors);
+        Assert.Equal(
+            "Shutdown threw: EvilShut.Plugin+EvilException: <message unavailable: EvilShut.Plugin+EvilException>",
+            Assert.Single(results[1].Errors));
+        Assert.Empty(results[2].Errors);
+        Assert.Contains("shutdown com.test.alpha", contexts.Lines);
+        Assert.Contains("shutdown com.test.zulu", contexts.Lines);
+        Assert.Equal(["com.test.alpha", "com.test.evilshut", "com.test.zulu"], contexts.Disposed.Order());
+        Assert.Empty(host.Loaded);
+        Assert.Empty(host.LastReport!.Loaded);
+        AssertLoadContextsGone("com.test.alpha", "com.test.evilshut", "com.test.zulu");
+    }
+
+    [Fact]
+    public void Dispose_ExceptionWhoseMessageThrows_FromShutdown_DoesNotThrow()
+    {
+        using var dir = new TempDir();
+        WriteFolder(dir.Path, "com.test.evildispose", Manifest("com.test.evildispose", "EvilDispose.dll", "EvilDispose.Plugin"),
+            ("EvilDispose.dll", Compile("EvilDispose", PluginSource("EvilDispose", shutdownBody: "throw new EvilException();", extraMembers: EvilException))));
+        WriteStandard(dir.Path, "com.test.zulu", "Zulu");
+        var contexts = new RecordingContexts();
+        var host = contexts.Host(dir.Path);
+        Assert.Equal(2, LoadCount(host));
+
+        host.Dispose();
+
+        Assert.Equal(["com.test.evildispose", "com.test.zulu"], contexts.Disposed.Order());
+        AssertLoadContextsGone("com.test.evildispose", "com.test.zulu");
+    }
+
+    [Fact]
+    public void Describe_NeverThrows()
+    {
+        Assert.Equal("x: EDNexus.Plugins.Hosting.Tests.PluginHostTests+ThrowingMessage: <message unavailable: EDNexus.Plugins.Hosting.Tests.PluginHostTests+ThrowingMessage>",
+            PluginHost.Describe("x", new ThrowingMessage()));
+        Assert.Equal("x: System.InvalidOperationException: inner",
+            PluginHost.Describe("x", new System.Reflection.TargetInvocationException(new InvalidOperationException("inner"))));
+    }
+
+    private sealed class ThrowingMessage : Exception
+    {
+        public override string Message => throw new InvalidOperationException();
+        public override string ToString() => throw new InvalidOperationException();
+    }
+
+    // ---- recovery runs once; re-entrancy ---------------------------------------------------
+
+    [Fact]
+    public void LoadAll_RunsRecoveryOnlyOncePerHost()
+    {
+        using var dir = new TempDir();
+        WriteStandard(dir.Path, "com.test.alpha", "Alpha");
+        var contexts = new RecordingContexts();
+        using var host = contexts.Host(dir.Path);
+        var first = host.LoadAll();
+        var staging = Directory.CreateDirectory(Path.Combine(dir.Path, ".staging-" + Guid.NewGuid().ToString("N"))).FullName;
+
+        host.UnloadAll();
+        var second = host.LoadAll();
+
+        Assert.Same(first.Recovery, host.Recovery);
+        Assert.Empty(second.Recovery.Removed);
+        Assert.Empty(second.Recovery.Restored);
+        Assert.True(Directory.Exists(staging), "recovery must not rerun (it may race an install)");
+        Assert.Equal(PluginLoadStatus.Loaded, Single(second, "com.test.alpha").Status);
+    }
+
+    [Fact]
+    public void LoadAll_CalledReentrantlyDuringAPass_FailsFastWithoutBreakingThePass()
+    {
+        using var dir = new TempDir();
+        WriteStandard(dir.Path, "com.test.alpha", "Alpha");
+        WriteStandard(dir.Path, "com.test.zulu", "Zulu");
+        var contexts = new RecordingContexts();
+        PluginHost? host = null;
+        host = new PluginHost(dir.Path, SemanticVersion.Parse("1.0.0"), manifest =>
+        {
+            if (manifest.Id == "com.test.alpha")
+                host!.LoadAll();
+            return contexts.Factory(manifest);
+        });
+        using (host)
+        {
+            var report = host.LoadAll();
+
+            var alpha = Single(report, "com.test.alpha");
+            Assert.Equal(PluginLoadStatus.Failed, alpha.Status);
+            Assert.Contains("building the plugin context failed: System.InvalidOperationException: A plugin load pass is already in progress.", alpha.ReasonSummary);
+            Assert.Equal(["com.test.zulu"], host.Loaded.Select(p => p.Id));
+        }
+    }
+
+    [Fact]
+    public void Report_Loaded_ExcludesPluginsUnloadedSinceThePass()
+    {
+        using var dir = new TempDir();
+        WriteStandard(dir.Path, "com.test.alpha", "Alpha");
+        WriteStandard(dir.Path, "com.test.beta", "Beta");
+        using var host = new RecordingContexts().Host(dir.Path);
+        var report = host.LoadAll();
+
+        host.Unload("com.test.alpha");
+
+        Assert.Equal(["com.test.beta"], report.Loaded.Select(p => p.Id));
+        Assert.Equal(PluginLoadStatus.Loaded, Single(report, "com.test.alpha").Status); // load-time status kept
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static int LoadCount(PluginHost host) => host.LoadAll().Plugins.Count(p => p.Status == PluginLoadStatus.Loaded);
+
+    private static void AssertLoadContextsGone(params string[] ids)
+    {
+        var names = ids.Select(id => "EDNexus plugin " + id).ToHashSet();
+        for (var i = 0; i < 20 && AssemblyLoadContext.All.Any(c => names.Contains(c.Name!)); i++)
+        {
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+        }
+        Assert.DoesNotContain(AssemblyLoadContext.All, c => c.Name is not null && names.Contains(c.Name));
     }
 
     // Kept out of line so no plugin object is left in a local of the calling test's frame.
