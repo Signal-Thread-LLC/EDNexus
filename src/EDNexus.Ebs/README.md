@@ -74,7 +74,8 @@ The desktop app never talks to Twitch directly. Instead:
    underlying Twitch access/refresh tokens, and returns `{ "token", "channelId", "username" }`. This
    is the only token the desktop client ever stores.
 4. **`POST /oauth/revoke`** — best-effort logout: `Authorization: Bearer <ebs-token>` revokes both
-   the EBS token and (best-effort) the underlying Twitch grant.
+   the EBS token and (best-effort) the underlying Twitch grant. It also clears the channel's stored
+   card, the same way `DELETE /api/update-state` does.
 
 A background service refreshes each broadcaster's Twitch access token ahead of expiry using their
 stored refresh token, so the commander stays logged in across a multi-day gap without re-auth. If a
@@ -101,6 +102,16 @@ Called by the desktop client on behalf of the broadcaster.
 - **Responses**: `200 OK` on success, `401 Unauthorized` for a missing/invalid/revoked token,
   `413 Payload Too Large` if the state exceeds the size limit, `429 Too Many Requests` if
   the per-channel rate limit is exceeded, `502 Bad Gateway` if Twitch PubSub rejects the message.
+
+### `DELETE /api/update-state`
+
+Called by the desktop client when the broadcaster switches the card off. Same bearer auth as the
+`POST`. It deletes the stored snapshot, so `GET /api/initial-state` answers `404` again, and
+broadcasts `{ "v": 1, "offline": true }` so viewers who are already watching hide the card. Returns
+`204`. It has its own per-channel limit (10 per minute), so a clear sent straight after a publish is
+never rejected by that publish's window. `POST /oauth/revoke` does the same clear on sign-out.
+
+Every `429` from the EBS carries a `Retry-After` header in seconds.
 
 ### `GET /api/initial-state/{channelId}`
 

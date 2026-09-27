@@ -35,6 +35,16 @@ internal sealed class FakeStreamStateApiClient : IStreamStateApiClient
         return Task.FromResult(result);
     }
 
+    /// <summary>Tokens sent to <see cref="ClearAsync"/>, in order.</summary>
+    public ConcurrentQueue<string> Clears { get; } = new();
+
+    public Task<StreamStatePublishResult> ClearAsync(string updateStateEndpoint, string token, CancellationToken ct = default)
+    {
+        LastEndpoint = updateStateEndpoint;
+        Clears.Enqueue(token);
+        return Task.FromResult(StreamStatePublishResult.ClearedOk);
+    }
+
     /// <summary>Waits for the next publish attempt, failing the test rather than hanging forever.</summary>
     public async Task<bool> WaitForPublishAsync(TimeSpan? timeout = null) =>
         await Published.WaitAsync(timeout ?? TimeSpan.FromSeconds(5)).ConfigureAwait(false);

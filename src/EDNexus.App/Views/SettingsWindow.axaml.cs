@@ -175,10 +175,14 @@ public partial class SettingsWindow : Window
                 VoiceNameCombo.SelectedItem as string,
                 (int)VoiceVolumeSlider.Value,
                 DisabledCalloutNames());
-            _boot.ApplyTwitchChoice(
+            var takeOffAir = _boot.ApplyTwitchChoice(
                 TwitchCardToggle.IsChecked == true,
                 TwitchSectionsFromToggles(),
                 TwitchEbsBox.Text);
+            // Stopping publishes is not enough: the EBS would keep serving the last card to every
+            // viewer who opens the stream. Best-effort — the result surfaces on the status line.
+            if (takeOffAir is { } off && _dashboard?.TwitchCard is { } card)
+                _ = card.TakeOffAirAsync(off.Endpoint, off.Token);
             // Switching the card on (or changing which sections show) changes what viewers should
             // see without touching the commander picture, so the publisher has nothing to react to —
             // and with the game closed no journal event is coming to nudge it. Ask directly.

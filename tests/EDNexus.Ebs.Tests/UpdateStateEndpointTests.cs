@@ -104,6 +104,69 @@ public class UpdateStateEndpointTests : IClassFixture<UpdateStateEndpointTests.F
     }
 
     [Fact]
+    public async Task ClearState_forgets_the_stored_snapshot_and_tells_viewers_the_card_is_offline()
+    {
+        var record = _factory.TokenStore.IssueToken("chan-clear", "CMDR", "access", "refresh", DateTimeOffset.UtcNow.AddHours(4));
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new("Bearer", record.Token);
+        (await client.PostAsJsonAsync("/api/update-state", new { state = new { headline = "Docked at Home" } })).EnsureSuccessStatusCode();
+
+        var cleared = await client.DeleteAsync("/api/update-state");
+
+        Assert.Equal(HttpStatusCode.NoContent, cleared.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await _factory.CreateClient().GetAsync("/api/initial-state/chan-clear")).StatusCode);
+        Assert.True(_factory.PubSubClient.LastMessage["chan-clear"].GetProperty("offline").GetBoolean());
+    }
+
+    [Fact]
+    public async Task ClearState_requires_a_valid_broadcaster_token()
+    {
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new("Bearer", "not-a-real-token");
+
+        var response = await client.DeleteAsync("/api/update-state");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Signing_out_also_takes_the_card_off_the_air()
+    {
+        var record = _factory.TokenStore.IssueToken("chan-signout", "CMDR", "access", "refresh", DateTimeOffset.UtcNow.AddHours(4));
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new("Bearer", record.Token);
+        (await client.PostAsJsonAsync("/api/update-state", new { state = new { headline = "Docked at Home" } })).EnsureSuccessStatusCode();
+
+        (await client.PostAsync("/oauth/revoke", null)).EnsureSuccessStatusCode();
+
+        Assert.Equal(HttpStatusCode.NotFound, (await _factory.CreateClient().GetAsync("/api/initial-state/chan-signout")).StatusCode);
+        Assert.True(_factory.PubSubClient.LastMessage["chan-signout"].GetProperty("offline").GetBoolean());
+    }
+
+    [Fact]
+    public async Task A_rate_limited_update_says_when_to_retry()
+    {
+        using var factory = _factory.WithWebHostBuilder(builder =>
+            builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Ebs:UpdateStateRateLimit"] = "1",
+                ["Ebs:UpdateStateRateLimitWindowSeconds"] = "30",
+            })));
+        var record = factory.Services.GetRequiredService<IBroadcasterTokenStore>()
+            .IssueToken("chan-retry-after", "CMDR", "access", "refresh", DateTimeOffset.UtcNow.AddHours(4));
+        var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new("Bearer", record.Token);
+
+        await client.PostAsJsonAsync("/api/update-state", new { state = new { foo = "bar" } });
+        var limited = await client.PostAsJsonAsync("/api/update-state", new { state = new { foo = "bar" } });
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, limited.StatusCode);
+        var retryAfter = limited.Headers.RetryAfter?.Delta;
+        Assert.NotNull(retryAfter);
+        Assert.InRange(retryAfter.Value.TotalSeconds, 1, 30);
+    }
+
+    [Fact]
     public async Task InitialState_allows_the_extension_iframe_origin()
     {
         var client = _factory.CreateClient();
@@ -164,9 +227,12 @@ public sealed class FakeTwitchPubSubClient : ITwitchPubSubClient
 {
     public Dictionary<string, int> BroadcastCalls { get; } = new();
 
+    public Dictionary<string, JsonElement> LastMessage { get; } = new();
+
     public Task<bool> BroadcastAsync(string broadcasterId, JsonElement state, CancellationToken cancellationToken)
     {
         BroadcastCalls[broadcasterId] = BroadcastCalls.GetValueOrDefault(broadcasterId) + 1;
+        LastMessage[broadcasterId] = state.Clone();
         return Task.FromResult(true);
     }
 }

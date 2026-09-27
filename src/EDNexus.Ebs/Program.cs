@@ -102,6 +102,13 @@ builder.Services.AddCors(options =>
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    // Tell the client how long to wait, rather than leaving it to guess and retry into the same window.
+    options.OnRejected = (context, _) =>
+    {
+        if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+            context.HttpContext.Response.Headers.RetryAfter = ((int)Math.Ceiling(retryAfter.TotalSeconds)).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        return ValueTask.CompletedTask;
+    };
 
     options.AddPolicy("update-state", httpContext =>
     {
@@ -114,6 +121,21 @@ builder.Services.AddRateLimiter(options =>
         {
             PermitLimit = Math.Max(1, ebsOptions.UpdateStateRateLimit),
             Window = TimeSpan.FromSeconds(Math.Max(1, ebsOptions.UpdateStateRateLimitWindowSeconds)),
+            QueueLimit = 0,
+        });
+    });
+
+    // Separate from update-state so switching the card off straight after a publish is never
+    // rejected by that publish's window — a clear is the privacy-critical request of the two.
+    options.AddPolicy("clear-state", httpContext =>
+    {
+        var partitionKey = httpContext.Items.TryGetValue("ChannelId", out var channelId) && channelId is string id
+            ? id
+            : httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        return RateLimitPartition.GetFixedWindowLimiter(partitionKey, _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 10,
+            Window = TimeSpan.FromMinutes(1),
             QueueLimit = 0,
         });
     });
@@ -156,7 +178,7 @@ app.UseCors("extension-frontend");
 // handler, as this used to do, was always too late to affect partitioning for that same request).
 app.Use(async (context, next) =>
 {
-    if (HttpMethods.IsPost(context.Request.Method)
+    if ((HttpMethods.IsPost(context.Request.Method) || HttpMethods.IsDelete(context.Request.Method))
         && context.Request.Path.Equals("/api/update-state", StringComparison.OrdinalIgnoreCase))
     {
         var tokenStore = context.RequestServices.GetRequiredService<IBroadcasterTokenStore>();
@@ -229,6 +251,24 @@ app.MapPost("/api/update-state", async (
     })
     .RequireRateLimiting("update-state");
 
+// The broadcaster switched the card off or signed out: forget the stored snapshot so
+// /api/initial-state stops serving it to anyone who asks, and tell viewers already watching to hide it.
+app.MapDelete("/api/update-state", async (
+        HttpRequest httpRequest,
+        IChannelStateStore stateStore,
+        ITwitchPubSubClient pubSubClient,
+        CancellationToken cancellationToken) =>
+    {
+        if (httpRequest.HttpContext.Items["ChannelId"] is not string channelId)
+        {
+            return (IResult?)httpRequest.HttpContext.Items["BroadcasterAuthFailure"] ?? Results.Unauthorized();
+        }
+
+        await ChannelStateClearing.ClearAsync(channelId, stateStore, pubSubClient, cancellationToken).ConfigureAwait(false);
+        return Results.NoContent();
+    })
+    .RequireRateLimiting("clear-state");
+
 app.MapGet("/api/initial-state/{channelId}", (string channelId, IChannelStateStore stateStore) =>
     {
         if (!stateStore.TryGet(channelId, out var state))
@@ -285,12 +325,12 @@ static bool TryAuthenticateBroadcaster(HttpRequest request, IBroadcasterTokenSto
     var token = header["Bearer ".Length..].Trim();
     if (!tokenStore.TryGetByToken(token, out var record))
     {
-        // Say which kind of 401 this is. The token store is in-memory, so the overwhelmingly common
-        // cause is that this EBS process has restarted since the client logged in — an empty 401
-        // sends people hunting through their Twitch console configuration instead.
+        // Say which kind of 401 this is: an empty 401 sends people hunting through their Twitch
+        // console configuration. Tokens survive restarts, so an unknown one was revoked, replaced by
+        // a newer login, or issued by a different EBS.
         failure = Results.Problem(
-            "This token is not known to the service. If the service has restarted, log in again — "
-            + "broadcaster tokens are held in memory and do not survive a restart.",
+            "This token is not known to the service. It was revoked, replaced by a newer sign-in, or "
+            + "issued by a different service — log in again.",
             statusCode: StatusCodes.Status401Unauthorized);
         return false;
     }

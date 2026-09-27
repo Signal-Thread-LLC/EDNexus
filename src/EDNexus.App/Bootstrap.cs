@@ -240,17 +240,29 @@ public sealed class Bootstrap
     /// The EBS to publish to and log in against. Blank restores the shipped default rather than
     /// leaving the app with no endpoint at all.
     /// </param>
-    public void ApplyTwitchChoice(bool enabled, TwitchCardSections sections, string? ebsBaseUrl)
+    /// <returns>
+    /// The endpoint and token of a card that was on the air and no longer should be (switched off,
+    /// or moved to a different EBS), for the caller to pass to
+    /// <see cref="EDNexus.Core.Twitch.TwitchStreamCardService.TakeOffAirAsync"/>; otherwise null.
+    /// </returns>
+    public (string Endpoint, string Token)? ApplyTwitchChoice(bool enabled, TwitchCardSections sections, string? ebsBaseUrl)
     {
         var trimmed = (ebsBaseUrl ?? string.Empty).Trim().TrimEnd('/');
         var previousBaseUrl = Settings.Twitch.EbsBaseUrl;
+        var wasOnAir = Settings.Twitch.StreamCardEnabled && !string.IsNullOrWhiteSpace(Settings.Twitch.Token);
+        var previousToken = Settings.Twitch.Token;
 
         Settings.Twitch.StreamCardEnabled = enabled;
         Settings.Twitch.Card = sections;
         Settings.Twitch.EbsBaseUrl = trimmed.Length > 0 ? trimmed : new TwitchSettings().EbsBaseUrl;
         Store.Save(Settings);
 
-        if (!string.Equals(previousBaseUrl, Settings.Twitch.EbsBaseUrl, StringComparison.OrdinalIgnoreCase))
+        var ebsChanged = !string.Equals(previousBaseUrl, Settings.Twitch.EbsBaseUrl, StringComparison.OrdinalIgnoreCase);
+        (string, string)? takeOffAir = wasOnAir && (!enabled || ebsChanged)
+            ? (new TwitchOAuthOptions { EbsBaseUrl = previousBaseUrl }.UpdateStateEndpoint, previousToken!)
+            : null;
+
+        if (ebsChanged)
         {
             // A token minted by one EBS means nothing to another, so pointing at a different instance
             // ends the session rather than leaving the UI claiming to be signed in while every publish
@@ -264,6 +276,8 @@ public sealed class Bootstrap
             // EBS needs a new one — otherwise the next sign-in would still go to the old instance.
             Twitch = BuildTwitchAuth();
         }
+
+        return takeOffAir;
     }
 
     private TwitchAuthService BuildTwitchAuth() =>

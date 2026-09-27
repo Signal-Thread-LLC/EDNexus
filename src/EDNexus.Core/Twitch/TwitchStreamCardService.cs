@@ -70,6 +70,8 @@ public sealed class TwitchStreamCardService : IDisposable
     private readonly TimeSpan _minInterval;
     private readonly CancellationTokenSource _cts = new();
     private readonly SemaphoreSlim _dirty = new(0, 1);
+    /// <summary>Serialises publishes and clears, so a publish already in flight cannot land after a clear.</summary>
+    private readonly SemaphoreSlim _sendGate = new(1, 1);
     private readonly Task _pump;
 
     private string? _lastPublishedKey;
@@ -255,15 +257,58 @@ public sealed class TwitchStreamCardService : IDisposable
         var key = string.Join(KeySeparator, endpoint, token, snapshot.ContentFingerprint());
         if (key == _lastPublishedKey) return null;
 
-        var result = await _client.PublishAsync(endpoint, token!, snapshot, ct).ConfigureAwait(false);
-
-        if (result.IsSuccess) _lastPublishedKey = key;
+        StreamStatePublishResult result;
+        await _sendGate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            // The card may have been switched off while the snapshot was being built; publishing
+            // now would put it back on the air straight after the clear.
+            if (_token() != token) return null;
+            result = await _client.PublishAsync(endpoint, token!, snapshot, ct).ConfigureAwait(false);
+            if (result.IsSuccess) _lastPublishedKey = key;
+        }
+        finally { _sendGate.Release(); }
 
         if (result.RequiresReauth)
         {
             Volatile.Write(ref _rejectedToken, token);
             Volatile.Write(ref _stoppedForReauth, true);
             try { ReauthRequired?.Invoke(); } catch { /* never let a handler break the pump */ }
+        }
+
+        Raise(result);
+        return result;
+    }
+
+    /// <summary>
+    /// Takes the card off the air: the EBS forgets the last snapshot and tells viewers to hide it.
+    /// Call it when the commander switches the card off or points it at a different EBS — merely
+    /// stopping publishes would leave the last snapshot being served to every new viewer.
+    /// </summary>
+    /// <param name="updateStateEndpoint">The EBS the card was published to.</param>
+    /// <param name="token">The token it was published with (the card's token callback may already return null).</param>
+    public async Task<StreamStatePublishResult> TakeOffAirAsync(
+        string updateStateEndpoint, string token, CancellationToken ct = default)
+    {
+        StreamStatePublishResult result;
+        try
+        {
+            await _sendGate.WaitAsync(ct).ConfigureAwait(false);
+            try
+            {
+                result = await _client.ClearAsync(updateStateEndpoint, token, ct).ConfigureAwait(false);
+                // Switching back on must republish even if the commander picture has not changed.
+                _lastPublishedKey = null;
+            }
+            finally { _sendGate.Release(); }
+        }
+        catch (ObjectDisposedException)
+        {
+            result = new StreamStatePublishResult(StreamStatePublishStatus.Failed, "The stream card service has shut down.");
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            result = new StreamStatePublishResult(StreamStatePublishStatus.Failed, ex.Message);
         }
 
         Raise(result);
@@ -293,5 +338,6 @@ public sealed class TwitchStreamCardService : IDisposable
 
         _cts.Dispose();
         _dirty.Dispose();
+        _sendGate.Dispose();
     }
 }
