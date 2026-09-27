@@ -14,20 +14,20 @@
         Focusable="False">
   <!-- Click-through is applied in code-behind (Win32 WS_EX_TRANSPARENT) once the native handle
        exists, so the game underneath always keeps mouse/keyboard focus. -->
-  <Border Background="#C8101216" CornerRadius="8" Padding="14" BorderBrush="#F07100" BorderThickness="1"
+  <Border Background="{StaticResource OverlayScrim}" CornerRadius="8" Padding="14" BorderBrush="{StaticResource AmberBrush}" BorderThickness="1"
           MinWidth="230">
     <StackPanel Spacing="5">
-      <TextBlock Text="EDNEXUS" Foreground="#F07100" FontSize="11" FontWeight="Bold" LetterSpacing="2" />
-      <TextBlock x:Name="SystemLine" Foreground="#E7E9EE" FontSize="13" />
-      <TextBlock x:Name="NextJumpLine" Foreground="#E7E9EE" FontSize="13" IsVisible="False" />
-      <TextBlock x:Name="FuelLine" Foreground="#E7E9EE" FontSize="13" />
-      <TextBlock x:Name="BioLine" Foreground="#7CD992" FontSize="13" IsVisible="False" />
-      <TextBlock x:Name="ShortfallHeader" Text="COLONISATION SHORTFALL" Foreground="#8A909C" FontSize="10"
+      <TextBlock Text="EDNEXUS" Foreground="{StaticResource AmberBrush}" FontSize="11" FontWeight="Bold" LetterSpacing="2" />
+      <TextBlock x:Name="SystemLine" Foreground="{StaticResource Ink}" FontSize="13" />
+      <TextBlock x:Name="NextJumpLine" Foreground="{StaticResource Ink}" FontSize="13" IsVisible="False" />
+      <TextBlock x:Name="FuelLine" Foreground="{StaticResource Ink}" FontSize="13" />
+      <TextBlock x:Name="BioLine" Foreground="{StaticResource Good}" FontSize="13" IsVisible="False" />
+      <TextBlock x:Name="ShortfallHeader" Text="COLONISATION SHORTFALL" Foreground="{StaticResource InkDim}" FontSize="10"
                  FontWeight="SemiBold" LetterSpacing="1" Margin="0,4,0,0" IsVisible="False" />
       <ItemsControl x:Name="ShortfallList" IsVisible="False">
         <ItemsControl.ItemTemplate>
           <DataTemplate>
-            <TextBlock Text="{Binding}" Foreground="#E7E9EE" FontSize="12" />
+            <TextBlock Text="{Binding}" Foreground="{StaticResource Ink}" FontSize="12" />
           </DataTemplate>
         </ItemsControl.ItemTemplate>
       </ItemsControl>

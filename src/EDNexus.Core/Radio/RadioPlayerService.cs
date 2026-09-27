@@ -17,7 +17,7 @@ namespace EDNexus.Core.Radio;
 /// cannot throw even if no native VLC runtime is present on the machine — a missing/broken native
 /// library surfaces as <see cref="RadioPlaybackStatus.Error"/> instead of a crash.
 /// </remarks>
-public sealed class RadioPlayerService : IDisposable, IAsyncDisposable
+public sealed class RadioPlayerService : IRadioPlayer, IDisposable, IAsyncDisposable
 {
     private readonly object _gate = new();
     private readonly AppSettings? _settings;
@@ -33,6 +33,32 @@ public sealed class RadioPlayerService : IDisposable, IAsyncDisposable
     private bool _wantsPlayback; // user intent: last transport action was play (vs pause/stop)
     private string? _lastError;
     private bool _disposed;
+    private bool _suspended; // audio stopped for developer mode; resume on leaving it
+    private int _pendingPlays; // plays queued but not yet through PlayStationCore (status still stale)
+
+    // Serializes every call into the native player (play, pause, stop, volume, mute, teardown), so a
+    // play that was already queued can't slip in after a suspend and the player is never freed while
+    // another call is using it. LibVLC event handlers never take it (they only take _gate).
+    //
+    // #144: LibVLC raises its events synchronously on its own threads, and Stop() joins those
+    // threads. Our handlers take _gate, so _gate must never be held across a native call; callers
+    // snapshot what they need under _gate, release it, and only then call into LibVLC.
+    private readonly object _transportGate = new();
+
+    // How long Dispose waits for LibVLC to stop and release before giving up on it: a wedged native
+    // teardown must not hang app exit.
+    private static readonly TimeSpan DefaultNativeTeardownTimeout = TimeSpan.FromSeconds(3);
+    private readonly TimeSpan _nativeTeardownTimeout;
+
+    // Volume changes arrive in bursts (a slider drag fires one per step). They apply to the player
+    // and the in-memory settings immediately, but the disk write is coalesced: one save once the
+    // burst goes quiet, flushed on Dispose so a change made just before shutdown isn't lost.
+    private static readonly TimeSpan DefaultSaveDelay = TimeSpan.FromMilliseconds(500);
+    private readonly TimeSpan _saveDelay;
+    private readonly object _saveGate = new();
+    private readonly Action<Action> _postSave;
+    private Timer? _saveTimer;
+    private bool _savePending;
 
     /// <summary>Raised after any playback state, station, volume, or mute change.</summary>
     public event Action? Changed;
@@ -42,10 +68,39 @@ public sealed class RadioPlayerService : IDisposable, IAsyncDisposable
     /// change is persisted back into it (and saved via <paramref name="store"/>, if present).
     /// </param>
     /// <param name="store">Used to write <paramref name="settings"/> to disk after each change.</param>
-    public RadioPlayerService(AppSettings? settings = null, SettingsStore? store = null)
+    /// <param name="saveDelay">
+    /// How long volume changes must go quiet before they're written to disk (default 500 ms).
+    /// Every other change is saved immediately.
+    /// </param>
+    /// <param name="postSave">
+    /// Runs the delayed volume save on the thread that owns <paramref name="settings"/>. The settings
+    /// object is shared with the rest of the app, which mutates it on the UI thread, so serializing it
+    /// from the timer's thread pool thread could race those edits. Defaults to posting to the
+    /// <see cref="SynchronizationContext"/> current at construction, or running inline when there is
+    /// none (tests, CLI).
+    /// </param>
+    public RadioPlayerService(
+        AppSettings? settings = null,
+        SettingsStore? store = null,
+        TimeSpan? saveDelay = null,
+        Action<Action>? postSave = null)
+        : this(settings, store, saveDelay, postSave, DefaultNativeTeardownTimeout)
+    {
+    }
+
+    /// <summary>Test seam: as the public constructor, with a custom bound on the native teardown in <see cref="Dispose"/>.</summary>
+    internal RadioPlayerService(
+        AppSettings? settings,
+        SettingsStore? store,
+        TimeSpan? saveDelay,
+        Action<Action>? postSave,
+        TimeSpan nativeTeardownTimeout)
     {
         _settings = settings;
         _store = store;
+        _saveDelay = saveDelay ?? DefaultSaveDelay;
+        _nativeTeardownTimeout = nativeTeardownTimeout;
+        _postSave = postSave ?? PostTo(SynchronizationContext.Current);
 
         var radio = settings?.Radio;
         if (radio is not null)
@@ -128,10 +183,12 @@ public sealed class RadioPlayerService : IDisposable, IAsyncDisposable
             _station = station;
             _enabled = true;
             _wantsPlayback = true;
+            _suspended = false; // an explicit play takes over from a developer-mode suspend
+            _pendingPlays++;
         }
         Persist();
 
-        return Task.Run(() => PlayStationCore(station), ct);
+        return QueuePlay(station, ct);
     }
 
     /// <summary>Resumes the currently-loaded station (or restarts it if stopped). No-op if none is tuned.</summary>
@@ -198,7 +255,12 @@ public sealed class RadioPlayerService : IDisposable, IAsyncDisposable
         {
             try
             {
-                lock (_gate) _mediaPlayer?.Pause();
+                lock (_transportGate)
+                {
+                    MediaPlayer? player;
+                    lock (_gate) player = LivePlayerLocked();
+                    player?.Pause(); // outside _gate (#144)
+                }
             }
             catch (Exception ex)
             {
@@ -218,10 +280,12 @@ public sealed class RadioPlayerService : IDisposable, IAsyncDisposable
         {
             try
             {
-                lock (_gate)
+                lock (_transportGate)
                 {
-                    _mediaPlayer?.Stop();
-                    _status = RadioPlaybackStatus.Stopped;
+                    MediaPlayer? player;
+                    lock (_gate) player = LivePlayerLocked();
+                    player?.Stop(); // outside _gate (#144): Stop waits for LibVLC's event threads
+                    lock (_gate) _status = RadioPlaybackStatus.Stopped;
                 }
                 RaiseChanged();
             }
@@ -237,26 +301,113 @@ public sealed class RadioPlayerService : IDisposable, IAsyncDisposable
     {
         lock (_gate)
         {
+            _suspended = false; // an explicit pause/stop: leaving developer mode must not resume
             if (!_wantsPlayback) return;
             _wantsPlayback = false;
         }
         Persist();
     }
 
-    /// <summary>Sets output volume (0-100), applying it immediately if the engine is initialized.</summary>
-    public Task SetVolumeAsync(int volume, CancellationToken ct = default)
+    /// <summary>True while audio is stopped by <see cref="SuspendForDeveloperModeAsync"/> and not yet resumed.</summary>
+    public bool IsSuspendedForDeveloperMode
     {
-        var clamped = Math.Clamp(volume, 0, 100);
-        lock (_gate) _volume = clamped;
-        Persist();
+        get { lock (_gate) return _suspended; }
+    }
+
+    /// <summary>
+    /// Silences the real radio while developer mode is on, where the UI drives a simulation and so
+    /// can't reach this player. Unlike <see cref="PauseAsync"/>/<see cref="StopAsync"/> this keeps
+    /// the resume-on-launch intent and writes nothing to disk: closing the app while suspended
+    /// leaves the saved settings exactly as they were before developer mode. Only a stream that is
+    /// playing, connecting, or queued to start is suspended (stopped rather than paused, since a
+    /// paused live stream would resume stale; a queued play is dropped); paused, stopped, or failed
+    /// playback is left alone. Idempotent.
+    /// </summary>
+    public Task SuspendForDeveloperModeAsync(CancellationToken ct = default)
+    {
+        lock (_gate)
+        {
+            if (_suspended || _disposed) return Task.CompletedTask;
+            // A play still queued hasn't moved _status off Stopped/Paused yet, but will start audio.
+            var audible = _status is RadioPlaybackStatus.Playing or RadioPlaybackStatus.Buffering;
+            if (!audible && _pendingPlays == 0) return Task.CompletedTask;
+            _suspended = true;
+        }
 
         return Task.Run(() =>
         {
             try
             {
-                lock (_gate)
+                lock (_transportGate)
                 {
-                    if (_mediaPlayer is not null) _mediaPlayer.Volume = clamped;
+                    MediaPlayer? player;
+                    lock (_gate)
+                    {
+                        if (!_suspended || _disposed) return; // an explicit play/stop got here first
+                        player = _mediaPlayer;
+                        _status = RadioPlaybackStatus.Stopped;
+                    }
+                    // Stop outside _gate: LibVLC can wait on its event thread, whose handlers take _gate (#144).
+                    player?.Stop();
+                }
+                RaiseChanged();
+            }
+            catch (Exception ex)
+            {
+                SetError(ex.Message);
+            }
+        }, ct);
+    }
+
+    /// <summary>
+    /// Undoes <see cref="SuspendForDeveloperModeAsync"/>: restarts the tuned station, but only if
+    /// that call actually silenced it and nothing since (an explicit play/pause/stop, or turning the
+    /// radio off) has changed what the user wants. Otherwise a no-op. Writes nothing to disk.
+    /// </summary>
+    public Task ResumeAfterDeveloperModeAsync(CancellationToken ct = default)
+    {
+        RadioStation? station;
+        lock (_gate)
+        {
+            if (!_suspended) return Task.CompletedTask;
+            _suspended = false;
+            station = _station;
+            if (_disposed || !_enabled || !_wantsPlayback || station is null) return Task.CompletedTask;
+            _pendingPlays++;
+        }
+
+        return QueuePlay(station, ct);
+    }
+
+    /// <summary>Test seam: pretend LibVLC reported <paramref name="status"/> (there's no native runtime under test).</summary>
+    internal void SetStatusForTest(RadioPlaybackStatus status)
+    {
+        lock (_gate) _status = status;
+    }
+
+    /// <summary>Test seam: the lock queued plays and the developer-mode suspend serialize on, so a test can hold them back.</summary>
+    internal object TransportGateForTest => _transportGate;
+
+    /// <summary>Sets output volume (0-100), applying it immediately if the engine is initialized.</summary>
+    public Task SetVolumeAsync(int volume, CancellationToken ct = default)
+    {
+        var clamped = Math.Clamp(volume, 0, 100);
+        lock (_gate) _volume = clamped;
+        PersistSoon();
+
+        return Task.Run(() =>
+        {
+            try
+            {
+                // Read the latest level rather than `clamped`: these tasks can run out of order
+                // during a slider drag, and the player must end on the value the snapshot shows.
+                // _transportGate keeps read-then-apply atomic, so the last task to run applies it.
+                lock (_transportGate)
+                {
+                    MediaPlayer? player;
+                    int level;
+                    lock (_gate) { player = LivePlayerLocked(); level = _volume; }
+                    if (player is not null) player.Volume = level; // outside _gate (#144)
                 }
                 RaiseChanged();
             }
@@ -277,9 +428,12 @@ public sealed class RadioPlayerService : IDisposable, IAsyncDisposable
         {
             try
             {
-                lock (_gate)
+                lock (_transportGate)
                 {
-                    if (_mediaPlayer is not null) _mediaPlayer.Mute = muted;
+                    MediaPlayer? player;
+                    bool mute;
+                    lock (_gate) { player = LivePlayerLocked(); mute = _muted; }
+                    if (player is not null) player.Mute = mute; // outside _gate (#144)
                 }
                 RaiseChanged();
             }
@@ -290,23 +444,50 @@ public sealed class RadioPlayerService : IDisposable, IAsyncDisposable
         }, ct);
     }
 
-    /// <summary>Runs on a background thread: lazily brings up LibVLC and starts streaming the given station.</summary>
-    private void PlayStationCore(RadioStation station)
+    /// <summary>
+    /// Runs <see cref="PlayStationCore"/> on a background thread for a play already counted in
+    /// <see cref="_pendingPlays"/>. The token is checked inside the task rather than handed to
+    /// <see cref="Task.Run(Action, CancellationToken)"/>, so a cancelled play still releases its count.
+    /// </summary>
+    private Task QueuePlay(RadioStation station, CancellationToken ct)
+        => Task.Run(() => PlayStationCore(station, ct));
+
+    /// <summary>
+    /// Runs on a background thread: lazily brings up LibVLC and starts streaming the given station.
+    /// Always releases one <see cref="_pendingPlays"/> count taken by the caller.
+    /// </summary>
+    private void PlayStationCore(RadioStation station, CancellationToken ct = default)
     {
         try
         {
-            var player = EnsureEngine();
-            if (player is null) return; // EnsureEngine already recorded the error.
+            lock (_transportGate)
+            {
+                // A play queued before developer mode suspended the radio (or before shutdown) must
+                // not start audio now.
+                lock (_gate)
+                {
+                    if (_suspended || _disposed || ct.IsCancellationRequested) return;
+                }
 
-            lock (_gate) _status = RadioPlaybackStatus.Buffering;
-            RaiseChanged();
+                var player = EnsureEngine();
+                if (player is null) return; // EnsureEngine already recorded the error.
 
-            using var media = new Media(_libVlc!, new Uri(station.StreamUrl));
-            player.Play(media);
+                lock (_gate) _status = RadioPlaybackStatus.Buffering;
+                RaiseChanged();
+
+                using var media = new Media(_libVlc!, new Uri(station.StreamUrl));
+                player.Play(media);
+            }
         }
         catch (Exception ex)
         {
             SetError(ex.Message);
+        }
+        finally
+        {
+            // Released only once the status reflects this play (Buffering, or Error), so a suspend
+            // in between always sees either the pending count or the new status.
+            lock (_gate) _pendingPlays--;
         }
     }
 
@@ -352,6 +533,13 @@ public sealed class RadioPlayerService : IDisposable, IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// The player a transport call may use, read under <see cref="_gate"/>: null once disposed, so a
+    /// call that was queued (or waiting on <see cref="_transportGate"/>) when a teardown timed out
+    /// never reaches LibVLC after <see cref="Dispose"/>.
+    /// </summary>
+    private MediaPlayer? LivePlayerLocked() => _disposed ? null : _mediaPlayer;
+
     private void SetError(string message)
     {
         lock (_gate)
@@ -366,28 +554,122 @@ public sealed class RadioPlayerService : IDisposable, IAsyncDisposable
     private void Persist()
     {
         if (_settings is null) return;
+        CopyToSettings(_settings);
+
+        // A full save covers anything a debounced volume write was still waiting to save.
+        if (_store is null) return;
+        lock (_saveGate) SaveLocked();
+    }
+
+    /// <summary>
+    /// Like <see cref="Persist"/>, but the disk write waits until changes have gone quiet for the
+    /// save delay. The in-memory settings are updated straight away.
+    /// </summary>
+    private void PersistSoon()
+    {
+        if (_settings is null) return;
+        CopyToSettings(_settings);
+        if (_store is null) return;
+
+        lock (_saveGate)
+        {
+            if (_disposed) { SaveLocked(); return; }
+            _savePending = true;
+            ArmSaveTimerLocked();
+        }
+    }
+
+    /// <summary>Writes any debounced settings change to disk now. A no-op when nothing is pending.</summary>
+    public void FlushPendingSave()
+    {
+        if (_settings is null || _store is null) return;
+        lock (_saveGate)
+        {
+            if (_savePending) SaveLocked();
+        }
+    }
+
+    /// <summary>
+    /// Save while holding <see cref="_saveGate"/>. The pending flag only clears once the write has
+    /// succeeded; a failed write (file locked by another process, disk full…) is retried after the
+    /// save delay, until Dispose, instead of being dropped.
+    /// </summary>
+    private void SaveLocked()
+    {
+        if (_store!.TrySave(_settings!))
+        {
+            _savePending = false;
+            return;
+        }
+
+        _savePending = true;
+        if (!_disposed) ArmSaveTimerLocked();
+    }
+
+    private void ArmSaveTimerLocked()
+    {
+        // The timer only decides *when*; the save itself is posted to the settings' owning thread.
+        _saveTimer ??= new Timer(_ => _postSave(FlushPendingSave), null, Timeout.Infinite, Timeout.Infinite);
+        _saveTimer.Change(_saveDelay, Timeout.InfiniteTimeSpan);
+    }
+
+    private static Action<Action> PostTo(SynchronizationContext? context)
+        => context is null ? run => run() : run => context.Post(_ => run(), null);
+
+    private void CopyToSettings(AppSettings settings)
+    {
         lock (_gate)
         {
-            _settings.Radio.RadioEnabled = _enabled;
-            _settings.Radio.RadioLastStation = _station?.Id;
-            _settings.Radio.RadioVolume = _volume;
-            _settings.Radio.RadioMute = _muted;
-            _settings.Radio.RadioWasPlaying = _wantsPlayback;
+            settings.Radio.RadioEnabled = _enabled;
+            settings.Radio.RadioLastStation = _station?.Id;
+            settings.Radio.RadioVolume = _volume;
+            settings.Radio.RadioMute = _muted;
+            settings.Radio.RadioWasPlaying = _wantsPlayback;
         }
-        _store?.Save(_settings);
     }
 
     private void RaiseChanged() => Changed?.Invoke();
 
     public void Dispose()
     {
-        if (_disposed) return;
-        _disposed = true;
         lock (_gate)
         {
-            try { _mediaPlayer?.Stop(); } catch { /* best effort */ }
-            _mediaPlayer?.Dispose();
-            _libVlc?.Dispose();
+            if (_disposed) return;
+            _disposed = true;
+        }
+
+        // Don't lose a volume change made just before shutdown.
+        FlushPendingSave();
+        lock (_saveGate) _saveTimer?.Dispose();
+
+        // Stopping and releasing LibVLC happens off this thread with a bounded wait: if the native
+        // side wedges, app exit carries on and the process teardown reclaims it.
+        var teardown = Task.Run(TeardownEngine);
+        try { teardown.Wait(_nativeTeardownTimeout); } catch { /* best effort */ }
+    }
+
+    /// <summary>
+    /// Stops and frees the native engine. Takes <see cref="_transportGate"/> so the engine isn't
+    /// freed while another transport call is between reading the player and using it; detaches the
+    /// fields under <see cref="_gate"/> but calls LibVLC outside it (#144), since its event handlers
+    /// take <see cref="_gate"/>.
+    /// </summary>
+    private void TeardownEngine()
+    {
+        MediaPlayer? player;
+        LibVLC? libVlc;
+        lock (_transportGate)
+        {
+            lock (_gate)
+            {
+                player = _mediaPlayer;
+                libVlc = _libVlc;
+                _mediaPlayer = null;
+                _libVlc = null;
+            }
+            try { player?.Stop(); } catch { /* best effort */ }
+            try { player?.Dispose(); } catch { /* best effort */ }
+            try { libVlc?.Dispose(); } catch { /* best effort */ }
         }
     }
 

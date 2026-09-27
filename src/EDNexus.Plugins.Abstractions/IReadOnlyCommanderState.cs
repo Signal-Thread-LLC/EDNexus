@@ -6,9 +6,16 @@ namespace EDNexus.Plugins.Abstractions;
 /// underlying state; plugins only ever see this read-only view.
 /// </summary>
 /// <remarks>
-/// This is a minimal, stable surface for Phase 11's initial SDK contract. Additional read-only
-/// projections (cargo, materials, on-foot inventory, etc.) land alongside the storage/dashboard
-/// work that consumes them, without breaking existing plugins built against this interface.
+/// A stable surface that grows additively: members added after the initial SDK contract carry
+/// default implementations, so neither plugins nor test doubles built against an older version
+/// break. Further read-only projections (on-foot inventory, etc.) land alongside the work that
+/// consumes them.
+/// <para>
+/// The host's view always reflects the commander as of the <b>last completed journal event</b>:
+/// every member reads one immutable snapshot the host rebuilds after the engine has finished
+/// applying each event, so no member ever shows an event half-applied. Two separate property reads
+/// may still straddle an event; read them off one <see cref="Snapshot"/> when they must agree.
+/// </para>
 /// </remarks>
 public interface IReadOnlyCommanderState
 {
@@ -41,4 +48,36 @@ public interface IReadOnlyCommanderState
 
     /// <summary>UTC timestamp of the last event that updated this state.</summary>
     DateTimeOffset LastUpdated { get; }
+
+    /// <summary>
+    /// The cargo hold: commodity name to tons, as of the last completed journal event. An immutable
+    /// copy, never the host's live collection, so mutating it (even via a cast) is impossible.
+    /// </summary>
+    IReadOnlyDictionary<string, int> Cargo { get => EmptyInventory.Instance; }
+
+    /// <summary>Raw engineering materials: name to count. An immutable copy, like <see cref="Cargo"/>.</summary>
+    IReadOnlyDictionary<string, int> RawMaterials { get => EmptyInventory.Instance; }
+
+    /// <summary>Manufactured engineering materials: name to count. An immutable copy, like <see cref="Cargo"/>.</summary>
+    IReadOnlyDictionary<string, int> ManufacturedMaterials { get => EmptyInventory.Instance; }
+
+    /// <summary>Encoded engineering materials (data): name to count. An immutable copy, like <see cref="Cargo"/>.</summary>
+    IReadOnlyDictionary<string, int> EncodedMaterials { get => EmptyInventory.Instance; }
+
+    /// <summary>
+    /// A consistent, immutable copy of every member of this state as of the last completed journal
+    /// event. Separate reads off the view can straddle an event; read related values off one
+    /// snapshot instead.
+    /// Implementations that are already immutable may return themselves (the default).
+    /// </summary>
+    IReadOnlyCommanderState Snapshot() => this;
+}
+
+/// <summary>The shared empty inventory the default <see cref="IReadOnlyCommanderState"/> members return.</summary>
+internal static class EmptyInventory
+{
+    /// <summary>An immutable, empty, ordinal-ignore-case dictionary.</summary>
+    public static IReadOnlyDictionary<string, int> Instance { get; } =
+        new System.Collections.ObjectModel.ReadOnlyDictionary<string, int>(
+            new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase));
 }

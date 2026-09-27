@@ -95,6 +95,135 @@ public class RadioPlayerServiceTests
     }
 
     [Fact]
+    public async Task Volume_changes_apply_at_once_but_the_disk_write_waits_and_is_flushed_on_dispose()
+    {
+        using var temp = new TempRadioSettings(wasPlaying: false);
+        var radio = new RadioPlayerService(temp.Settings, temp.Store, saveDelay: TimeSpan.FromHours(1));
+
+        // A slider drag: many steps in quick succession.
+        for (var v = 10; v <= 70; v += 10) await radio.SetVolumeAsync(v);
+
+        Assert.Equal(70, radio.Snapshot.Volume);            // the player has it now
+        Assert.Equal(70, temp.Settings.Radio.RadioVolume);  // and so do the in-memory settings
+        Assert.Equal(50, temp.Reload().RadioVolume);        // but it hasn't hit the disk yet
+
+        radio.Dispose();                                    // app shutdown
+
+        Assert.Equal(70, temp.Reload().RadioVolume);
+    }
+
+    [Fact]
+    public async Task A_debounced_volume_write_lands_once_the_changes_go_quiet()
+    {
+        using var temp = new TempRadioSettings(wasPlaying: false);
+        using var radio = new RadioPlayerService(temp.Settings, temp.Store, saveDelay: TimeSpan.FromMilliseconds(50));
+
+        await radio.SetVolumeAsync(33);
+
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (temp.Reload().RadioVolume != 33 && DateTime.UtcNow < deadline) await Task.Delay(20);
+        Assert.Equal(33, temp.Reload().RadioVolume);
+    }
+
+    [Fact]
+    public async Task The_delayed_volume_save_runs_on_the_settings_owner_not_the_timer_thread()
+    {
+        using var temp = new TempRadioSettings(wasPlaying: false);
+        var posted = new System.Collections.Concurrent.ConcurrentQueue<Action>();
+        using var radio = new RadioPlayerService(temp.Settings, temp.Store,
+            saveDelay: TimeSpan.FromMilliseconds(10), postSave: posted.Enqueue);
+
+        await radio.SetVolumeAsync(64);
+
+        // The timer fires, but only hands the save to the owner; nothing is written from its thread.
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (posted.IsEmpty && DateTime.UtcNow < deadline) await Task.Delay(10);
+        Assert.True(posted.TryDequeue(out var save));
+        Assert.Equal(50, temp.Reload().RadioVolume);
+
+        save!();   // the owner (the UI thread, in the app) runs it
+        Assert.Equal(64, temp.Reload().RadioVolume);
+    }
+
+    [Fact]
+    public async Task A_failed_delayed_save_is_retried_rather_than_dropped()
+    {
+        // Point the store at a path that is currently a directory, so every write fails.
+        var path = Path.Combine(Path.GetTempPath(), $"ednexus-radio-test-{Guid.NewGuid():N}.json");
+        Directory.CreateDirectory(path);
+        try
+        {
+            var store = new SettingsStore(path);
+            var settings = new AppSettings();
+            var posted = new System.Collections.Concurrent.ConcurrentQueue<Action>();
+            using var radio = new RadioPlayerService(settings, store,
+                saveDelay: TimeSpan.FromMilliseconds(10), postSave: posted.Enqueue);
+
+            await radio.SetVolumeAsync(42);
+
+            var deadline = DateTime.UtcNow.AddSeconds(10);
+            while (posted.IsEmpty && DateTime.UtcNow < deadline) await Task.Delay(10);
+            Assert.True(posted.TryDequeue(out var firstTry));
+            firstTry!();   // fails: the path is a directory
+            Assert.False(File.Exists(path));
+
+            // The write became possible again; the save must still be pending and re-armed.
+            Directory.Delete(path);
+            deadline = DateTime.UtcNow.AddSeconds(10);
+            while (!File.Exists(path) && DateTime.UtcNow < deadline)
+            {
+                if (posted.TryDequeue(out var retry)) retry();
+                else await Task.Delay(10);
+            }
+
+            Assert.Equal(42, new SettingsStore(path).Load().Radio.RadioVolume);
+        }
+        finally
+        {
+            if (Directory.Exists(path)) Directory.Delete(path);
+            if (File.Exists(path)) File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void Concurrent_saves_to_one_store_are_serialized()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"ednexus-settings-test-{Guid.NewGuid():N}.json");
+        try
+        {
+            var store = new SettingsStore(path);
+            var settings = new AppSettings();
+            var failures = 0;
+
+            Parallel.For(0, 200, new ParallelOptions { MaxDegreeOfParallelism = 8 }, _ =>
+            {
+                if (!store.TrySave(settings)) Interlocked.Increment(ref failures);
+            });
+
+            Assert.Equal(0, failures);
+            Assert.NotNull(new SettingsStore(path).Load());
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public async Task An_immediate_save_also_covers_a_pending_volume_change()
+    {
+        using var temp = new TempRadioSettings(wasPlaying: false);
+        using var radio = new RadioPlayerService(temp.Settings, temp.Store, saveDelay: TimeSpan.FromHours(1));
+
+        await radio.SetVolumeAsync(25);
+        await radio.SetMuteAsync(true);   // saved immediately, carrying the volume with it
+
+        var saved = temp.Reload();
+        Assert.Equal(25, saved.RadioVolume);
+        Assert.True(saved.RadioMute);
+    }
+
+    [Fact]
     public async Task SetMuteAsync_updates_snapshot_and_persists()
     {
         var settings = new AppSettings();
@@ -340,5 +469,229 @@ public class RadioPlayerServiceTests
 
         Assert.True(settings.Radio.RadioWasPlaying);
         Assert.True(RadioPlayerService.ShouldResumeOnLaunch(settings.Radio));
+    }
+
+    // --- Developer mode suspends the real radio without touching its saved resume intent. ---
+    // No native libvlc under test, so the "playing" stream is faked with SetStatusForTest and a
+    // resume shows up as a play attempt (Buffering/Playing, or Error when libvlc is missing).
+
+    /// <summary>A radio playing station 0 with a resume-on-launch intent, whose settings file is then deleted so any write shows.</summary>
+    private static RadioPlayerService PlayingRadio(TempRadioSettings temp, RadioPlaybackStatus status)
+    {
+        var radio = new RadioPlayerService(temp.Settings, temp.Store);
+        radio.SetStatusForTest(status);
+        File.Delete(temp.Store.Path);
+        return radio;
+    }
+
+    [Theory]
+    [InlineData(RadioPlaybackStatus.Playing)]
+    [InlineData(RadioPlaybackStatus.Buffering)]
+    public async Task Entering_developer_mode_silences_an_audible_stream_but_keeps_and_does_not_persist_the_intent(
+        RadioPlaybackStatus status)
+    {
+        using var temp = new TempRadioSettings();
+        using var radio = PlayingRadio(temp, status);
+
+        await radio.SuspendForDeveloperModeAsync();
+
+        Assert.True(radio.IsSuspendedForDeveloperMode);
+        Assert.Equal(RadioPlaybackStatus.Stopped, radio.Snapshot.Status);
+        Assert.True(temp.Settings.Radio.RadioWasPlaying);   // in-memory intent untouched
+        Assert.False(File.Exists(temp.Store.Path));          // and nothing written
+    }
+
+    [Fact]
+    public async Task Leaving_developer_mode_resumes_a_stream_it_suspended()
+    {
+        using var temp = new TempRadioSettings();
+        using var radio = PlayingRadio(temp, RadioPlaybackStatus.Playing);
+
+        await radio.SuspendForDeveloperModeAsync();
+        await radio.ResumeAfterDeveloperModeAsync();
+
+        Assert.False(radio.IsSuspendedForDeveloperMode);
+        Assert.NotEqual(RadioPlaybackStatus.Stopped, radio.Snapshot.Status); // a play was attempted
+        Assert.Equal(RadioStationCatalog.Stations[0].Id, radio.Snapshot.Station?.Id);
+        Assert.True(temp.Settings.Radio.RadioWasPlaying);
+        Assert.False(File.Exists(temp.Store.Path));
+    }
+
+    [Theory]
+    [InlineData(RadioPlaybackStatus.Paused)]
+    [InlineData(RadioPlaybackStatus.Stopped)]
+    [InlineData(RadioPlaybackStatus.Error)]
+    public async Task A_quiet_radio_is_left_alone_on_entering_and_leaving_developer_mode(RadioPlaybackStatus status)
+    {
+        using var temp = new TempRadioSettings(wasPlaying: status == RadioPlaybackStatus.Error);
+        var wasPlaying = temp.Settings.Radio.RadioWasPlaying;
+        using var radio = PlayingRadio(temp, status);
+
+        await radio.SuspendForDeveloperModeAsync();
+        Assert.False(radio.IsSuspendedForDeveloperMode);
+        Assert.Equal(status, radio.Snapshot.Status);
+
+        await radio.ResumeAfterDeveloperModeAsync();
+        Assert.Equal(status, radio.Snapshot.Status);   // nothing restarted
+        Assert.Equal(wasPlaying, temp.Settings.Radio.RadioWasPlaying);
+        Assert.False(File.Exists(temp.Store.Path));
+    }
+
+    [Fact]
+    public async Task Pausing_or_stopping_during_developer_mode_cancels_the_resume()
+    {
+        using var temp = new TempRadioSettings();
+        using var radio = PlayingRadio(temp, RadioPlaybackStatus.Playing);
+
+        await radio.SuspendForDeveloperModeAsync();
+        await radio.SetEnabledAsync(false);             // Settings → Radio off while in dev mode
+        await radio.ResumeAfterDeveloperModeAsync();
+
+        Assert.False(radio.IsSuspendedForDeveloperMode);
+        Assert.Equal(RadioPlaybackStatus.Stopped, radio.Snapshot.Status);
+        Assert.False(temp.Reload().RadioWasPlaying);
+    }
+
+    [Theory]
+    [InlineData("pause")]
+    [InlineData("stop")]
+    [InlineData("play")]
+    public async Task An_explicit_transport_action_during_developer_mode_cancels_the_resume(string action)
+    {
+        using var temp = new TempRadioSettings();
+        using var radio = PlayingRadio(temp, RadioPlaybackStatus.Playing);
+        await radio.SuspendForDeveloperModeAsync();
+
+        await (action switch
+        {
+            "pause" => radio.PauseAsync(),
+            "stop" => radio.StopAsync(),
+            "play" => radio.PlayAsync(),
+            _ => throw new ArgumentOutOfRangeException(nameof(action)),
+        });
+        Assert.False(radio.IsSuspendedForDeveloperMode);
+
+        radio.SetStatusForTest(RadioPlaybackStatus.Stopped); // so a (wrong) resume would show as a play attempt
+        await radio.ResumeAfterDeveloperModeAsync();
+
+        Assert.Equal(RadioPlaybackStatus.Stopped, radio.Snapshot.Status);
+        Assert.Equal(action == "play", temp.Reload().RadioWasPlaying); // the explicit action's own intent
+    }
+
+    [Fact]
+    public async Task A_play_still_queued_when_developer_mode_starts_is_suspended_not_started()
+    {
+        using var temp = new TempRadioSettings(wasPlaying: false);
+        using var radio = new RadioPlayerService(temp.Settings, temp.Store);
+        Task play, suspend;
+
+        // Hold the queued play back so its status is still Stopped when developer mode comes on.
+        lock (radio.TransportGateForTest)
+        {
+            play = radio.PlayAsync(RadioStationCatalog.Stations[0].Id);
+            Assert.Equal(RadioPlaybackStatus.Stopped, radio.Snapshot.Status);
+            suspend = radio.SuspendForDeveloperModeAsync();
+            Assert.True(radio.IsSuspendedForDeveloperMode);
+        }
+        await Task.WhenAll(play, suspend);
+
+        Assert.Equal(RadioPlaybackStatus.Stopped, radio.Snapshot.Status); // no start attempted
+        Assert.Null(radio.Snapshot.LastError);
+        Assert.True(temp.Reload().RadioWasPlaying);                        // the user still wants it
+
+        await radio.ResumeAfterDeveloperModeAsync();
+        Assert.NotEqual(RadioPlaybackStatus.Stopped, radio.Snapshot.Status); // now it plays
+    }
+
+    [Fact]
+    public async Task Re_entering_developer_mode_before_the_resume_starts_suspends_it_again()
+    {
+        using var temp = new TempRadioSettings();
+        using var radio = PlayingRadio(temp, RadioPlaybackStatus.Playing);
+        await radio.SuspendForDeveloperModeAsync();
+        Task resume, suspend;
+
+        lock (radio.TransportGateForTest)
+        {
+            resume = radio.ResumeAfterDeveloperModeAsync();   // leave: a play is queued, status still Stopped
+            suspend = radio.SuspendForDeveloperModeAsync();   // and straight back in
+            Assert.True(radio.IsSuspendedForDeveloperMode);
+        }
+        await Task.WhenAll(resume, suspend);
+
+        Assert.Equal(RadioPlaybackStatus.Stopped, radio.Snapshot.Status);
+        Assert.Null(radio.Snapshot.LastError);
+        Assert.True(temp.Settings.Radio.RadioWasPlaying);
+        Assert.False(File.Exists(temp.Store.Path));
+    }
+
+    [Fact]
+    public async Task Closing_the_app_while_suspended_keeps_the_saved_resume_flag()
+    {
+        using var temp = new TempRadioSettings();
+        var radio = new RadioPlayerService(temp.Settings, temp.Store);
+        radio.SetStatusForTest(RadioPlaybackStatus.Playing);
+
+        await radio.SuspendForDeveloperModeAsync();
+        radio.Dispose();
+
+        var saved = temp.Reload();
+        Assert.True(saved.RadioWasPlaying);
+        Assert.True(RadioPlayerService.ShouldResumeOnLaunch(saved)); // next launch as if dev mode never happened
+    }
+
+    [Fact]
+    public async Task Dispose_does_not_hang_when_the_native_teardown_is_wedged()
+    {
+        // #144: stand in for a LibVLC call stuck behind its event thread by holding the lock the
+        // teardown needs on another thread. Dispose must still flush settings and return in bound.
+        using var temp = new TempRadioSettings();
+        var radio = new RadioPlayerService(temp.Settings, temp.Store, TimeSpan.FromMinutes(1), postSave: null,
+            nativeTeardownTimeout: TimeSpan.FromMilliseconds(200));
+        await radio.SetVolumeAsync(17);
+
+        using var held = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        var wedge = new Thread(() =>
+        {
+            lock (radio.TransportGateForTest) { held.Set(); release.Wait(); }
+        }) { IsBackground = true };
+        wedge.Start();
+        held.Wait();
+
+        try
+        {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var dispose = Task.Run(radio.Dispose);
+            var finished = await Task.WhenAny(dispose, Task.Delay(TimeSpan.FromSeconds(10)));
+            sw.Stop();
+            Assert.Same(dispose, finished); // returned despite the wedge
+            await dispose;                  // and didn't fault
+            // 200 ms bound plus generous CI slack; without the bound it never returns at all.
+            Assert.True(sw.Elapsed < TimeSpan.FromSeconds(3), $"Dispose took {sw.Elapsed}");
+        }
+        finally
+        {
+            release.Set();
+        }
+
+        Assert.Equal(17, temp.Reload().RadioVolume); // the debounced save still went out
+    }
+
+    [Fact]
+    public async Task Transport_calls_after_dispose_are_harmless()
+    {
+        using var temp = new TempRadioSettings();
+        var radio = new RadioPlayerService(temp.Settings, temp.Store);
+        radio.Dispose();
+
+        await radio.PauseAsync();
+        await radio.StopAsync();
+        await radio.SetVolumeAsync(30);
+        await radio.SetMuteAsync(true);
+        await radio.PlayAsync(RadioStationCatalog.Stations[0].Id);
+
+        Assert.Null(radio.Snapshot.LastError);
+        Assert.Equal(RadioPlaybackStatus.Stopped, radio.Snapshot.Status); // no engine brought back up
     }
 }

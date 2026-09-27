@@ -8,17 +8,17 @@
         Width="880" SizeToContent="Height"
         MinWidth="380" MinHeight="240"
         WindowStartupLocation="CenterOwner"
-        CanResize="True" Background="#14161A">
+        CanResize="True" Background="{StaticResource CardBg}">
   <!-- The dialog auto-sizes to its content but is capped to the display in code-behind, so the body
        scrolls rather than running off the bottom of a short screen. The action row is docked so
        Save/Close stay reachable however far the body has scrolled. -->
   <DockPanel>
-    <Border DockPanel.Dock="Bottom" BorderBrush="#242830" BorderThickness="0,1,0,0" Padding="24,14">
+    <Border DockPanel.Dock="Bottom" BorderBrush="{StaticResource CardBorder}" BorderThickness="0,1,0,0" Padding="24,14">
       <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
         <Button Content="Open logs" Click="OnOpenLogs" Padding="16,8" />
         <Button Content="Close" Click="OnClose" Padding="16,8" />
         <Button Content="Save" Click="OnSave" Padding="16,8"
-                Background="#F07100" Foreground="#101216" FontWeight="SemiBold" />
+                Background="{StaticResource AmberBrush}" Foreground="{StaticResource OnBrand}" FontWeight="SemiBold" />
       </StackPanel>
     </Border>
 
@@ -28,61 +28,61 @@
       <controls:MasonryPanel Margin="24,24,24,20" MinColumnWidth="340" ColumnSpacing="16" RowSpacing="16">
 
         <StackPanel Spacing="8">
-          <TextBlock Text="PRIVACY" Foreground="#F07100" FontSize="12" FontWeight="SemiBold" LetterSpacing="2" />
-          <Border Background="#0F1114" CornerRadius="6" Padding="16">
+          <TextBlock Text="PRIVACY" Foreground="{StaticResource AmberBrush}" FontSize="12" FontWeight="SemiBold" LetterSpacing="2" />
+          <Border Background="{StaticResource SurfaceField}" CornerRadius="6" Padding="16">
             <StackPanel Spacing="10">
               <CheckBox x:Name="CrashToggle" Content="Send anonymous crash &amp; error reports"
-                        Foreground="#E7E9EE" />
-              <TextBlock Foreground="#8A909C" FontSize="12" TextWrapping="Wrap"
+                        Foreground="{StaticResource Ink}" />
+              <TextBlock Foreground="{StaticResource InkDim}" FontSize="12" TextWrapping="Wrap"
                          Text="App version, OS, and errors with stack traces, plus a random install id. Never your commander name, systems, journal contents, or user name / paths." />
-              <TextBlock x:Name="StatusLine" Foreground="#8A909C" FontSize="11" TextWrapping="Wrap" />
+              <TextBlock x:Name="StatusLine" Foreground="{StaticResource InkDim}" FontSize="11" TextWrapping="Wrap" />
             </StackPanel>
           </Border>
         </StackPanel>
 
         <StackPanel Spacing="8">
-          <TextBlock Text="DATA REPORTING" Foreground="#F07100" FontSize="12" FontWeight="SemiBold" LetterSpacing="2" />
-          <Border Background="#0F1114" CornerRadius="6" Padding="16">
+          <TextBlock Text="DATA REPORTING" Foreground="{StaticResource AmberBrush}" FontSize="12" FontWeight="SemiBold" LetterSpacing="2" />
+          <Border Background="{StaticResource SurfaceField}" CornerRadius="6" Padding="16">
             <StackPanel Spacing="10">
               <CheckBox x:Name="EddnToggle" Content="Contribute anonymized data to EDDN"
-                        Foreground="#E7E9EE" />
-              <TextBlock Foreground="#8A909C" FontSize="12" TextWrapping="Wrap"
+                        Foreground="{StaticResource Ink}" />
+              <TextBlock Foreground="{StaticResource InkDim}" FontSize="12" TextWrapping="Wrap"
                          Text="Uploads market, scan, and travel data to the community Elite Dangerous Data Network. The relay obfuscates your uploader id — no personal identity is shared." />
             </StackPanel>
           </Border>
 
-          <Border Background="#0F1114" CornerRadius="6" Padding="16">
+          <Border Background="{StaticResource SurfaceField}" CornerRadius="6" Padding="16">
             <StackPanel Spacing="10">
               <CheckBox x:Name="InaraToggle" Content="Sync my commander to Inara"
-                        Foreground="#E7E9EE" />
-              <TextBlock Foreground="#8A909C" FontSize="12" TextWrapping="Wrap"
+                        Foreground="{StaticResource Ink}" />
+              <TextBlock Foreground="{StaticResource InkDim}" FontSize="12" TextWrapping="Wrap"
                          Text="Sends your identity, credits, ranks, and travel to your Inara profile on session start, docking, and FSD jumps. Requires your personal Inara API key (Inara → Profile → API keys)." />
               <!-- Masked by default: keys get leaked through streams and screenshots, not local attackers. -->
               <Grid ColumnDefinitions="*,Auto">
                 <TextBox x:Name="InaraApiKey" PlaceholderText="Inara API key" PasswordChar="●"
-                         Foreground="#E7E9EE" Background="#14161A" />
+                         Foreground="{StaticResource Ink}" Background="{StaticResource CardBg}" />
                 <CheckBox x:Name="RevealApiKey" Grid.Column="1" Content="Show" Margin="10,0,0,0"
-                          Foreground="#8A909C" IsCheckedChanged="OnRevealApiKeyChanged" />
+                          Foreground="{StaticResource InkDim}" IsCheckedChanged="OnRevealApiKeyChanged" />
               </Grid>
             </StackPanel>
           </Border>
         </StackPanel>
 
         <StackPanel Spacing="8">
-          <TextBlock Text="UPDATES" Foreground="#F07100" FontSize="12" FontWeight="SemiBold" LetterSpacing="2" />
-          <Border Background="#0F1114" CornerRadius="6" Padding="16">
+          <TextBlock Text="UPDATES" Foreground="{StaticResource AmberBrush}" FontSize="12" FontWeight="SemiBold" LetterSpacing="2" />
+          <Border Background="{StaticResource SurfaceField}" CornerRadius="6" Padding="16">
             <StackPanel Spacing="10">
               <CheckBox x:Name="AutoDownloadToggle" Content="Automatically download updates on startup"
-                        Foreground="#E7E9EE" />
-              <TextBlock Foreground="#8A909C" FontSize="12" TextWrapping="Wrap"
+                        Foreground="{StaticResource Ink}" />
+              <TextBlock Foreground="{StaticResource InkDim}" FontSize="12" TextWrapping="Wrap"
                          Text="When enabled, EDNexus will fetch the latest GitHub release asset for your platform and download it to your temp folder. Installation must still be performed by the user." />
 
               <!-- Wraps rather than clipping: the update line can be a long file name in a narrow column. -->
               <WrapPanel ItemSpacing="10" LineSpacing="4">
-                <TextBlock Text="Version:" Foreground="#E7E9EE" VerticalAlignment="Center" />
-                <TextBlock x:Name="VersionLine" Foreground="#8A909C" VerticalAlignment="Center" />
-                <TextBlock Text="Update:" Foreground="#E7E9EE" VerticalAlignment="Center" Margin="14,0,0,0" />
-                <TextBlock x:Name="UpdateLine" Foreground="#8A909C" VerticalAlignment="Center" />
+                <TextBlock Text="Version:" Foreground="{StaticResource Ink}" VerticalAlignment="Center" />
+                <TextBlock x:Name="VersionLine" Foreground="{StaticResource InkDim}" VerticalAlignment="Center" />
+                <TextBlock Text="Update:" Foreground="{StaticResource Ink}" VerticalAlignment="Center" Margin="14,0,0,0" />
+                <TextBlock x:Name="UpdateLine" Foreground="{StaticResource InkDim}" VerticalAlignment="Center" />
               </WrapPanel>
 
               <Button x:Name="CheckNowButton" Content="Check for updates now" Click="OnCheckNow"
@@ -92,16 +92,16 @@
         </StackPanel>
 
         <StackPanel Spacing="8">
-          <TextBlock Text="MINING" Foreground="#F07100" FontSize="12" FontWeight="SemiBold" LetterSpacing="2" />
-          <Border Background="#0F1114" CornerRadius="6" Padding="16">
+          <TextBlock Text="MINING" Foreground="{StaticResource AmberBrush}" FontSize="12" FontWeight="SemiBold" LetterSpacing="2" />
+          <Border Background="{StaticResource SurfaceField}" CornerRadius="6" Padding="16">
             <StackPanel Spacing="10">
-              <TextBlock Text="MIN VALUE TO CALL OUT (CR)" Foreground="#E7E9EE" FontSize="12" />
+              <TextBlock Text="MIN VALUE TO CALL OUT (CR)" Foreground="{StaticResource Ink}" FontSize="12" />
               <TextBox x:Name="MiningThresholdBox" PlaceholderText="e.g. 50000" />
-              <TextBlock Foreground="#8A909C" FontSize="12" TextWrapping="Wrap"
+              <TextBlock Foreground="{StaticResource InkDim}" FontSize="12" TextWrapping="Wrap"
                          Text="A prospected material — or deep-core motherlode — at or above this galactic-average price is called out on the mining card and rings a chime. Leave blank to turn the highlight off." />
 
-              <CheckBox x:Name="MiningSpotAnnounceToggle" Content="Call out known planetary mining spots on arrival" Foreground="#E7E9EE" />
-              <TextBlock x:Name="MiningSpotsSummary" Foreground="#8A909C" FontSize="12" TextWrapping="Wrap"
+              <CheckBox x:Name="MiningSpotAnnounceToggle" Content="Call out known planetary mining spots on arrival" Foreground="{StaticResource Ink}" />
+              <TextBlock x:Name="MiningSpotsSummary" Foreground="{StaticResource InkDim}" FontSize="12" TextWrapping="Wrap"
                          Text="Whenever you refine a commodity at or above the value above from an SRV, EDNexus records where on the planet you mined it. Arriving in that system again speaks the spots worth mining. Needs voice callouts turned on under Overlay &amp; Voice." />
             </StackPanel>
           </Border>
@@ -111,7 +111,7 @@
              changes take effect on the dashboard behind this window immediately. -->
         <StackPanel x:Name="DashboardSection" Spacing="8">
           <Grid ColumnDefinitions="*,Auto">
-            <TextBlock Grid.Column="0" Text="DASHBOARD" Foreground="#F07100" FontSize="12"
+            <TextBlock Grid.Column="0" Text="DASHBOARD" Foreground="{StaticResource AmberBrush}" FontSize="12"
                        FontWeight="SemiBold" LetterSpacing="2" VerticalAlignment="Center" />
             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
               <Button x:Name="ExportLayoutButton" Content="Export…" Click="OnExportLayout"
@@ -124,11 +124,11 @@
                       Padding="10,4" FontSize="12" ToolTip.Tip="Restore the shipped order and widths, and hand placement back to automatic packing" />
             </StackPanel>
           </Grid>
-          <Border Background="#0F1114" CornerRadius="6" Padding="16">
+          <Border Background="{StaticResource SurfaceField}" CornerRadius="6" Padding="16">
             <StackPanel Spacing="10">
-              <TextBlock Foreground="#8A909C" FontSize="12" TextWrapping="Wrap"
+              <TextBlock Foreground="{StaticResource InkDim}" FontSize="12" TextWrapping="Wrap"
                          Text="Drag a card by its title to move it to another column or position on the dashboard — that arrangement is saved. The arrows move a card within its own column. Until you move one, cards are packed automatically into as many columns as the window is wide; a wide card claims two of those columns, a narrow one claims one. Collapsing a card from its header is remembered too. Export carries only the layout — never your Inara key — so it is safe to sync or share." />
-              <TextBlock x:Name="LayoutStatus" Foreground="#F07100" FontSize="12" TextWrapping="Wrap" IsVisible="False" />
+              <TextBlock x:Name="LayoutStatus" Foreground="{StaticResource AmberBrush}" FontSize="12" TextWrapping="Wrap" IsVisible="False" />
               <!-- No inner scroller: the dialog scrolls as a whole now, and a nested scroll region
                    steals the wheel from the page it sits in. -->
               <ItemsControl x:Name="CardList">
@@ -139,11 +139,11 @@
                               Click="OnMoveCardUp" Tag="{Binding Id}" ToolTip.Tip="Move up within its column" />
                       <Button Grid.Column="1" Content="▼" Padding="8,2" FontSize="11" MinWidth="30" Margin="4,0,0,0"
                               Click="OnMoveCardDown" Tag="{Binding Id}" ToolTip.Tip="Move down within its column" />
-                      <TextBlock Grid.Column="2" Text="{Binding Title}" Foreground="#E7E9EE" FontSize="13"
+                      <TextBlock Grid.Column="2" Text="{Binding Title}" Foreground="{StaticResource Ink}" FontSize="13"
                                  VerticalAlignment="Center" Margin="10,0,8,0" TextTrimming="CharacterEllipsis" />
                       <Button Grid.Column="3" Content="{Binding WidthGlyph}" Padding="8,2" FontSize="11" MinWidth="34"
                               Command="{Binding ToggleWidthCommand}" ToolTip.Tip="Toggle narrow / wide" />
-                      <CheckBox Grid.Column="4" Content="Show" Margin="10,0,0,0" Foreground="#E7E9EE"
+                      <CheckBox Grid.Column="4" Content="Show" Margin="10,0,0,0" Foreground="{StaticResource Ink}"
                                 FontSize="12" IsChecked="{Binding IsVisible}" />
                     </Grid>
                   </DataTemplate>
@@ -156,34 +156,47 @@
         <!-- Overlay & voice — Phase 6. The overlay is Windows-only; elsewhere the toggle is harmless
              (IOverlay/IVoice degrade to no-ops) but left visible so the setting still round-trips. -->
         <StackPanel Spacing="8">
-          <TextBlock Text="OVERLAY &amp; VOICE" Foreground="#F07100" FontSize="12" FontWeight="SemiBold" LetterSpacing="2" />
-          <Border Background="#0F1114" CornerRadius="6" Padding="16">
+          <TextBlock Text="OVERLAY &amp; VOICE" Foreground="{StaticResource AmberBrush}" FontSize="12" FontWeight="SemiBold" LetterSpacing="2" />
+          <Border Background="{StaticResource SurfaceField}" CornerRadius="6" Padding="16">
             <StackPanel Spacing="10">
-              <CheckBox x:Name="OverlayToggle" Content="Show in-game overlay" Foreground="#E7E9EE" />
-              <TextBlock Foreground="#8A909C" FontSize="12" TextWrapping="Wrap"
+              <CheckBox x:Name="OverlayToggle" Content="Show in-game overlay" Foreground="{StaticResource Ink}" />
+              <TextBlock Foreground="{StaticResource InkDim}" FontSize="12" TextWrapping="Wrap"
                          Text="A small, click-through, always-on-top panel over the game (borderless/windowed) showing your next jump, fuel, bio signals on the current body, and any colonisation shortfall. Windows only — a no-op on other platforms." />
             </StackPanel>
           </Border>
 
-          <Border Background="#0F1114" CornerRadius="6" Padding="16">
+          <Border Background="{StaticResource SurfaceField}" CornerRadius="6" Padding="16">
             <StackPanel Spacing="10">
-              <CheckBox x:Name="VoiceToggle" Content="Speak callouts" Foreground="#E7E9EE" />
-              <TextBlock Foreground="#8A909C" FontSize="12" TextWrapping="Wrap"
+              <CheckBox x:Name="VoiceToggle" Content="Speak callouts" Foreground="{StaticResource Ink}" />
+              <TextBlock Foreground="{StaticResource InkDim}" FontSize="12" TextWrapping="Wrap"
                          Text="Announces fuel low, a completed exobiology scan, and a colonisation shopping-list item fully aboard. Windows only (SAPI) — a no-op on other platforms." />
 
-              <TextBlock Text="VOICE" Foreground="#E7E9EE" FontSize="12" />
+              <TextBlock Text="VOICE" Foreground="{StaticResource Ink}" FontSize="12" />
               <ComboBox x:Name="VoiceNameCombo" HorizontalAlignment="Stretch" PlaceholderText="System default" />
 
-              <TextBlock Text="VOLUME" Foreground="#E7E9EE" FontSize="12" />
+              <TextBlock Text="VOLUME" Foreground="{StaticResource Ink}" FontSize="12" />
               <Slider x:Name="VoiceVolumeSlider" Minimum="0" Maximum="100" TickFrequency="10" />
 
-              <TextBlock Text="CALLOUTS" Foreground="#E7E9EE" FontSize="12" />
-              <CheckBox x:Name="FuelLowToggle" Content="Fuel low" Foreground="#E7E9EE" />
-              <CheckBox x:Name="ScanCompleteToggle" Content="Scan complete" Foreground="#E7E9EE" />
-              <CheckBox x:Name="ShoppingListToggle" Content="Shopping-list item acquired" Foreground="#E7E9EE" />
+              <TextBlock Text="CALLOUTS" Foreground="{StaticResource Ink}" FontSize="12" />
+              <CheckBox x:Name="FuelLowToggle" Content="Fuel low" Foreground="{StaticResource Ink}" />
+              <CheckBox x:Name="ScanCompleteToggle" Content="Scan complete" Foreground="{StaticResource Ink}" />
+              <CheckBox x:Name="ShoppingListToggle" Content="Shopping-list item acquired" Foreground="{StaticResource Ink}" />
 
               <Button x:Name="TestVoiceButton" Content="Test voice" Click="OnTestVoice"
                       Padding="10" HorizontalAlignment="Left" />
+            </StackPanel>
+          </Border>
+        </StackPanel>
+
+        <!-- Radio player — the on/off switch. Station, volume and mute live on the Space Radio card and
+             the title-bar transport, and are saved as they change. -->
+        <StackPanel Spacing="8">
+          <TextBlock Text="RADIO PLAYER" Foreground="{StaticResource AmberBrush}" FontSize="12" FontWeight="SemiBold" LetterSpacing="2" />
+          <Border Background="{StaticResource SurfaceField}" CornerRadius="6" Padding="16">
+            <StackPanel Spacing="10">
+              <CheckBox x:Name="RadioToggle" Content="Enable the radio player" Foreground="{StaticResource Ink}" />
+              <TextBlock Foreground="{StaticResource InkDim}" FontSize="12" TextWrapping="Wrap"
+                         Text="Streams community and ambient space radio stations in the background. Turning this off stops playback and keeps the radio silent on the next launch. Pick a station, volume and mute from the Space Radio card or the title-bar controls; pressing play there turns the radio back on." />
             </StackPanel>
           </Border>
         </StackPanel>
@@ -192,90 +205,91 @@
              is opt-in: anything left unchecked is never put into the published payload at all, so it
              does not leave this machine. See extension/README.md for the viewer side. -->
         <StackPanel Spacing="8">
-          <TextBlock Text="TWITCH" Foreground="#F07100" FontSize="12" FontWeight="SemiBold" LetterSpacing="2" />
+          <TextBlock Text="TWITCH" Foreground="{StaticResource AmberBrush}" FontSize="12" FontWeight="SemiBold" LetterSpacing="2" />
 
-          <Border Background="#0F1114" CornerRadius="6" Padding="16">
+          <Border Background="{StaticResource SurfaceField}" CornerRadius="6" Padding="16">
             <StackPanel Spacing="10">
-              <TextBlock x:Name="TwitchAccountLine" Foreground="#E7E9EE" FontSize="13" TextWrapping="Wrap"
+              <TextBlock x:Name="TwitchAccountLine" Foreground="{StaticResource Ink}" FontSize="13" TextWrapping="Wrap"
                          Text="Not signed in." />
-              <TextBlock Foreground="#8A909C" FontSize="12" TextWrapping="Wrap"
+              <TextBlock Foreground="{StaticResource InkDim}" FontSize="12" TextWrapping="Wrap"
                          Text="Signing in opens your browser. EDNexus never sees your Twitch password or token — the backend service performs the handshake and hands back its own credential for this machine." />
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <Button x:Name="TwitchLoginButton" Content="Sign in with Twitch" Click="OnTwitchLogin" Padding="12,7" />
                 <Button x:Name="TwitchLogoutButton" Content="Sign out" Click="OnTwitchLogout" Padding="12,7" IsVisible="False" />
               </StackPanel>
-              <TextBlock x:Name="TwitchAuthLine" Foreground="#8A909C" FontSize="12" TextWrapping="Wrap" IsVisible="False" />
+              <TextBlock x:Name="TwitchAuthLine" Foreground="{StaticResource InkDim}" FontSize="12" TextWrapping="Wrap" IsVisible="False" />
             </StackPanel>
           </Border>
 
-          <Border Background="#0F1114" CornerRadius="6" Padding="16">
+          <Border Background="{StaticResource SurfaceField}" CornerRadius="6" Padding="16">
             <StackPanel Spacing="10">
-              <CheckBox x:Name="TwitchCardToggle" Content="Show my session to viewers" Foreground="#E7E9EE"
+              <CheckBox x:Name="TwitchCardToggle" Content="Show my session to viewers" Foreground="{StaticResource Ink}"
                         IsCheckedChanged="OnTwitchCardToggled" />
-              <TextBlock Foreground="#8A909C" FontSize="12" TextWrapping="Wrap"
+              <TextBlock Foreground="{StaticResource InkDim}" FontSize="12" TextWrapping="Wrap"
                          Text="Publishes the sections below to your channel's EDNexus extension, where viewers can pull out a card over the stream and hide it again. Off while developer mode is on, so fabricated data never reaches your audience." />
 
-              <TextBlock Text="WHAT VIEWERS CAN SEE" Foreground="#E7E9EE" FontSize="12" Margin="0,4,0,0" />
-              <CheckBox x:Name="TwitchCommanderToggle" Content="Commander name &amp; ranks" Foreground="#E7E9EE" IsCheckedChanged="OnTwitchSectionToggled" />
-              <CheckBox x:Name="TwitchCreditsToggle" Content="Credit balance" Foreground="#E7E9EE" IsCheckedChanged="OnTwitchSectionToggled" />
-              <CheckBox x:Name="TwitchShipToggle" Content="Ship, fuel &amp; hold" Foreground="#E7E9EE" IsCheckedChanged="OnTwitchSectionToggled" />
-              <CheckBox x:Name="TwitchLocationToggle" Content="System, body &amp; station" Foreground="#E7E9EE" IsCheckedChanged="OnTwitchSectionToggled" />
-              <CheckBox x:Name="TwitchCarrierToggle" Content="Fleet carrier &amp; booked jumps" Foreground="#E7E9EE" IsCheckedChanged="OnTwitchSectionToggled" />
-              <CheckBox x:Name="TwitchExobioToggle" Content="Exobiology progress" Foreground="#E7E9EE" IsCheckedChanged="OnTwitchSectionToggled" />
-              <CheckBox x:Name="TwitchMiningToggle" Content="Mining" Foreground="#E7E9EE" IsCheckedChanged="OnTwitchSectionToggled" />
-              <CheckBox x:Name="TwitchMissionsToggle" Content="Missions" Foreground="#E7E9EE" IsCheckedChanged="OnTwitchSectionToggled" />
-              <CheckBox x:Name="TwitchCargoToggle" Content="Cargo manifest" Foreground="#E7E9EE" IsCheckedChanged="OnTwitchSectionToggled" />
+              <TextBlock Text="WHAT VIEWERS CAN SEE" Foreground="{StaticResource Ink}" FontSize="12" Margin="0,4,0,0" />
+              <CheckBox x:Name="TwitchCommanderToggle" Content="Commander name &amp; ranks" Foreground="{StaticResource Ink}" IsCheckedChanged="OnTwitchSectionToggled" />
+              <CheckBox x:Name="TwitchCreditsToggle" Content="Credit balance" Foreground="{StaticResource Ink}" IsCheckedChanged="OnTwitchSectionToggled" />
+              <CheckBox x:Name="TwitchShipToggle" Content="Ship, fuel &amp; hold" Foreground="{StaticResource Ink}" IsCheckedChanged="OnTwitchSectionToggled" />
+              <CheckBox x:Name="TwitchLocationToggle" Content="System, body &amp; station" Foreground="{StaticResource Ink}" IsCheckedChanged="OnTwitchSectionToggled" />
+              <CheckBox x:Name="TwitchCarrierToggle" Content="Fleet carrier &amp; booked jumps" Foreground="{StaticResource Ink}" IsCheckedChanged="OnTwitchSectionToggled" />
+              <CheckBox x:Name="TwitchExobioToggle" Content="Exobiology progress" Foreground="{StaticResource Ink}" IsCheckedChanged="OnTwitchSectionToggled" />
+              <CheckBox x:Name="TwitchMiningToggle" Content="Mining" Foreground="{StaticResource Ink}" IsCheckedChanged="OnTwitchSectionToggled" />
+              <CheckBox x:Name="TwitchMissionsToggle" Content="Missions" Foreground="{StaticResource Ink}" IsCheckedChanged="OnTwitchSectionToggled" />
+              <CheckBox x:Name="TwitchCargoToggle" Content="Cargo manifest" Foreground="{StaticResource Ink}" IsCheckedChanged="OnTwitchSectionToggled" />
 
-              <TextBlock Foreground="#8A909C" FontSize="12" TextWrapping="Wrap"
+              <TextBlock Foreground="{StaticResource InkDim}" FontSize="12" TextWrapping="Wrap"
                          Text="Anything unchecked is never sent — it is left out of the payload entirely, not hidden after the fact." />
             </StackPanel>
           </Border>
 
           <!-- The preview answers the only question that really matters before going live: what
                exactly is about to be on screen. Built from the same mapper the publisher uses. -->
-          <Border Background="#0F1114" CornerRadius="6" Padding="16">
+          <Border Background="{StaticResource SurfaceField}" CornerRadius="6" Padding="16">
             <StackPanel Spacing="10">
               <Grid ColumnDefinitions="*,Auto">
-                <TextBlock Grid.Column="0" Text="WHAT VIEWERS WILL SEE NOW" Foreground="#E7E9EE" FontSize="12"
+                <TextBlock Grid.Column="0" Text="WHAT VIEWERS WILL SEE NOW" Foreground="{StaticResource Ink}" FontSize="12"
                            VerticalAlignment="Center" />
                 <Button Grid.Column="1" x:Name="TwitchPreviewRefresh" Content="Refresh" Click="OnTwitchRefreshPreview"
                         Padding="10,4" FontSize="12" />
               </Grid>
-              <Border Background="#14161A" CornerRadius="4" Padding="12">
-                <SelectableTextBlock x:Name="TwitchPreview" Foreground="#8A909C" FontSize="12"
+              <Border Background="{StaticResource CardBg}" CornerRadius="4" Padding="12">
+                <SelectableTextBlock x:Name="TwitchPreview" Foreground="{StaticResource InkDim}" FontSize="12"
                                      FontFamily="Consolas,Menlo,monospace" TextWrapping="Wrap"
                                      Text="Start the app with the game running to see a preview." />
               </Border>
-              <TextBlock x:Name="TwitchPublishStatus" Foreground="#8A909C" FontSize="11" TextWrapping="Wrap" />
+              <TextBlock x:Name="TwitchPublishStatus" Foreground="{StaticResource InkDim}" FontSize="11" TextWrapping="Wrap" />
             </StackPanel>
           </Border>
 
-          <Border Background="#0F1114" CornerRadius="6" Padding="16">
+          <Border Background="{StaticResource SurfaceField}" CornerRadius="6" Padding="16">
             <StackPanel Spacing="10">
-              <TextBlock Text="BACKEND SERVICE (EBS)" Foreground="#E7E9EE" FontSize="12" />
-              <TextBox x:Name="TwitchEbsBox" PlaceholderText="https://ednexus.signal-and-thread.com" Foreground="#E7E9EE" Background="#14161A" />
-              <TextBlock Foreground="#8A909C" FontSize="12" TextWrapping="Wrap"
+              <TextBlock Text="BACKEND SERVICE (EBS)" Foreground="{StaticResource Ink}" FontSize="12" />
+              <TextBox x:Name="TwitchEbsBox" PlaceholderText="https://ednexus.signal-and-thread.com" Foreground="{StaticResource Ink}" Background="{StaticResource CardBg}" />
+              <TextBlock Foreground="{StaticResource InkDim}" FontSize="12" TextWrapping="Wrap"
                          Text="Leave blank for the hosted service. Change it only if you run your own — it must match the EBS base URL configured on the extension in your Twitch dashboard. Changing this signs you out." />
             </StackPanel>
           </Border>
         </StackPanel>
+
         <!-- Discord Rich Presence — a local IPC link to the commander's own Discord client. Applied
              live on Save: off disconnects, the privacy toggles re-push the presence immediately. -->
         <StackPanel Spacing="8">
-          <TextBlock Text="DISCORD PRESENCE" Foreground="#F07100" FontSize="12" FontWeight="SemiBold" LetterSpacing="2" />
-          <Border Background="#0F1114" CornerRadius="6" Padding="16">
+          <TextBlock Text="DISCORD PRESENCE" Foreground="{StaticResource AmberBrush}" FontSize="12" FontWeight="SemiBold" LetterSpacing="2" />
+          <Border Background="{StaticResource SurfaceField}" CornerRadius="6" Padding="16">
             <StackPanel Spacing="10">
-              <CheckBox x:Name="DiscordToggle" Content="Enable Discord Rich Presence" Foreground="#E7E9EE"
+              <CheckBox x:Name="DiscordToggle" Content="Enable Discord Rich Presence" Foreground="{StaticResource Ink}"
                         IsCheckedChanged="OnDiscordToggleChanged" />
-              <TextBlock Foreground="#8A909C" FontSize="12" TextWrapping="Wrap"
+              <TextBlock Foreground="{StaticResource InkDim}" FontSize="12" TextWrapping="Wrap"
                          Text="Shows your ship, location, and activity on your Discord profile while EDNexus is running. EDNexus hands this to the Discord app on this machine, and Discord shares it with your friends and servers like any other game status. Hidden while developer mode is on." />
 
-              <CheckBox x:Name="DiscordShowSystemToggle" Content="Show current star system name" Foreground="#E7E9EE" />
-              <TextBlock Foreground="#8A909C" FontSize="12" TextWrapping="Wrap"
+              <CheckBox x:Name="DiscordShowSystemToggle" Content="Show current star system name" Foreground="{StaticResource Ink}" />
+              <TextBlock Foreground="{StaticResource InkDim}" FontSize="12" TextWrapping="Wrap"
                          Text="When off, your presence reads &quot;In flight&quot; or &quot;Docked&quot; — no system, body, station, or carrier name, and no Inara link (Inara shows your location) — so you can't be stream-sniped or give away a fresh discovery." />
 
-              <CheckBox x:Name="DiscordShowCommanderToggle" Content="Show commander identity (Inara link, ship ID)" Foreground="#E7E9EE" />
-              <TextBlock Foreground="#8A909C" FontSize="12" TextWrapping="Wrap"
+              <CheckBox x:Name="DiscordShowCommanderToggle" Content="Show commander identity (Inara link, ship ID)" Foreground="{StaticResource Ink}" />
+              <TextBlock Foreground="{StaticResource InkDim}" FontSize="12" TextWrapping="Wrap"
                          Text="When off, the &quot;View on Inara&quot; button (which carries your commander name) and your ship's ID are left out." />
             </StackPanel>
           </Border>
@@ -283,11 +297,11 @@
 
         <!-- Developer options — hidden entirely when the dev tools are stripped/disabled (FeatureFlags). -->
         <StackPanel x:Name="DevSection" Spacing="8" IsVisible="False">
-          <TextBlock Text="DEVELOPER OPTIONS" Foreground="#F07100" FontSize="12" FontWeight="SemiBold" LetterSpacing="2" />
-          <Border Background="#0F1114" CornerRadius="6" Padding="16">
+          <TextBlock Text="DEVELOPER OPTIONS" Foreground="{StaticResource AmberBrush}" FontSize="12" FontWeight="SemiBold" LetterSpacing="2" />
+          <Border Background="{StaticResource SurfaceField}" CornerRadius="6" Padding="16">
             <StackPanel Spacing="10">
-              <CheckBox x:Name="DevModeToggle" Content="Enable developer mode" Foreground="#E7E9EE" />
-              <TextBlock Foreground="#8A909C" FontSize="12" TextWrapping="Wrap"
+              <CheckBox x:Name="DevModeToggle" Content="Enable developer mode" Foreground="{StaticResource Ink}" />
+              <TextBlock Foreground="{StaticResource InkDim}" FontSize="12" TextWrapping="Wrap"
                          Text="Adds a 🎲 control to each dashboard card to fabricate random-but-valid state, plus &quot;Randomize all&quot; and &quot;Reset to live data&quot;. For testing only — this resets to off every launch and is not saved. While it is on, EDDN/Inara reporting is paused so fabricated data is never sent." />
               <Button x:Name="SimulateOverlayVoiceButton" Content="Simulate overlay &amp; voice callouts"
                       Click="OnSimulateOverlayVoice" Padding="10" HorizontalAlignment="Left"

@@ -45,6 +45,15 @@ and folds that into a single live commander state that every feature reads from.
 - **Avalonia 12** — the desktop UI
 - **CommunityToolkit.Mvvm** — view models
 
+## Design
+
+The desktop app and the Twitch extension share one dark HUD palette, type scale, and icon set,
+documented in the **[EDNexus design system](https://claude.ai/artifact/8G7pW33gGu6SFvVockTpcd)**.
+The tokens it documents are wired into the code as shared constants —
+`src/EDNexus.App/Themes/Theme.axaml` for the desktop app, `extension/css/tokens.css` for the
+extension — rather than duplicated hex values, so changing a color means editing one file, not
+every window.
+
 ## Projects
 
 | Project | Role |

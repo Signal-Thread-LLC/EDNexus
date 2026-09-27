@@ -87,6 +87,14 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
+      - name: Generate checksums
+        # AutoUpdateService verifies a downloaded asset against a "<asset>.sha256" sidecar
+        # when one is present in the release; without this step there was nothing to check
+        # against, so verification always silently no-opped.
+        run: |
+          find artifacts -type f ! -name '*.sha256' -print0 | while IFS= read -r -d '' f; do
+            sha256sum "$f" | cut -d' ' -f1 > "$f.sha256"
+          done
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
