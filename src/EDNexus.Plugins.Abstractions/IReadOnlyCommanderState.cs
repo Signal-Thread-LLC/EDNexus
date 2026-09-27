@@ -9,8 +9,13 @@ namespace EDNexus.Plugins.Abstractions;
 /// A stable surface that grows additively: members added after the initial SDK contract carry
 /// default implementations, so neither plugins nor test doubles built against an older version
 /// break. Further read-only projections (on-foot inventory, etc.) land alongside the work that
-/// consumes them. The host's view reads live values; call <see cref="Snapshot"/> for a consistent
-/// point-in-time copy.
+/// consumes them.
+/// <para>
+/// The host's view always reflects the commander as of the <b>last completed journal event</b>:
+/// every member reads one immutable snapshot the host rebuilds after the engine has finished
+/// applying each event, so no member ever shows an event half-applied. Two separate property reads
+/// may still straddle an event; read them off one <see cref="Snapshot"/> when they must agree.
+/// </para>
 /// </remarks>
 public interface IReadOnlyCommanderState
 {
@@ -45,8 +50,8 @@ public interface IReadOnlyCommanderState
     DateTimeOffset LastUpdated { get; }
 
     /// <summary>
-    /// The cargo hold: commodity name to tons. Each read returns an immutable copy taken at that
-    /// moment, never the host's live collection, so mutating it (even via a cast) is impossible.
+    /// The cargo hold: commodity name to tons, as of the last completed journal event. An immutable
+    /// copy, never the host's live collection, so mutating it (even via a cast) is impossible.
     /// </summary>
     IReadOnlyDictionary<string, int> Cargo { get => EmptyInventory.Instance; }
 
@@ -60,8 +65,9 @@ public interface IReadOnlyCommanderState
     IReadOnlyDictionary<string, int> EncodedMaterials { get => EmptyInventory.Instance; }
 
     /// <summary>
-    /// A consistent point-in-time copy of every member of this state. Reading several properties
-    /// off the live view can observe an event half-applied; read them off one snapshot instead.
+    /// A consistent, immutable copy of every member of this state as of the last completed journal
+    /// event. Separate reads off the view can straddle an event; read related values off one
+    /// snapshot instead.
     /// Implementations that are already immutable may return themselves (the default).
     /// </summary>
     IReadOnlyCommanderState Snapshot() => this;

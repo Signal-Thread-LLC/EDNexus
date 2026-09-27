@@ -1,5 +1,7 @@
 using System.Collections;
 using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
+using System.Runtime.Loader;
 using EDNexus.Core.Journal;
 using EDNexus.Core.State;
 using EDNexus.Plugins.Abstractions;
@@ -7,28 +9,47 @@ using EDNexus.Plugins.Hosting.Bridge;
 
 namespace EDNexus.Plugins.Hosting.Tests;
 
+/// <summary>
+/// Loaded into a collectible <see cref="AssemblyLoadContext"/> by
+/// <see cref="PluginBridgeTests.DisposedSession_DoesNotPinACollectiblePlugin"/> to stand in for plugin code.
+/// </summary>
+public static class CollectibleProbe
+{
+    public static void Hook(IPluginEvents events, Action onEvent) => events.SubscribeAny(_ => onEvent());
+}
+
 public sealed class PluginBridgeTests : IDisposable
 {
     private static readonly TimeSpan Wait = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan Long = TimeSpan.FromSeconds(30);
 
     private readonly JournalEventBus _bus = new();
     private readonly CommanderState _state = new();
-    private readonly List<PluginBridgeSession> _sessions = [];
+    private readonly List<IDisposable> _owned = [];
 
     public PluginBridgeTests() => _ = new StateTracker(_bus, _state);
 
     public void Dispose()
     {
-        foreach (var session in _sessions) session.Dispose();
+        for (var i = _owned.Count - 1; i >= 0; i--) _owned[i].Dispose();
+    }
+
+    private PluginBridge Bridge(PluginBridgeOptions? options = null)
+    {
+        var bridge = new PluginBridge(_bus, _state, options);
+        _owned.Add(bridge);
+        return bridge;
     }
 
     private static PluginManifest Manifest(string id, params string[] capabilities)
         => new(id, id, "1.0.0", PluginSdk.CurrentVersionString) { Capabilities = capabilities };
 
     private PluginBridgeSession Attach(PluginBridge bridge, string id, params string[] capabilities)
+        => Track(bridge.Attach(Manifest(id, capabilities)));
+
+    private PluginBridgeSession Track(PluginBridgeSession session)
     {
-        var session = bridge.Attach(Manifest(id, capabilities));
-        _sessions.Add(session);
+        _owned.Add(session);
         return session;
     }
 
@@ -38,16 +59,22 @@ public sealed class PluginBridgeTests : IDisposable
         _bus.Publish(entry);
     }
 
+    private static string JumpTo(string system, string? body = null)
+        => $$"""{"timestamp":"2026-09-26T10:00:00Z","event":"FSDJump","StarSystem":"{{system}}","Body":"{{body ?? system}}"}""";
+
+    private static string CargoOf(int gold)
+        => $$"""{"timestamp":"2026-09-26T10:00:01Z","event":"Cargo","Vessel":"Ship","Inventory":[{"Name":"gold","Name_Localised":"Gold","Count":{{gold}}}]}""";
+
     private const string Jump = """{"timestamp":"2026-09-26T10:00:00Z","event":"FSDJump","StarSystem":"Sol","Body":"Sol"}""";
     private const string Cargo = """{"timestamp":"2026-09-26T10:00:01Z","event":"Cargo","Vessel":"Ship","Inventory":[{"Name":"gold","Name_Localised":"Gold","Count":12}]}""";
     private const string Materials = """{"timestamp":"2026-09-26T10:00:02Z","event":"Materials","Raw":[{"Name":"iron","Count":40}],"Manufactured":[],"Encoded":[]}""";
 
-    // ---- State: read-only, copies, no path back to CommanderState ----
+    // ---- State: read-only, immutable snapshots, no path back to CommanderState ----
 
     [Fact]
     public void State_ReflectsCommanderState_AndCollectionsAreFrozenCopies()
     {
-        var session = Attach(new PluginBridge(_bus, _state), "a.state", PluginCapabilities.State);
+        var session = Attach(Bridge(), "a.state", PluginCapabilities.State);
         Publish(Jump);
         Publish(Cargo);
         Publish(Materials);
@@ -59,7 +86,6 @@ public sealed class PluginBridgeTests : IDisposable
 
         // Neither the interface nor a cast back to a mutable type can reach the live collection.
         var cargo = view.Cargo;
-        Assert.IsNotType<ConcurrentDictionary<string, int>>(cargo);
         Assert.False(cargo is ConcurrentDictionary<string, int>);
         Assert.NotSame(_state.Cargo, cargo);
         var asDictionary = Assert.IsAssignableFrom<IDictionary<string, int>>(cargo);
@@ -70,8 +96,8 @@ public sealed class PluginBridgeTests : IDisposable
             Assert.Throws<NotSupportedException>(() => nonGeneric["Gold"] = 999);
         Assert.Equal(12, _state.Cargo["Gold"]);
 
-        // A copy handed out earlier does not change under the plugin either.
-        _state.Cargo["Gold"] = 1;
+        // A copy handed out earlier does not change under the plugin; the view moves on.
+        Publish(CargoOf(1));
         Assert.Equal(12, cargo["Gold"]);
         Assert.Equal(1, view.Cargo["Gold"]);
     }
@@ -79,9 +105,8 @@ public sealed class PluginBridgeTests : IDisposable
     [Fact]
     public void State_ExposesNoSetters()
     {
-        var session = Attach(new PluginBridge(_bus, _state), "a.state", PluginCapabilities.State);
-        var type = session.State.GetType();
-        Assert.All(type.GetProperties(), p => Assert.Null(p.GetSetMethod(nonPublic: false)));
+        var session = Attach(Bridge(), "a.state", PluginCapabilities.State);
+        Assert.All(session.State.GetType().GetProperties(), p => Assert.Null(p.GetSetMethod(nonPublic: false)));
         Assert.All(session.State.Snapshot().GetType().GetProperties(), p => Assert.Null(p.GetSetMethod(nonPublic: false)));
         Assert.IsNotType<CommanderState>(session.State);
     }
@@ -89,15 +114,85 @@ public sealed class PluginBridgeTests : IDisposable
     [Fact]
     public void Snapshot_IsPointInTime()
     {
-        var session = Attach(new PluginBridge(_bus, _state), "a.state", PluginCapabilities.State);
+        var session = Attach(Bridge(), "a.state", PluginCapabilities.State);
         Publish(Jump);
         var snapshot = session.State.Snapshot();
 
-        Publish("""{"timestamp":"2026-09-26T10:05:00Z","event":"FSDJump","StarSystem":"Achenar"}""");
+        Publish(JumpTo("Achenar"));
 
         Assert.Equal("Sol", snapshot.StarSystem);
         Assert.Equal("Achenar", session.State.StarSystem);
         Assert.Same(snapshot, snapshot.Snapshot());
+    }
+
+    [Fact]
+    public void State_ReflectsTheLastCompletedEvent_NotAMidEventMutation()
+    {
+        var session = Attach(Bridge(), "a.state", PluginCapabilities.State);
+        Publish(Jump);
+
+        // Written straight to the live object, outside any event: invisible until an event completes.
+        _state.StarSystem = "Mid-event";
+        Assert.Equal("Sol", session.State.StarSystem);
+
+        Publish("""{"timestamp":"2026-09-26T10:00:00Z","event":"Music","MusicTrack":"Exploration"}""");
+        Assert.Equal("Mid-event", session.State.StarSystem);
+    }
+
+    [Fact]
+    public async Task Snapshot_NeverSeesAHalfAppliedEvent_WhileTheJournalThreadRebuildsState()
+    {
+        var session = Attach(Bridge(), "a.state", PluginCapabilities.State);
+        const int Items = 60;
+        string MaterialsSet(int count) =>
+            $$"""{"timestamp":"2026-09-26T10:00:00Z","event":"Materials","Raw":[{{string.Join(",",
+                Enumerable.Range(0, Items).Select(i => $$"""{"Name":"m{{i}}","Count":{{count}}}"""))}}],"Manufactured":[],"Encoded":[]}""";
+        var sets = new[] { MaterialsSet(1), MaterialsSet(2) };
+        Publish(sets[0]);
+        Publish(JumpTo("A", "A 1"));
+
+        using var stop = new CancellationTokenSource();
+        var writer = Task.Run(() =>
+        {
+            for (var i = 0; !stop.IsCancellationRequested; i++)
+            {
+                Publish(sets[i % 2]);
+                Publish(i % 2 == 0 ? JumpTo("B", "B 1") : JumpTo("A", "A 1"));
+            }
+        });
+
+        var reads = 0;
+        var deadline = DateTime.UtcNow.AddSeconds(1.5);
+        while (DateTime.UtcNow < deadline)
+        {
+            var snapshot = session.State.Snapshot();
+            var raw = snapshot.RawMaterials;
+            Assert.Equal(Items, raw.Count);
+            Assert.Single(raw.Values.Distinct());
+            Assert.StartsWith(snapshot.StarSystem + " ", snapshot.Body);
+            reads++;
+        }
+        stop.Cancel();
+        await writer.WaitAsync(Wait);
+
+        Assert.True(reads > 100, $"only {reads} reads");
+    }
+
+    [Fact]
+    public void DisposedSession_RevokesItsStateView()
+    {
+        var session = Attach(Bridge(), "a.state", PluginCapabilities.State);
+        Publish(Jump);
+        Publish(Cargo);
+        var heldByPlugin = session.State;
+        Assert.Equal("Sol", heldByPlugin.StarSystem);
+
+        session.Dispose();
+        Publish(JumpTo("Achenar"));
+
+        Assert.Null(heldByPlugin.StarSystem);
+        Assert.Empty(heldByPlugin.Cargo);
+        Assert.Null(heldByPlugin.Snapshot().StarSystem);
     }
 
     // ---- Events: dispatch, isolation, unsubscribe ----
@@ -105,7 +200,7 @@ public sealed class PluginBridgeTests : IDisposable
     [Fact]
     public void Events_DeliverAdaptedEvents_WithHistoricalFlag_AfterStateIsUpdated()
     {
-        var session = Attach(new PluginBridge(_bus, _state), "a.events", PluginCapabilities.Events, PluginCapabilities.State);
+        var session = Attach(Bridge(), "a.events", PluginCapabilities.Events, PluginCapabilities.State);
         var received = new BlockingCollection<(IJournalEvent Event, string? SystemInState)>();
         session.Events.Subscribe("FSDJump", e => received.Add((e, session.State.StarSystem)));
 
@@ -125,7 +220,7 @@ public sealed class PluginBridgeTests : IDisposable
     [Fact]
     public void Events_NameMatchingIsOrdinal()
     {
-        var session = Attach(new PluginBridge(_bus, _state), "a.events", PluginCapabilities.Events);
+        var session = Attach(Bridge(), "a.events", PluginCapabilities.Events);
         var hits = new BlockingCollection<string>();
         session.Events.Subscribe("fsdjump", e => hits.Add("wrong-case"));
         session.Events.Subscribe("FSDJump", e => hits.Add("exact"));
@@ -142,7 +237,7 @@ public sealed class PluginBridgeTests : IDisposable
     public void ThrowingHandler_IsReportedAndIsolated_FromItsSiblingsAndOtherPlugins()
     {
         var errors = new BlockingCollection<PluginHandlerError>();
-        var bridge = new PluginBridge(_bus, _state, new PluginBridgeOptions { HandlerError = errors.Add });
+        var bridge = Bridge(new PluginBridgeOptions { HandlerError = errors.Add });
         var bad = Attach(bridge, "bad.plugin", PluginCapabilities.Events);
         var good = Attach(bridge, "good.plugin", PluginCapabilities.Events);
 
@@ -174,18 +269,19 @@ public sealed class PluginBridgeTests : IDisposable
     [Fact]
     public async Task BlockedHandler_DoesNotBlockThePumpOrOtherPlugins()
     {
-        var bridge = new PluginBridge(_bus, _state);
+        var bridge = Bridge();
         var slow = Attach(bridge, "slow.plugin", PluginCapabilities.Events);
         var fast = Attach(bridge, "fast.plugin", PluginCapabilities.Events);
 
         using var release = new ManualResetEventSlim();
-        var slowEntered = new ManualResetEventSlim();
-        slow.Events.SubscribeAny(_ => { slowEntered.Set(); release.Wait(Wait); });
+        using var slowEntered = new ManualResetEventSlim();
+        slow.Events.SubscribeAny(_ => { slowEntered.Set(); release.Wait(Long); });
         var fastSeen = new BlockingCollection<string>();
         fast.Events.SubscribeAny(e => fastSeen.Add(e.Event));
 
+        // The slow handler holds until released, so if Publish waited on it this would time out.
         var publish = Task.Run(() => { Publish(Jump); Publish(Cargo); });
-        var finished = await Task.WhenAny(publish, Task.Delay(TimeSpan.FromSeconds(1)));
+        var finished = await Task.WhenAny(publish, Task.Delay(Wait));
         Assert.True(finished == publish, "Publish must not wait for plugin handlers.");
         Assert.True(slowEntered.Wait(Wait));
         Assert.Equal(new[] { "FSDJump", "Cargo" }, TakeN(fastSeen, 2));
@@ -198,7 +294,7 @@ public sealed class PluginBridgeTests : IDisposable
     [Fact]
     public void Dispose_OnSubscription_StopsDelivery_AndIsIdempotent()
     {
-        var session = Attach(new PluginBridge(_bus, _state), "a.events", PluginCapabilities.Events);
+        var session = Attach(Bridge(), "a.events", PluginCapabilities.Events);
         var removable = new BlockingCollection<string>();
         var kept = new BlockingCollection<string>();
         var subscription = session.Events.On("FSDJump", e => removable.Add(e.Event));
@@ -220,7 +316,7 @@ public sealed class PluginBridgeTests : IDisposable
     [Fact]
     public void DisposingTheSession_UnhooksFromTheBus_AndStopsItsThread()
     {
-        var session = Attach(new PluginBridge(_bus, _state), "a.events", PluginCapabilities.Events);
+        var session = Attach(Bridge(), "a.events", PluginCapabilities.Events);
         var seen = 0;
         session.Events.SubscribeAny(_ => Interlocked.Increment(ref seen));
         Publish(Jump);
@@ -235,28 +331,123 @@ public sealed class PluginBridgeTests : IDisposable
     }
 
     [Fact]
+    public void NoHandlerStarts_AfterSessionDisposeReturns()
+    {
+        var session = Attach(Bridge(), "a.events", PluginCapabilities.Events);
+        using var entered = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        var laterHandlerRuns = 0;
+        session.Events.Subscribe("FSDJump", _ => { entered.Set(); release.Wait(Long); });
+        session.Events.Subscribe("FSDJump", _ => Interlocked.Increment(ref laterHandlerRuns));
+
+        Publish(Jump);
+        Assert.True(entered.Wait(Wait));   // first handler is mid-flight with the second already captured
+        session.Dispose();
+        release.Set();
+
+        Assert.True(session.WaitForDispatchExit(Wait));
+        Assert.Equal(0, Volatile.Read(ref laterHandlerRuns));
+    }
+
+    [Fact]
+    public void BlockedHandler_MakesWaitForDispatchExitReportCannotUnload()
+    {
+        var session = Attach(Bridge(), "stuck.plugin", PluginCapabilities.Events);
+        using var entered = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        session.Events.SubscribeAny(_ => { entered.Set(); release.Wait(Long); });
+        Publish(Jump);
+        Assert.True(entered.Wait(Wait));
+
+        session.Dispose();
+        Assert.False(session.WaitForDispatchExit(TimeSpan.FromMilliseconds(100)));
+
+        release.Set();
+        Assert.True(session.WaitForDispatchExit(Wait));
+    }
+
+    [Fact]
     public void FullQueue_DropsOldest_WithoutBlockingThePump()
     {
-        var bridge = new PluginBridge(_bus, _state, new PluginBridgeOptions { QueueCapacity = 2 });
-        var session = Attach(bridge, "slow.plugin", PluginCapabilities.Events);
+        var session = Attach(Bridge(new PluginBridgeOptions { QueueCapacity = 2 }), "slow.plugin", PluginCapabilities.Events);
         using var release = new ManualResetEventSlim();
-        var entered = new ManualResetEventSlim();
+        using var entered = new ManualResetEventSlim();
         var seen = new BlockingCollection<string?>();
         session.Events.SubscribeAny(e =>
         {
             entered.Set();
-            release.Wait(Wait);
+            release.Wait(Long);
             seen.Add(e.GetString("StarSystem"));
         });
 
-        Publish("""{"timestamp":"2026-09-26T10:00:00Z","event":"FSDJump","StarSystem":"A"}""");
+        Publish(JumpTo("A"));
         Assert.True(entered.Wait(Wait));
         foreach (var system in new[] { "B", "C", "D" })
-            Publish($$"""{"timestamp":"2026-09-26T10:00:00Z","event":"FSDJump","StarSystem":"{{system}}"}""");
+            Publish(JumpTo(system));
 
         Assert.Equal(1, session.DroppedEventCount);
         release.Set();
         Assert.Equal(new[] { "A", "C", "D" }, TakeN(seen, 3));
+    }
+
+    [Fact]
+    public void UnsubscribedEvents_AreNeitherQueuedNorAllowedToEvictWantedOnes()
+    {
+        var session = Attach(Bridge(new PluginBridgeOptions { QueueCapacity = 2 }), "jumps.only", PluginCapabilities.Events);
+        using var release = new ManualResetEventSlim();
+        using var entered = new ManualResetEventSlim();
+        var seen = new BlockingCollection<string?>();
+        session.Events.Subscribe("FSDJump", e =>
+        {
+            entered.Set();
+            release.Wait(Long);
+            seen.Add(e.GetString("StarSystem"));
+        });
+
+        Publish(JumpTo("A"));
+        Assert.True(entered.Wait(Wait));
+        Publish(JumpTo("B"));
+        for (var i = 0; i < 20; i++) Publish(Cargo);
+        Publish(JumpTo("C"));
+
+        Assert.Equal(2, session.PendingEventCount);
+        Assert.Equal(0, session.DroppedEventCount);
+        release.Set();
+        Assert.Equal(new[] { "A", "B", "C" }, TakeN(seen, 3));
+    }
+
+    [Fact]
+    public void DisposedSession_DoesNotPinACollectiblePlugin()
+    {
+        var context = RunProbePluginAndUnload();
+
+        for (var i = 0; i < 20 && context.IsAlive; i++)
+        {
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+        }
+
+        Assert.False(context.IsAlive, "The plugin's AssemblyLoadContext was kept alive after its session was disposed.");
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private WeakReference RunProbePluginAndUnload()
+    {
+        var context = new AssemblyLoadContext("bridge-probe", isCollectible: true);
+        var assembly = context.LoadFromAssemblyPath(typeof(CollectibleProbe).Assembly.Location);
+        var probeType = assembly.GetType(typeof(CollectibleProbe).FullName!)!;
+        Assert.NotSame(typeof(CollectibleProbe), probeType);   // really the collectible copy
+
+        var session = Attach(Bridge(), "probe.plugin", PluginCapabilities.Events);
+        using var seen = new ManualResetEventSlim();
+        probeType.GetMethod(nameof(CollectibleProbe.Hook))!.Invoke(null, [session.Events, (Action)seen.Set]);
+        Publish(Jump);
+        Assert.True(seen.Wait(Wait));
+
+        session.Dispose();
+        Assert.True(session.WaitForDispatchExit(Wait));
+        context.Unload();
+        return new WeakReference(context);
     }
 
     // ---- Capability gating ----
@@ -264,7 +455,7 @@ public sealed class PluginBridgeTests : IDisposable
     [Fact]
     public void WithoutEventsCapability_SubscriptionIsDenied()
     {
-        var session = Attach(new PluginBridge(_bus, _state), "no.events", PluginCapabilities.State);
+        var session = Attach(Bridge(), "no.events", PluginCapabilities.State);
 
         var ex = Assert.Throws<UnauthorizedAccessException>(() => session.Events.Subscribe("FSDJump", _ => { }));
         Assert.Contains("no.events", ex.Message);
@@ -277,7 +468,7 @@ public sealed class PluginBridgeTests : IDisposable
     [Fact]
     public void WithoutStateCapability_EveryReadIsDenied()
     {
-        var session = Attach(new PluginBridge(_bus, _state), "no.state", PluginCapabilities.Events);
+        var session = Attach(Bridge(), "no.state", PluginCapabilities.Events);
         var state = session.State;
 
         Assert.Throws<UnauthorizedAccessException>(() => state.Name);
@@ -290,10 +481,9 @@ public sealed class PluginBridgeTests : IDisposable
     [Fact]
     public void GrantedCapabilities_NarrowTheDeclaredSet_AndCannotWidenIt()
     {
-        var bridge = new PluginBridge(_bus, _state);
-        var revoked = bridge.Attach(Manifest("revoked", PluginCapabilities.Events, PluginCapabilities.State), [PluginCapabilities.Events]);
-        var widened = bridge.Attach(Manifest("widened", PluginCapabilities.Events), [PluginCapabilities.Events, PluginCapabilities.State]);
-        _sessions.AddRange([revoked, widened]);
+        var bridge = Bridge();
+        var revoked = Track(bridge.Attach(Manifest("revoked", PluginCapabilities.Events, PluginCapabilities.State), [PluginCapabilities.Events]));
+        var widened = Track(bridge.Attach(Manifest("widened", PluginCapabilities.Events), [PluginCapabilities.Events, PluginCapabilities.State]));
 
         Assert.Throws<UnauthorizedAccessException>(() => revoked.State.Name);
         Assert.Throws<UnauthorizedAccessException>(() => widened.State.Name);
@@ -306,7 +496,7 @@ public sealed class PluginBridgeTests : IDisposable
     public void DeveloperMode_FlagsEvents_AndWithholdsThemFromNetworkPlugins()
     {
         var simulated = true;
-        var bridge = new PluginBridge(_bus, _state, new PluginBridgeOptions { IsSimulated = () => simulated });
+        var bridge = Bridge(new PluginBridgeOptions { IsSimulated = () => Volatile.Read(ref simulated) });
         var local = Attach(bridge, "local.plugin", PluginCapabilities.Events, PluginCapabilities.State);
         var networked = Attach(bridge, "net.plugin", PluginCapabilities.Events, PluginCapabilities.State, PluginCapabilities.Network);
 
@@ -322,10 +512,10 @@ public sealed class PluginBridgeTests : IDisposable
         Assert.Equal("Sol", local.State.StarSystem);
         Assert.Null(networked.State.StarSystem);          // fabricated state is hidden too
         Assert.Empty(networked.State.Cargo);
-        DrainAndAssertIdle(networked);
+        DrainAndAssertIdle(networked, withheld: true);
         Assert.Empty(netSeen);
 
-        simulated = false;
+        Volatile.Write(ref simulated, false);
         Publish(Jump);
         Assert.True(netSeen.TryTake(out var live, Wait));
         Assert.False(live.IsSimulated);
@@ -333,16 +523,33 @@ public sealed class PluginBridgeTests : IDisposable
     }
 
     [Fact]
+    public void DeveloperMode_StillWithholds_WhenTheDeclaredNetworkCapabilityIsRevoked()
+    {
+        var bridge = Bridge(new PluginBridgeOptions { IsSimulated = () => true });
+        var session = Track(bridge.Attach(
+            Manifest("net.plugin", PluginCapabilities.Events, PluginCapabilities.State, PluginCapabilities.Network),
+            [PluginCapabilities.Events, PluginCapabilities.State]));
+        var seen = new BlockingCollection<IJournalEvent>();
+        session.Events.SubscribeAny(seen.Add);
+
+        Publish(Jump);
+
+        DrainAndAssertIdle(session, withheld: true);
+        Assert.Empty(seen);
+        Assert.Null(session.State.StarSystem);
+    }
+
+    [Fact]
     public void ThrowingDeveloperModePredicate_FailsClosed()
     {
-        var bridge = new PluginBridge(_bus, _state, new PluginBridgeOptions { IsSimulated = () => throw new InvalidOperationException() });
+        var bridge = Bridge(new PluginBridgeOptions { IsSimulated = () => throw new InvalidOperationException() });
         var networked = Attach(bridge, "net.plugin", PluginCapabilities.Events, PluginCapabilities.State, PluginCapabilities.Network);
         var seen = new BlockingCollection<IJournalEvent>();
         networked.Events.SubscribeAny(seen.Add);
 
         Publish(Jump);
 
-        DrainAndAssertIdle(networked);
+        DrainAndAssertIdle(networked, withheld: true);
         Assert.Empty(seen);
         Assert.Null(networked.State.StarSystem);
     }
@@ -385,6 +592,53 @@ public sealed class PluginBridgeTests : IDisposable
         Assert.Equal(new[] { "any", "named", "completed", "any", "named" }, order);
     }
 
+    [Fact]
+    public void BusCompletedHook_IsolatesExceptions()
+    {
+        var bus = new JournalEventBus();
+        var errors = new List<Exception>();
+        bus.HandlerError += (_, ex) => errors.Add(ex);
+        var ran = 0;
+        using var bad = bus.SubscribeCompleted(_ => throw new InvalidOperationException("boom"));
+        using var good = bus.SubscribeCompleted(_ => ran++);
+
+        Assert.True(JournalEntry.TryParse(Jump, false, out var entry));
+        bus.Publish(entry);
+
+        Assert.Equal(1, ran);
+        Assert.IsType<InvalidOperationException>(Assert.Single(errors));
+    }
+
+    [Fact]
+    public void BusCompletedHook_ToleratesReentrantSubscribeDisposeAndPublish()
+    {
+        var bus = new JournalEventBus();
+        Assert.True(JournalEntry.TryParse(Jump, false, out var outer));
+        Assert.True(JournalEntry.TryParse(Cargo, false, out var inner));
+        var log = new List<string>();
+        var errors = new List<Exception>();
+        bus.HandlerError += (_, ex) => errors.Add(ex);
+
+        IDisposable? added = null;
+        IDisposable? self = null;
+        self = bus.SubscribeCompleted(e =>
+        {
+            log.Add("self:" + e.Event);
+            self!.Dispose();                                                    // remove itself mid-publish
+            added = bus.SubscribeCompleted(x => log.Add("added:" + x.Event));   // add another mid-publish
+            bus.Publish(inner);                                                 // nested publish
+        });
+
+        bus.Publish(outer);
+        bus.Publish(outer);
+        added?.Dispose();
+
+        Assert.Empty(errors);
+        // The handler added during the outer publish is not in that publish's snapshot, but does see
+        // the nested one; the self-removed handler never runs again.
+        Assert.Equal(new[] { "self:FSDJump", "added:Cargo", "added:FSDJump" }, log);
+    }
+
     // ---- helpers ----
 
     private static string[] TakeN<T>(BlockingCollection<T> source, int count)
@@ -400,17 +654,25 @@ public sealed class PluginBridgeTests : IDisposable
 
     /// <summary>
     /// Waits until everything published so far has been through the plugin's queue, by publishing a
-    /// sentinel and waiting for a probe handler to see it. Delivery is in order, so anything that
-    /// should have arrived before the sentinel has.
+    /// sentinel and waiting for a probe handler to see it (delivery is in order). With
+    /// <paramref name="withheld"/>, the plugin is expected to be receiving nothing at all, so the
+    /// sentinel must not arrive and nothing may be queued.
     /// </summary>
-    private void DrainAndAssertIdle(PluginBridgeSession session)
+    private void DrainAndAssertIdle(PluginBridgeSession session, bool withheld = false)
     {
         using var seen = new ManualResetEventSlim();
         using var probe = session.Events.On("DrainProbe", _ => seen.Set());
         var droppedBefore = session.DroppedEventCount;
         Publish("""{"timestamp":"2026-09-26T10:00:00Z","event":"DrainProbe"}""");
-        // Network plugins never see the sentinel while simulated; fall back to an idle queue.
-        Assert.True(seen.Wait(TimeSpan.FromMilliseconds(500)) || session.PendingEventCount == 0);
+        if (withheld)
+        {
+            Assert.Equal(0, session.PendingEventCount);
+            Assert.False(seen.Wait(TimeSpan.FromMilliseconds(200)));
+        }
+        else
+        {
+            Assert.True(seen.Wait(Wait));
+        }
         Assert.Equal(droppedBefore, session.DroppedEventCount);
     }
 }

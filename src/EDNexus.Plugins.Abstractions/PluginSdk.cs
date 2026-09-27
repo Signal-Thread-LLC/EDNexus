@@ -15,6 +15,12 @@ public static class PluginSdk
     /// The SDK contract version this build of <c>EDNexus.Plugins.Abstractions</c> implements,
     /// as <c>"major.minor"</c>. Bump the major component for breaking contract changes.
     /// </summary>
+    /// <remarks>
+    /// Still 1.0 although members were added after the first contract (<c>IPluginEvents.On/OnAny</c>,
+    /// <c>IJournalEvent.IsSimulated</c>, the <c>IReadOnlyCommanderState</c> inventories and
+    /// <c>Snapshot</c>), because no host had loaded a plugin before them. If any loader ever ships
+    /// without these members, this must become 1.1 so plugins using them are not loaded there.
+    /// </remarks>
     public const string CurrentVersionString = "1.0";
 
     /// <summary>The parsed <see cref="CurrentVersionString"/>.</summary>

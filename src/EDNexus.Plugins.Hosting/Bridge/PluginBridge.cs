@@ -15,9 +15,9 @@ namespace EDNexus.Plugins.Hosting.Bridge;
 /// <remarks>
 /// <para>
 /// Nothing a session hands out is, wraps publicly, or can be cast back to an engine type: plugins
-/// get <see cref="IJournalEvent"/> views, a state view with no setters, and frozen copies of the
-/// collections. The bridge adds no mutation path — <c>StateTracker</c> stays the only writer.
-/// (This is least-privilege plumbing, not a sandbox: in-process code can always use reflection.)
+/// get <see cref="IJournalEvent"/> views and a state view with no setters over immutable snapshots.
+/// The bridge adds no mutation path — <c>StateTracker</c> stays the only writer. (This is
+/// least-privilege plumbing, not a sandbox: in-process code can always use reflection.)
 /// </para>
 /// <para>
 /// <b>Dispatch model.</b> Plugin handlers never run on the journal thread. Each plugin gets its own
@@ -27,19 +27,28 @@ namespace EDNexus.Plugins.Hosting.Bridge;
 /// a handler that blocks only delays its own plugin.
 /// </para>
 /// <para>
+/// <b>State.</b> The bridge keeps one immutable snapshot of the commander as of the last completed
+/// journal event, rebuilt on the journal thread once the engine has finished with each entry, and
+/// every plugin's state view reads it. A plugin never sees an event half-applied, and by the time
+/// its handler for an event runs the snapshot already includes that event.
+/// </para>
+/// <para>
 /// A bridge is bound to one bus. The app rebuilds its <c>EngineHost</c> (and so its bus) when
-/// leaving developer mode or resetting to live, so the loader must dispose its sessions and attach
-/// new ones to the new host's bridge.
+/// leaving developer mode or resetting to live, so the loader must dispose its sessions and this
+/// bridge, and attach new sessions to a bridge over the new host.
 /// </para>
 /// </remarks>
-public sealed class PluginBridge
+public sealed class PluginBridge : IDisposable
 {
     private readonly JournalEventBus _bus;
-    private readonly CommanderState _state;
+    private readonly CommanderStatePublisher _snapshots;
     private readonly PluginBridgeOptions _options;
 
     /// <param name="bus">The engine bus to observe. The bridge only ever subscribes to it.</param>
-    /// <param name="state">The engine's commander state. The bridge only ever reads it.</param>
+    /// <param name="state">
+    /// The engine's commander state. The bridge only ever reads it. Construct the bridge before the
+    /// engine starts publishing: the first snapshot is taken here.
+    /// </param>
     /// <param name="options">Dispatch and developer-mode options; defaults when null.</param>
     public PluginBridge(JournalEventBus bus, CommanderState state, PluginBridgeOptions? options = null)
     {
@@ -48,8 +57,8 @@ public sealed class PluginBridge
         if (options is not null && options.QueueCapacity < 1)
             throw new ArgumentOutOfRangeException(nameof(options), "QueueCapacity must be at least 1.");
         _bus = bus;
-        _state = state;
         _options = options ?? new PluginBridgeOptions();
+        _snapshots = new CommanderStatePublisher(bus, state);
     }
 
     /// <summary>
@@ -58,6 +67,12 @@ public sealed class PluginBridge
     /// without <see cref="PluginCapabilities.State"/> the state view refuses every read, both with
     /// <see cref="UnauthorizedAccessException"/>.
     /// </summary>
+    /// <remarks>
+    /// For consent purposes <see cref="PluginCapabilities.Events"/> is data-equivalent to
+    /// <see cref="PluginCapabilities.State"/>: the journal feed carries everything the state is
+    /// derived from, so a plugin with <c>events</c> alone can rebuild the commander's location,
+    /// balance and inventory. Present the two to the user accordingly.
+    /// </remarks>
     /// <param name="manifest">The plugin's validated manifest; its id attributes errors.</param>
     /// <param name="grantedCapabilities">
     /// The capabilities the user has granted, or null to grant exactly what the manifest declares.
@@ -72,22 +87,36 @@ public sealed class PluginBridge
 
         // Developer mode feeds the bus fabricated events. EDDN, Inara, Discord and the Twitch card all
         // go silent while it is on, so a plugin that can phone home is held to the same rule: it sees
-        // no simulated events and an empty commander. Plugins that cannot phone home still see
+        // no simulated events and an unknown commander. Plugins that cannot phone home still see
         // everything, so their cards stay exercisable, with each event flagged IsSimulated.
-        var networked = granted.Contains(PluginCapabilities.Network);
+        // This keys off what the manifest declares, not what is granted: network access cannot be
+        // enforced in-process, so revoking the grant does not stop a plugin phoning home, and the
+        // fabricated data must stay withheld (fail closed).
+        var networked = manifest.Declares(PluginCapabilities.Network);
         var isSimulated = SafePredicate(_options.IsSimulated);
         var onError = _options.HandlerError ?? (static _ => { });
 
-        PluginEvents? events = granted.Contains(PluginCapabilities.Events)
+        var events = granted.Contains(PluginCapabilities.Events)
             ? new PluginEvents(_bus, manifest.Id, networked, isSimulated, onError, _options.QueueCapacity)
             : null;
 
-        IReadOnlyCommanderState state = granted.Contains(PluginCapabilities.State)
-            ? new CommanderStateView(_state, networked ? isSimulated : static () => false)
-            : new DeniedCommanderState(manifest.Id);
+        var view = granted.Contains(PluginCapabilities.State)
+            ? new CommanderStateView(_snapshots, networked ? isSimulated : static () => false)
+            : null;
 
-        return new PluginBridgeSession(manifest.Id, events, events ?? (IPluginEvents)new DeniedPluginEvents(manifest.Id), state);
+        return new PluginBridgeSession(
+            manifest.Id,
+            events,
+            events ?? (IPluginEvents)new DeniedPluginEvents(manifest.Id),
+            view,
+            view ?? (IReadOnlyCommanderState)new DeniedCommanderState(manifest.Id));
     }
+
+    /// <summary>
+    /// Stops refreshing the state snapshot and unhooks from the bus and state. Dispose the sessions
+    /// first; a view left attached keeps returning the last snapshot taken.
+    /// </summary>
+    public void Dispose() => _snapshots.Dispose();
 
     /// <summary>
     /// Wraps the developer-mode predicate so it never throws onto the journal thread; a predicate
@@ -109,8 +138,9 @@ public sealed class PluginBridgeOptions
 {
     /// <summary>
     /// Live predicate: true while the bus is carrying developer-mode (fabricated) events. Evaluated on
-    /// the journal thread as each event is published, so keep it cheap. The app passes the same
-    /// predicate it gives <c>EngineHost</c> as <c>reportingSuppressed</c>.
+    /// the journal thread as each event is published, and on plugin threads as network-declaring
+    /// plugins read state, so keep it cheap. The app passes the same predicate it gives
+    /// <c>EngineHost</c> as <c>reportingSuppressed</c>.
     /// </summary>
     public Func<bool>? IsSimulated { get; init; }
 
@@ -122,8 +152,8 @@ public sealed class PluginBridgeOptions
     public Action<PluginHandlerError>? HandlerError { get; init; }
 
     /// <summary>
-    /// How many undelivered events a plugin may fall behind before the oldest are dropped. The default
-    /// comfortably holds a startup replay of a long session's journal.
+    /// How many undelivered (subscribed-to) events a plugin may fall behind before the oldest are
+    /// dropped. The default comfortably holds a startup replay of a long session's journal.
     /// </summary>
     public int QueueCapacity { get; init; } = 8192;
 }
@@ -139,16 +169,24 @@ public sealed record PluginHandlerError(string PluginId, string EventName, Excep
 /// <see cref="IReadOnlyCommanderState"/> to put in its <see cref="IPluginContext"/>, plus delivery
 /// diagnostics. Dispose it when the plugin unloads: that removes every handler the plugin
 /// registered (so the bus holds no references into its <c>AssemblyLoadContext</c>), discards any
-/// queued events and stops its dispatch thread.
+/// queued events, stops its dispatch thread, and cuts its state view off from the engine (it reads
+/// as an unknown commander from then on).
 /// </summary>
 public sealed class PluginBridgeSession : IDisposable
 {
     private readonly PluginEvents? _dispatcher;
+    private readonly CommanderStateView? _view;
 
-    internal PluginBridgeSession(string pluginId, PluginEvents? dispatcher, IPluginEvents events, IReadOnlyCommanderState state)
+    internal PluginBridgeSession(
+        string pluginId,
+        PluginEvents? dispatcher,
+        IPluginEvents events,
+        CommanderStateView? view,
+        IReadOnlyCommanderState state)
     {
         PluginId = pluginId;
         _dispatcher = dispatcher;
+        _view = view;
         Events = events;
         State = state;
     }
@@ -162,7 +200,7 @@ public sealed class PluginBridgeSession : IDisposable
     /// <summary>The plugin's read-only state view, for <see cref="IPluginContext.State"/>.</summary>
     public IReadOnlyCommanderState State { get; }
 
-    /// <summary>Events dropped because the plugin fell <see cref="PluginBridgeOptions.QueueCapacity"/> behind.</summary>
+    /// <summary>Subscribed-to events dropped because the plugin fell <see cref="PluginBridgeOptions.QueueCapacity"/> behind.</summary>
     public long DroppedEventCount => _dispatcher?.DroppedEventCount ?? 0;
 
     /// <summary>Handler invocations that threw, for quarantine decisions.</summary>
@@ -173,10 +211,16 @@ public sealed class PluginBridgeSession : IDisposable
 
     /// <summary>
     /// After <see cref="Dispose"/>, waits up to <paramref name="timeout"/> for the dispatch thread to
-    /// finish the handler it may be running. Returns false if the plugin is stuck in a handler.
+    /// finish the handler it may be running. Returns false if the plugin is stuck in a handler:
+    /// callers must then treat the plugin as <b>cannot unload</b>, because its code is still on a
+    /// stack and unloading its <c>AssemblyLoadContext</c> will not complete.
     /// </summary>
     public bool WaitForDispatchExit(TimeSpan timeout) => _dispatcher?.WaitForExit(timeout) ?? true;
 
     /// <inheritdoc />
-    public void Dispose() => _dispatcher?.Dispose();
+    public void Dispose()
+    {
+        _dispatcher?.Dispose();
+        _view?.Revoke();
+    }
 }
