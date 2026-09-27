@@ -258,7 +258,7 @@ public sealed class RadioPlayerService : IRadioPlayer, IDisposable, IAsyncDispos
                 lock (_transportGate)
                 {
                     MediaPlayer? player;
-                    lock (_gate) player = _mediaPlayer;
+                    lock (_gate) player = LivePlayerLocked();
                     player?.Pause(); // outside _gate (#144)
                 }
             }
@@ -283,7 +283,7 @@ public sealed class RadioPlayerService : IRadioPlayer, IDisposable, IAsyncDispos
                 lock (_transportGate)
                 {
                     MediaPlayer? player;
-                    lock (_gate) player = _mediaPlayer;
+                    lock (_gate) player = LivePlayerLocked();
                     player?.Stop(); // outside _gate (#144): Stop waits for LibVLC's event threads
                     lock (_gate) _status = RadioPlaybackStatus.Stopped;
                 }
@@ -406,7 +406,7 @@ public sealed class RadioPlayerService : IRadioPlayer, IDisposable, IAsyncDispos
                 {
                     MediaPlayer? player;
                     int level;
-                    lock (_gate) { player = _mediaPlayer; level = _volume; }
+                    lock (_gate) { player = LivePlayerLocked(); level = _volume; }
                     if (player is not null) player.Volume = level; // outside _gate (#144)
                 }
                 RaiseChanged();
@@ -432,7 +432,7 @@ public sealed class RadioPlayerService : IRadioPlayer, IDisposable, IAsyncDispos
                 {
                     MediaPlayer? player;
                     bool mute;
-                    lock (_gate) { player = _mediaPlayer; mute = _muted; }
+                    lock (_gate) { player = LivePlayerLocked(); mute = _muted; }
                     if (player is not null) player.Mute = mute; // outside _gate (#144)
                 }
                 RaiseChanged();
@@ -533,6 +533,13 @@ public sealed class RadioPlayerService : IRadioPlayer, IDisposable, IAsyncDispos
         }
     }
 
+    /// <summary>
+    /// The player a transport call may use, read under <see cref="_gate"/>: null once disposed, so a
+    /// call that was queued (or waiting on <see cref="_transportGate"/>) when a teardown timed out
+    /// never reaches LibVLC after <see cref="Dispose"/>.
+    /// </summary>
+    private MediaPlayer? LivePlayerLocked() => _disposed ? null : _mediaPlayer;
+
     private void SetError(string message)
     {
         lock (_gate)
@@ -625,8 +632,11 @@ public sealed class RadioPlayerService : IRadioPlayer, IDisposable, IAsyncDispos
 
     public void Dispose()
     {
-        if (_disposed) return;
-        _disposed = true;
+        lock (_gate)
+        {
+            if (_disposed) return;
+            _disposed = true;
+        }
 
         // Don't lose a volume change made just before shutdown.
         FlushPendingSave();

@@ -661,9 +661,14 @@ public class RadioPlayerServiceTests
 
         try
         {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
             var dispose = Task.Run(radio.Dispose);
             var finished = await Task.WhenAny(dispose, Task.Delay(TimeSpan.FromSeconds(10)));
+            sw.Stop();
             Assert.Same(dispose, finished); // returned despite the wedge
+            await dispose;                  // and didn't fault
+            // 200 ms bound plus generous CI slack; without the bound it never returns at all.
+            Assert.True(sw.Elapsed < TimeSpan.FromSeconds(3), $"Dispose took {sw.Elapsed}");
         }
         finally
         {
