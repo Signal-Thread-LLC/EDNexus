@@ -164,7 +164,7 @@ public partial class SettingsWindow : Window
         }
     }
 
-    private void OnSave(object? sender, RoutedEventArgs e)
+    private async void OnSave(object? sender, RoutedEventArgs e)
     {
         if (_boot is not null)
         {
@@ -193,8 +193,10 @@ public partial class SettingsWindow : Window
                 TwitchEbsBox.Text);
             // Stopping publishes is not enough: the EBS would keep serving the last card to every
             // viewer who opens the stream. Best-effort — the result surfaces on the status line.
+            // Awaited because leaving developer mode below rebuilds the host, disposing this
+            // service and its HTTP client mid-request.
             if (takeOffAir is { } off && _dashboard?.TwitchCard is { } card)
-                _ = card.TakeOffAirAsync(off.Endpoint, off.Token);
+                await card.TakeOffAirAsync(off.Endpoint, off.Token);
             // Switching the card on (or changing which sections show) changes what viewers should
             // see without touching the commander picture, so the publisher has nothing to react to —
             // and with the game closed no journal event is coming to nudge it. Ask directly.

@@ -52,12 +52,13 @@
     function showSavedUrl(fromConfig) {
       // Never clobber an edit in progress: onChanged also fires on a token refresh, and on the
       // broadcaster's own save.
-      if (loaded || input.value.trim() !== '') return;
-      input.value = currentConfig().ebsBaseUrl || '';
+      if (loaded) return;
       // Only a delivered configuration settles the field. Authorization can arrive first, with the
       // configuration still empty; latching then would ignore the saved URL when it lands, and the
       // next save would erase it.
       if (fromConfig) loaded = true;
+      if (input.value.trim() !== '') return;
+      input.value = currentConfig().ebsBaseUrl || '';
     }
 
     if (helper.configuration && typeof helper.configuration.onChanged === 'function') {
