@@ -680,6 +680,61 @@ public class PluginHostTests
         AssertLoadContextsGone("com.test.evildispose", "com.test.zulu");
     }
 
+    private const string ThrowOnUnloading =
+        "System.Runtime.Loader.AssemblyLoadContext.GetLoadContext(GetType().Assembly)!.Unloading += _ => throw new EvilException();";
+
+    [Fact]
+    public void UnloadAll_UnloadingHandlerThatThrows_IsContainedAndEveryPluginStillUnloads()
+    {
+        using var dir = new TempDir();
+        WriteStandard(dir.Path, "com.test.alpha", "Alpha");
+        WriteFolder(dir.Path, "com.test.evilunload", Manifest("com.test.evilunload", "EvilUnload.dll", "EvilUnload.Plugin"),
+            ("EvilUnload.dll", Compile("EvilUnload", PluginSource("EvilUnload", initBody: ThrowOnUnloading, extraMembers: EvilException))));
+        WriteStandard(dir.Path, "com.test.zulu", "Zulu");
+        var contexts = new RecordingContexts();
+        using var host = contexts.Host(dir.Path);
+        Assert.Equal(3, LoadCount(host));
+
+        var results = host.UnloadAll(); // must not throw
+
+        Assert.Equal(["com.test.alpha", "com.test.evilunload", "com.test.zulu"], results.Select(r => r.Id));
+        Assert.Equal(
+            "unloading the load context failed: EvilUnload.Plugin+EvilException: <message unavailable: EvilUnload.Plugin+EvilException>",
+            Assert.Single(results[1].Errors));
+        Assert.Empty(results[2].Errors);
+        Assert.Contains("shutdown com.test.evilunload", contexts.Lines);
+        Assert.Contains("shutdown com.test.zulu", contexts.Lines);
+        Assert.Equal(["com.test.alpha", "com.test.evilunload", "com.test.zulu"], contexts.Disposed.Order());
+        Assert.Empty(host.Loaded);
+        AssertLoadContextsGone("com.test.alpha", "com.test.evilunload", "com.test.zulu");
+    }
+
+    [Fact]
+    public void LoadAll_UnloadingHandlerThatThrowsDuringAFailedLoad_KeepsTheRealReason()
+    {
+        using var dir = new TempDir();
+        WriteFolder(dir.Path, "com.test.evilfail", Manifest("com.test.evilfail", "EvilFail.dll", "EvilFail.Plugin"),
+            ("EvilFail.dll", Compile("EvilFail", PluginSource("EvilFail",
+                initBody: ThrowOnUnloading + " throw new System.IO.IOException(\"init failed\");", extraMembers: EvilException))));
+        WriteStandard(dir.Path, "com.test.zulu", "Zulu");
+        var contexts = new RecordingContexts();
+        using var host = contexts.Host(dir.Path);
+
+        var report = host.LoadAll(); // must not throw
+
+        var result = Single(report, "com.test.evilfail");
+        Assert.Equal(PluginLoadStatus.Failed, result.Status);
+        Assert.Equal(
+            [
+                "Initialize failed: System.IO.IOException: init failed",
+                "unloading the load context failed: EvilFail.Plugin+EvilException: <message unavailable: EvilFail.Plugin+EvilException>",
+            ],
+            result.Reasons);
+        Assert.Equal(["com.test.evilfail"], contexts.Disposed);
+        Assert.Equal(["com.test.zulu"], host.Loaded.Select(p => p.Id));
+        AssertLoadContextsGone("com.test.evilfail");
+    }
+
     [Fact]
     public void Describe_NeverThrows()
     {

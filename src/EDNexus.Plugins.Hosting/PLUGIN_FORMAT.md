@@ -134,5 +134,7 @@ plugin code runs in-process with the host's full trust (trust and consent are #6
 stopped. Threads or timers the plugin started, or references held outside the host (for example
 a handler the plugin added to a static event such as `AppDomain.ProcessExit`), keep running and
 keep the load context alive. A stack overflow or `Environment.FailFast` in plugin code ends the
-process. `LoadAll()` fails fast if called while a pass is in progress (including from plugin code
-or the context factory during that pass).
+process, and a constructor, `Initialize` or `Shutdown` that never returns blocks the load or unload
+pass that called it (timeouts belong to the threading contract, #62). `LoadAll()` throws
+`InvalidOperationException` rather than waiting if called while a pass is in progress (from
+another thread, or from plugin code or the context factory during that pass).

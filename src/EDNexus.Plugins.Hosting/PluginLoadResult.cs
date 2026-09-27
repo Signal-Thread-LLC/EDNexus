@@ -26,7 +26,9 @@ public enum PluginLoadStatus
     /// <see cref="IEDNexusPlugin.Initialize"/>). After a failed <c>Initialize</c> the host calls
     /// <see cref="IEDNexusPlugin.Shutdown"/> (best effort); in every case it disposes the context and
     /// unloads the load context. This does not guarantee plugin code has stopped: threads, timers
-    /// or static subscriptions it started can keep running (and keep it in memory).
+    /// or static subscriptions it started can keep running (and keep it in memory). A plugin that
+    /// hangs (never returns from its constructor, <c>Initialize</c> or <c>Shutdown</c>) is never
+    /// reported at all: it blocks the pass that called it (see #62).
     /// </summary>
     Failed,
 }
