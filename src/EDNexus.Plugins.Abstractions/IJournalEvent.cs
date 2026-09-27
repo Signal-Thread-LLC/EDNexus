@@ -19,6 +19,13 @@ public interface IJournalEvent
     /// </summary>
     bool IsHistorical { get; }
 
+    /// <summary>
+    /// True when the event was fabricated by the host's developer mode rather than read from the
+    /// game. Plugins must never forward simulated events off the machine; the host already withholds
+    /// them from plugins granted the <c>network</c> capability.
+    /// </summary>
+    bool IsSimulated { get => false; }
+
     /// <summary>Reads a string field, or <see langword="null"/> if it is missing or not a string.</summary>
     string? GetString(string field);
 

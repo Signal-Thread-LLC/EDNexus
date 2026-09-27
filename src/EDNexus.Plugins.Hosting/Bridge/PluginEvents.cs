@@ -1,0 +1,202 @@
+using EDNexus.Core.Journal;
+using EDNexus.Plugins.Abstractions;
+
+namespace EDNexus.Plugins.Hosting.Bridge;
+
+/// <summary>
+/// One plugin's <see cref="IPluginEvents"/>. Hooks the engine bus through
+/// <see cref="JournalEventBus.SubscribeCompleted"/> (so the event is already folded into
+/// <c>CommanderState</c>) and does nothing on the journal thread but wrap the entry and enqueue it.
+/// A dedicated background thread per plugin drains the queue and runs the plugin's handlers one at
+/// a time, in order, each inside its own try/catch.
+/// </summary>
+/// <remarks>
+/// <para>
+/// Why a thread per plugin rather than the pool: plugin handlers are third-party code and may block.
+/// A blocked pool thread starves the rest of the app; a blocked plugin thread only stalls that
+/// plugin. The thread and the bus hook are only created on the first subscription, so a plugin that
+/// never subscribes costs nothing.
+/// </para>
+/// <para>
+/// The queue is bounded at <see cref="PluginBridgeOptions.QueueCapacity"/>; when a plugin falls that
+/// far behind, the oldest undelivered event is dropped and counted in <see cref="DroppedEventCount"/>.
+/// </para>
+/// </remarks>
+internal sealed class PluginEvents : IPluginEvents, IDisposable
+{
+    private readonly JournalEventBus _bus;
+    private readonly string _pluginId;
+    private readonly bool _withholdSimulated;
+    private readonly Func<bool> _isSimulated;
+    private readonly Action<PluginHandlerError> _onError;
+    private readonly int _capacity;
+
+    private readonly object _gate = new();
+    private readonly List<Registration> _registrations = [];
+    private readonly Queue<IJournalEvent> _queue = new();
+    private IDisposable? _busHook;
+    private Thread? _worker;
+    private bool _disposed;
+    private long _dropped;
+    private long _handlerErrors;
+
+    public PluginEvents(
+        JournalEventBus bus,
+        string pluginId,
+        bool withholdSimulated,
+        Func<bool> isSimulated,
+        Action<PluginHandlerError> onError,
+        int capacity)
+    {
+        _bus = bus;
+        _pluginId = pluginId;
+        _withholdSimulated = withholdSimulated;
+        _isSimulated = isSimulated;
+        _onError = onError;
+        _capacity = capacity;
+    }
+
+    /// <summary>Events dropped because this plugin's queue was full.</summary>
+    public long DroppedEventCount => Interlocked.Read(ref _dropped);
+
+    /// <summary>Handler invocations that threw.</summary>
+    public long HandlerErrorCount => Interlocked.Read(ref _handlerErrors);
+
+    /// <summary>Events queued but not yet handed to the plugin.</summary>
+    public int PendingCount { get { lock (_gate) return _queue.Count; } }
+
+    public void Subscribe(string eventName, Action<IJournalEvent> handler) => On(eventName, handler);
+
+    public void SubscribeAny(Action<IJournalEvent> handler) => OnAny(handler);
+
+    public IDisposable On(string eventName, Action<IJournalEvent> handler)
+    {
+        ArgumentNullException.ThrowIfNull(eventName);
+        return Add(new Registration(this, eventName, handler ?? throw new ArgumentNullException(nameof(handler))));
+    }
+
+    public IDisposable OnAny(Action<IJournalEvent> handler)
+        => Add(new Registration(this, null, handler ?? throw new ArgumentNullException(nameof(handler))));
+
+    private Registration Add(Registration registration)
+    {
+        lock (_gate)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            _registrations.Add(registration);
+            if (_worker is null)
+            {
+                _worker = new Thread(Pump)
+                {
+                    IsBackground = true,
+                    Name = $"EDNexus plugin: {_pluginId}",
+                };
+                _worker.Start();
+                _busHook = _bus.SubscribeCompleted(OnPublished);
+            }
+        }
+        return registration;
+    }
+
+    private void Remove(Registration registration)
+    {
+        lock (_gate) _registrations.Remove(registration);
+    }
+
+    /// <summary>Runs on the journal thread: must stay cheap and must never call plugin code.</summary>
+    private void OnPublished(JournalEntry entry)
+    {
+        var simulated = _isSimulated();
+        if (simulated && _withholdSimulated) return;
+
+        var journalEvent = new JournalEventAdapter(entry, simulated);
+        lock (_gate)
+        {
+            if (_disposed) return;
+            if (_queue.Count >= _capacity)
+            {
+                _queue.Dequeue();
+                Interlocked.Increment(ref _dropped);
+            }
+            _queue.Enqueue(journalEvent);
+            Monitor.Pulse(_gate);
+        }
+    }
+
+    private void Pump()
+    {
+        while (true)
+        {
+            IJournalEvent next;
+            Registration[] handlers;
+            lock (_gate)
+            {
+                while (_queue.Count == 0 && !_disposed) Monitor.Wait(_gate);
+                if (_disposed) return;
+                next = _queue.Dequeue();
+                handlers = _registrations.ToArray();
+            }
+
+            foreach (var registration in handlers)
+            {
+                if (!registration.Matches(next)) continue;
+                try { registration.Handler(next); }
+                catch (Exception ex) { Report(next, ex); }
+            }
+        }
+    }
+
+    private void Report(IJournalEvent journalEvent, Exception exception)
+    {
+        Interlocked.Increment(ref _handlerErrors);
+        try { _onError(new PluginHandlerError(_pluginId, journalEvent.Event, exception)); }
+        catch { /* a faulty error sink must not kill the plugin's pump */ }
+    }
+
+    /// <summary>
+    /// Unhooks from the bus, drops every handler and anything still queued, and lets the worker exit.
+    /// Does not wait for a handler that is mid-flight: that would hand plugin code a way to hang
+    /// whoever is unloading it.
+    /// </summary>
+    public void Dispose()
+    {
+        IDisposable? hook;
+        lock (_gate)
+        {
+            if (_disposed) return;
+            _disposed = true;
+            _registrations.Clear();
+            _queue.Clear();
+            hook = _busHook;
+            _busHook = null;
+            Monitor.PulseAll(_gate);
+        }
+        hook?.Dispose();
+    }
+
+    /// <summary>Waits for the worker thread to exit, for tests and orderly shutdown.</summary>
+    public bool WaitForExit(TimeSpan timeout)
+    {
+        Thread? worker;
+        lock (_gate) worker = _worker;
+        return worker is null || worker.Join(timeout);
+    }
+
+    private sealed class Registration(PluginEvents owner, string? eventName, Action<IJournalEvent> handler) : IDisposable
+    {
+        private volatile bool _removed;
+
+        public Action<IJournalEvent> Handler { get; } = handler;
+
+        // Ordinal, as IPluginEvents documents — deliberately stricter than the engine bus.
+        public bool Matches(IJournalEvent journalEvent)
+            => !_removed && (eventName is null || string.Equals(eventName, journalEvent.Event, StringComparison.Ordinal));
+
+        public void Dispose()
+        {
+            if (_removed) return;
+            _removed = true;
+            owner.Remove(this);
+        }
+    }
+}
