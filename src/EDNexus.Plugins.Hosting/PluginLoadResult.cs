@@ -23,7 +23,10 @@ public enum PluginLoadStatus
 
     /// <summary>
     /// Plugin code was loaded and threw (while loading, in its constructor, or in
-    /// <see cref="IEDNexusPlugin.Initialize"/>). The plugin was unloaded.
+    /// <see cref="IEDNexusPlugin.Initialize"/>). After a failed <c>Initialize</c> the host calls
+    /// <see cref="IEDNexusPlugin.Shutdown"/> (best effort); in every case it disposes the context and
+    /// unloads the load context. This does not guarantee plugin code has stopped: threads, timers
+    /// or static subscriptions it started can keep running (and keep it in memory).
     /// </summary>
     Failed,
 }
@@ -78,7 +81,10 @@ public sealed class PluginLoadResult
 
 /// <summary>Everything <see cref="PluginHost.LoadAll"/> did, in folder-name order.</summary>
 /// <param name="Root">The plugins root that was scanned.</param>
-/// <param name="Recovery">What <see cref="PluginInstaller.RecoverInterrupted"/> repaired before discovery.</param>
+/// <param name="Recovery">
+/// What <see cref="PluginInstaller.RecoverInterrupted"/> repaired before discovery. Recovery runs
+/// only on a host's first pass, so later passes report an empty result (see <see cref="PluginHost.Recovery"/>).
+/// </param>
 /// <param name="Errors">
 /// Problems not tied to one plugin: recovery errors and a plugins root that could not be read.
 /// </param>
@@ -89,9 +95,12 @@ public sealed record PluginDiscoveryReport(
     IReadOnlyList<string> Errors,
     IReadOnlyList<PluginLoadResult> Plugins)
 {
-    /// <summary>The plugins that are running.</summary>
+    /// <summary>
+    /// The plugins from this pass that are still running (evaluated on each enumeration, so a
+    /// plugin unloaded since the pass is left out; <see cref="Plugins"/> keeps its load-time status).
+    /// </summary>
     public IEnumerable<LoadedPlugin> Loaded
-        => Plugins.Where(p => p.Status == PluginLoadStatus.Loaded).Select(p => p.Plugin!);
+        => Plugins.Where(p => p.Plugin is { IsLoaded: true }).Select(p => p.Plugin!);
 }
 
 /// <summary>What <see cref="PluginHost.Unload"/> did.</summary>

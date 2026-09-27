@@ -9,8 +9,10 @@ namespace EDNexus.Plugins.Hosting;
 /// resolve from its own folder (via its <c>.deps.json</c>, or every assembly beside the entry
 /// assembly when it has none), so two plugins can ship different versions of the same library.
 /// The SDK contract assembly is always the host's copy, even when the plugin bundles one, so
-/// <see cref="IEDNexusPlugin"/> in the plugin and in the host are the same type. The BCL is not
-/// listed in a framework-dependent plugin's deps and falls through to the default context.
+/// <see cref="IEDNexusPlugin"/> in the plugin and in the host are the same type. Anything else the
+/// plugin does not ship — the BCL, but also any host assembly it names, such as
+/// <c>EDNexus.Core</c> — falls through to the default context and resolves from the host process.
+/// This isolates dependency versions; it is not a security boundary.
 /// </summary>
 internal sealed class PluginLoadContext : AssemblyLoadContext
 {
