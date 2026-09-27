@@ -31,6 +31,9 @@ public sealed class TwitchStreamCardService : IDisposable
     /// </summary>
     public const int MaxPublishRetries = 5;
 
+    /// <summary>Longest <c>Retry-After</c> honoured. The EBS's own windows are a minute at most.</summary>
+    public static readonly TimeSpan MaxRetryAfter = TimeSpan.FromMinutes(2);
+
     /// <summary>Cannot occur in a URL, token or JSON, so no two key part combinations collide.</summary>
     private const string KeySeparator = "\u001f";
 
@@ -207,6 +210,10 @@ public sealed class TwitchStreamCardService : IDisposable
                     // Give a struggling EBS (or a tighter-than-expected rate limit) room to recover
                     // rather than retrying at the floor interval.
                     backoff = _minInterval * 2;
+                    // The EBS says exactly how long its window has left; retrying sooner is a wasted 429.
+                    // Capped, so a misconfigured proxy's header cannot silence the card for the session.
+                    if (published.RetryAfter is { } wait && wait > backoff)
+                        backoff = wait < MaxRetryAfter ? wait : MaxRetryAfter;
                     retry = ++_consecutiveFailures <= MaxPublishRetries;
                 }
                 else if (published is not null)

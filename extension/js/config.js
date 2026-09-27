@@ -48,20 +48,24 @@
   if (helper) {
     var loaded = false;
 
-    function showSavedUrl() {
+    /** @param {boolean} fromConfig True only when Twitch has actually delivered the configuration. */
+    function showSavedUrl(fromConfig) {
       // Never clobber an edit in progress: onChanged also fires on a token refresh, and on the
       // broadcaster's own save.
       if (loaded || input.value.trim() !== '') return;
-      loaded = true;
       input.value = currentConfig().ebsBaseUrl || '';
+      // Only a delivered configuration settles the field. Authorization can arrive first, with the
+      // configuration still empty; latching then would ignore the saved URL when it lands, and the
+      // next save would erase it.
+      if (fromConfig) loaded = true;
     }
 
     if (helper.configuration && typeof helper.configuration.onChanged === 'function') {
-      helper.configuration.onChanged(showSavedUrl);
+      helper.configuration.onChanged(function () { showSavedUrl(true); });
     }
     // A channel with no configuration document yet never gets an onChanged, so the field simply
     // stays empty and the placeholder explains the default.
-    helper.onAuthorized(showSavedUrl);
+    helper.onAuthorized(function () { showSavedUrl(false); });
   }
 
   saveButton.addEventListener('click', function () {
