@@ -93,7 +93,7 @@ public sealed class PluginHost : IDisposable
     /// plugins while the first load is in progress. Later calls (after <see cref="UnloadAll"/>)
     /// do not repeat recovery. Never throws for a bad plugin or an unreadable root; see the
     /// returned report. With no plugins root, or an empty one, nothing is loaded. A call made
-    /// while another pass is running (from another thread, or re-entrantly from plugin code)
+    /// while another load pass is running (from another thread, or re-entrantly from plugin code)
     /// throws <see cref="InvalidOperationException"/> rather than waiting for it.
     /// </summary>
     /// <exception cref="InvalidOperationException">
