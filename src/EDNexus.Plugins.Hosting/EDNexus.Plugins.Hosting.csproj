@@ -18,6 +18,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\EDNexus.Core\EDNexus.Core.csproj" />
     <ProjectReference Include="..\EDNexus.Plugins.Abstractions\EDNexus.Plugins.Abstractions.csproj" />
   </ItemGroup>
 

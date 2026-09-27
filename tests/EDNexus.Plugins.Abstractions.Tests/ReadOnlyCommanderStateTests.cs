@@ -36,4 +36,28 @@ public class ReadOnlyCommanderStateTests
         Assert.False(state.Docked);
         Assert.Equal(DateTimeOffset.UnixEpoch, state.LastUpdated);
     }
+
+    [Fact]
+    public void AddedMembers_HaveSafeDefaults_ForOlderImplementations()
+    {
+        IReadOnlyCommanderState state = new MinimalState();
+
+        Assert.Empty(state.Cargo);
+        Assert.Empty(state.RawMaterials);
+        Assert.Empty(state.ManufacturedMaterials);
+        Assert.Empty(state.EncodedMaterials);
+        Assert.Throws<NotSupportedException>(() => ((IDictionary<string, int>)state.Cargo).Add("gold", 1));
+        Assert.Same(state, state.Snapshot());
+    }
+
+    [Fact]
+    public void JournalEventAndEvents_AddedMembers_HaveSafeDefaults()
+    {
+        IJournalEvent journalEvent = new FakeJournalEvent("FSDJump", DateTimeOffset.UnixEpoch, isHistorical: false);
+        IPluginEvents events = new FakePluginEvents();
+
+        Assert.False(journalEvent.IsSimulated);
+        Assert.Throws<NotSupportedException>(() => events.On("FSDJump", _ => { }));
+        Assert.Throws<NotSupportedException>(() => events.OnAny(_ => { }));
+    }
 }
