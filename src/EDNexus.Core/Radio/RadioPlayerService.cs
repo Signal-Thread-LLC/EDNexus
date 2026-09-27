@@ -34,6 +34,7 @@ public sealed class RadioPlayerService : IRadioPlayer, IDisposable, IAsyncDispos
     private string? _lastError;
     private bool _disposed;
     private bool _suspended; // audio stopped for developer mode; resume on leaving it
+    private int _pendingPlays; // plays queued but not yet through PlayStationCore (status still stale)
 
     // Serializes "start a stream" against "stop it for developer mode" so a play that was already
     // queued can't slip in after the suspend. LibVLC event handlers never take it (they only take
@@ -162,10 +163,11 @@ public sealed class RadioPlayerService : IRadioPlayer, IDisposable, IAsyncDispos
             _enabled = true;
             _wantsPlayback = true;
             _suspended = false; // an explicit play takes over from a developer-mode suspend
+            _pendingPlays++;
         }
         Persist();
 
-        return Task.Run(() => PlayStationCore(station), ct);
+        return QueuePlay(station, ct);
     }
 
     /// <summary>Resumes the currently-loaded station (or restarts it if stopped). No-op if none is tuned.</summary>
@@ -289,15 +291,18 @@ public sealed class RadioPlayerService : IRadioPlayer, IDisposable, IAsyncDispos
     /// can't reach this player. Unlike <see cref="PauseAsync"/>/<see cref="StopAsync"/> this keeps
     /// the resume-on-launch intent and writes nothing to disk: closing the app while suspended
     /// leaves the saved settings exactly as they were before developer mode. Only a stream that is
-    /// playing or connecting is suspended (stopped rather than paused, since a paused live stream
-    /// would resume stale); paused, stopped, or failed playback is left alone. Idempotent.
+    /// playing, connecting, or queued to start is suspended (stopped rather than paused, since a
+    /// paused live stream would resume stale; a queued play is dropped); paused, stopped, or failed
+    /// playback is left alone. Idempotent.
     /// </summary>
     public Task SuspendForDeveloperModeAsync(CancellationToken ct = default)
     {
         lock (_gate)
         {
             if (_suspended || _disposed) return Task.CompletedTask;
-            if (_status is not (RadioPlaybackStatus.Playing or RadioPlaybackStatus.Buffering)) return Task.CompletedTask;
+            // A play still queued hasn't moved _status off Stopped/Paused yet, but will start audio.
+            var audible = _status is RadioPlaybackStatus.Playing or RadioPlaybackStatus.Buffering;
+            if (!audible && _pendingPlays == 0) return Task.CompletedTask;
             _suspended = true;
         }
 
@@ -340,9 +345,10 @@ public sealed class RadioPlayerService : IRadioPlayer, IDisposable, IAsyncDispos
             _suspended = false;
             station = _station;
             if (_disposed || !_enabled || !_wantsPlayback || station is null) return Task.CompletedTask;
+            _pendingPlays++;
         }
 
-        return Task.Run(() => PlayStationCore(station), ct);
+        return QueuePlay(station, ct);
     }
 
     /// <summary>Test seam: pretend LibVLC reported <paramref name="status"/> (there's no native runtime under test).</summary>
@@ -350,6 +356,9 @@ public sealed class RadioPlayerService : IRadioPlayer, IDisposable, IAsyncDispos
     {
         lock (_gate) _status = status;
     }
+
+    /// <summary>Test seam: the lock queued plays and the developer-mode suspend serialize on, so a test can hold them back.</summary>
+    internal object TransportGateForTest => _transportGate;
 
     /// <summary>Sets output volume (0-100), applying it immediately if the engine is initialized.</summary>
     public Task SetVolumeAsync(int volume, CancellationToken ct = default)
@@ -400,17 +409,29 @@ public sealed class RadioPlayerService : IRadioPlayer, IDisposable, IAsyncDispos
         }, ct);
     }
 
-    /// <summary>Runs on a background thread: lazily brings up LibVLC and starts streaming the given station.</summary>
-    private void PlayStationCore(RadioStation station)
+    /// <summary>
+    /// Runs <see cref="PlayStationCore"/> on a background thread for a play already counted in
+    /// <see cref="_pendingPlays"/>. The token is checked inside the task rather than handed to
+    /// <see cref="Task.Run(Action, CancellationToken)"/>, so a cancelled play still releases its count.
+    /// </summary>
+    private Task QueuePlay(RadioStation station, CancellationToken ct)
+        => Task.Run(() => PlayStationCore(station, ct));
+
+    /// <summary>
+    /// Runs on a background thread: lazily brings up LibVLC and starts streaming the given station.
+    /// Always releases one <see cref="_pendingPlays"/> count taken by the caller.
+    /// </summary>
+    private void PlayStationCore(RadioStation station, CancellationToken ct = default)
     {
         try
         {
             lock (_transportGate)
             {
-                // A play queued before developer mode suspended the radio must not start audio now.
+                // A play queued before developer mode suspended the radio (or before shutdown) must
+                // not start audio now.
                 lock (_gate)
                 {
-                    if (_suspended) return;
+                    if (_suspended || _disposed || ct.IsCancellationRequested) return;
                 }
 
                 var player = EnsureEngine();
@@ -426,6 +447,12 @@ public sealed class RadioPlayerService : IRadioPlayer, IDisposable, IAsyncDispos
         catch (Exception ex)
         {
             SetError(ex.Message);
+        }
+        finally
+        {
+            // Released only once the status reflects this play (Buffering, or Error), so a suspend
+            // in between always sees either the pending count or the new status.
+            lock (_gate) _pendingPlays--;
         }
     }
 
@@ -570,6 +597,9 @@ public sealed class RadioPlayerService : IRadioPlayer, IDisposable, IAsyncDispos
         FlushPendingSave();
         lock (_saveGate) _saveTimer?.Dispose();
 
+        // _transportGate first (same order as PlayStationCore and the developer-mode suspend), so
+        // the engine isn't freed while one of them is between reading the player and using it.
+        lock (_transportGate)
         lock (_gate)
         {
             try { _mediaPlayer?.Stop(); } catch { /* best effort */ }

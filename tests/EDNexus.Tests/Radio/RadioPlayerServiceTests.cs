@@ -552,6 +552,79 @@ public class RadioPlayerServiceTests
         Assert.False(temp.Reload().RadioWasPlaying);
     }
 
+    [Theory]
+    [InlineData("pause")]
+    [InlineData("stop")]
+    [InlineData("play")]
+    public async Task An_explicit_transport_action_during_developer_mode_cancels_the_resume(string action)
+    {
+        using var temp = new TempRadioSettings();
+        using var radio = PlayingRadio(temp, RadioPlaybackStatus.Playing);
+        await radio.SuspendForDeveloperModeAsync();
+
+        await (action switch
+        {
+            "pause" => radio.PauseAsync(),
+            "stop" => radio.StopAsync(),
+            "play" => radio.PlayAsync(),
+            _ => throw new ArgumentOutOfRangeException(nameof(action)),
+        });
+        Assert.False(radio.IsSuspendedForDeveloperMode);
+
+        radio.SetStatusForTest(RadioPlaybackStatus.Stopped); // so a (wrong) resume would show as a play attempt
+        await radio.ResumeAfterDeveloperModeAsync();
+
+        Assert.Equal(RadioPlaybackStatus.Stopped, radio.Snapshot.Status);
+        Assert.Equal(action == "play", temp.Reload().RadioWasPlaying); // the explicit action's own intent
+    }
+
+    [Fact]
+    public async Task A_play_still_queued_when_developer_mode_starts_is_suspended_not_started()
+    {
+        using var temp = new TempRadioSettings(wasPlaying: false);
+        using var radio = new RadioPlayerService(temp.Settings, temp.Store);
+        Task play, suspend;
+
+        // Hold the queued play back so its status is still Stopped when developer mode comes on.
+        lock (radio.TransportGateForTest)
+        {
+            play = radio.PlayAsync(RadioStationCatalog.Stations[0].Id);
+            Assert.Equal(RadioPlaybackStatus.Stopped, radio.Snapshot.Status);
+            suspend = radio.SuspendForDeveloperModeAsync();
+            Assert.True(radio.IsSuspendedForDeveloperMode);
+        }
+        await Task.WhenAll(play, suspend);
+
+        Assert.Equal(RadioPlaybackStatus.Stopped, radio.Snapshot.Status); // no start attempted
+        Assert.Null(radio.Snapshot.LastError);
+        Assert.True(temp.Reload().RadioWasPlaying);                        // the user still wants it
+
+        await radio.ResumeAfterDeveloperModeAsync();
+        Assert.NotEqual(RadioPlaybackStatus.Stopped, radio.Snapshot.Status); // now it plays
+    }
+
+    [Fact]
+    public async Task Re_entering_developer_mode_before_the_resume_starts_suspends_it_again()
+    {
+        using var temp = new TempRadioSettings();
+        using var radio = PlayingRadio(temp, RadioPlaybackStatus.Playing);
+        await radio.SuspendForDeveloperModeAsync();
+        Task resume, suspend;
+
+        lock (radio.TransportGateForTest)
+        {
+            resume = radio.ResumeAfterDeveloperModeAsync();   // leave: a play is queued, status still Stopped
+            suspend = radio.SuspendForDeveloperModeAsync();   // and straight back in
+            Assert.True(radio.IsSuspendedForDeveloperMode);
+        }
+        await Task.WhenAll(resume, suspend);
+
+        Assert.Equal(RadioPlaybackStatus.Stopped, radio.Snapshot.Status);
+        Assert.Null(radio.Snapshot.LastError);
+        Assert.True(temp.Settings.Radio.RadioWasPlaying);
+        Assert.False(File.Exists(temp.Store.Path));
+    }
+
     [Fact]
     public async Task Closing_the_app_while_suspended_keeps_the_saved_resume_flag()
     {
