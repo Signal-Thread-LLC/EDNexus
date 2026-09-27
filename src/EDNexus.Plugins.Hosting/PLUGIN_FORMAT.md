@@ -2,8 +2,9 @@
 
 This describes the on-disk format of an EDNexus plugin: the `plugin.json` manifest, the folder
 layout, and the `.ednplugin` package. It is implemented by `PluginManifestParser`,
-`PluginPackage`, `PluginInstaller` and `PluginPaths` in this project (issue #54). Loading,
-lifecycle and capability enforcement are covered by the plugin host issues (#55–#57).
+`PluginPackage`, `PluginInstaller` and `PluginPaths` in this project (issue #54), and loaded by
+`PluginHost` (issue #55; see [Discovery and loading](#discovery-and-loading)). Lifecycle policy
+and capability enforcement are covered by #56 and #57.
 
 ## Where plugins live
 
@@ -88,3 +89,36 @@ or if the package exceeds the size limits (`PluginPackageLimits`; defaults: 64 M
 parsed. During extraction, sizes are re-checked against the actual decompressed bytes and every
 file's CRC-32 is verified. The manifest must be named exactly `plugin.json`, be valid, and its
 `entryAssembly` must be in the package with the same casing.
+
+## Discovery and loading
+
+`PluginHost.LoadAll()` (issue #55) turns the plugins root into running plugins:
+
+1. `PluginInstaller.RecoverInterrupted(root)` runs **first**; its errors are surfaced in
+   `PluginDiscoveryReport.Errors`.
+2. Every folder directly under the root whose name does not start with `.` is a plugin candidate
+   (`.staging-*`, `.replaced-*`, `.extract-*` and other hidden folders are skipped). Folders are
+   processed in ordinal name order.
+3. A candidate is **Rejected** (no plugin code runs) when `plugin.json` is missing or invalid, the
+   folder name is not exactly the manifest `id`, or its `id` is also declared by another folder
+   (every claimant is rejected, since there is no safe way to pick one).
+4. It is **Incompatible** when `PluginCompatibility.Check` fails (SDK major/minor or `minAppVersion`).
+5. `entryAssembly` is resolved inside the plugin folder with the same path rules as extraction and
+   must exist. The plugin gets its own **collectible `AssemblyLoadContext`**: its private
+   dependencies resolve from its folder via `AssemblyDependencyResolver` (its `.deps.json`, or every
+   assembly beside the entry assembly when there is none), so two plugins can ship different
+   versions of the same library. `EDNexus.Plugins.Abstractions` always binds to the **host's** copy,
+   even if the plugin bundles one, so `IEDNexusPlugin` is the same type in host and plugin. The
+   framework (BCL) comes from the host.
+6. `entryType` must exist, implement the host's `IEDNexusPlugin`, be concrete and non-generic, and
+   have a public parameterless constructor (otherwise **Rejected**, without constructing it).
+7. The host constructs it and calls `Initialize(context)` with a context from its factory. If
+   loading, the constructor, the factory or `Initialize` throws, the plugin is **Failed**: the
+   reason records the exception type and message (sanitised; the exception object is not kept,
+   since it could pin the plugin in memory), the context is disposed if it is `IDisposable`, and
+   the load context is unloaded. Other plugins are unaffected.
+
+`PluginHost.Unload(id)` / `UnloadAll()` call `Shutdown()` (a throw is reported, not propagated),
+dispose the context, drop every reference to the plugin and unload its load context, which the GC
+then collects. While loaded, a plugin's assemblies are locked on Windows; they are released after
+unload and collection.
