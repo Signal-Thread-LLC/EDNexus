@@ -7,20 +7,11 @@
         Icon="/Assets/ednexus.png"
         Width="720" Height="640" MinWidth="480" MinHeight="360"
         WindowStartupLocation="CenterOwner"
-        Background="#0A0A0C">
-
-  <Window.Resources>
-    <SolidColorBrush x:Key="AmberBrush" Color="#FFF07100" />
-    <SolidColorBrush x:Key="CardBorder" Color="#242830" />
-    <SolidColorBrush x:Key="Ink" Color="#E7E9EE" />
-    <SolidColorBrush x:Key="InkDim" Color="#8A909C" />
-    <SolidColorBrush x:Key="Good" Color="#FF5FD08B" />
-    <SolidColorBrush x:Key="Bad" Color="#FFE0654F" />
-  </Window.Resources>
+        Background="{StaticResource Surface0}">
 
   <!-- Bound to the live MissionsCardViewModel, so this stays in step with the dashboard card. -->
   <DockPanel>
-    <Border DockPanel.Dock="Top" Background="#101216" BorderBrush="{StaticResource CardBorder}"
+    <Border DockPanel.Dock="Top" Background="{StaticResource Surface100}" BorderBrush="{StaticResource CardBorder}"
             BorderThickness="0,0,0,1" Padding="16,12">
       <StackPanel>
         <TextBlock Text="WAR BOARD" Foreground="{StaticResource AmberBrush}" FontSize="12"
@@ -40,7 +31,7 @@
       <ItemsControl ItemsSource="{Binding AllMissions}" Margin="16,12">
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="vm:MissionLine">
-            <Border Background="#101216" BorderBrush="{StaticResource CardBorder}" BorderThickness="1"
+            <Border Background="{StaticResource Surface100}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1"
                     CornerRadius="4" Padding="14,10" Margin="0,0,0,8">
               <StackPanel Spacing="3">
                 <Grid ColumnDefinitions="*,Auto">

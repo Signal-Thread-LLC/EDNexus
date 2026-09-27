@@ -1,0 +1,23 @@
+/*
+ * Shared identity tokens for both surfaces of the Twitch extension (the video overlay card and the
+ * broadcaster config page). Reconciled with src/EDNexus.App/Themes/Theme.axaml so the desktop app
+ * and the extension read as the same product instead of two independently re-picked palettes.
+ *
+ * Surface-specific tokens (background, raised surface, line, radius, panel sizing) stay local to
+ * card.css / config.css — the overlay is a translucent panel over video, the config page is an
+ * opaque dashboard surface, and that difference is real, not drift.
+ */
+
+:root {
+  --ednx-orange: #f07100;
+  --ednx-orange-dim: #b85200;
+  --ednx-on-brand: #101216;
+  --ednx-ink: #e7e9ee;
+  --ednx-ink-soft: rgba(231, 233, 238, 0.62);
+  --ednx-ink-faint: rgba(231, 233, 238, 0.55);
+  --ednx-good: #5fd08b;
+  --ednx-bad: #e0654f;
+  --ednx-warning: #e0a33c;
+  --ednx-font: "Inter", "Segoe UI", Roboto, system-ui, -apple-system, sans-serif;
+  --ednx-mono: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, monospace;
+}

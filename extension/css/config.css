@@ -1,9 +1,8 @@
 /* Broadcaster config page. Rendered inside the Twitch dashboard, which uses a dark surface. */
 
+@import url("tokens.css");
+
 :root {
-  --ednx-orange: #ff7100;
-  --ednx-ink: #f4f1ea;
-  --ednx-ink-soft: rgba(244, 241, 234, 0.64);
   --ednx-bg: #0e0f12;
   --ednx-raised: rgba(255, 255, 255, 0.04);
   --ednx-line: rgba(255, 255, 255, 0.12);
@@ -16,7 +15,7 @@ body {
   padding: 20px;
   background: var(--ednx-bg);
   color: var(--ednx-ink);
-  font-family: "Inter", "Segoe UI", Roboto, system-ui, -apple-system, sans-serif;
+  font-family: var(--ednx-font);
   font-size: 14px;
   line-height: 1.5;
 }
@@ -69,7 +68,7 @@ input[type="url"]:focus { outline: 2px solid var(--ednx-orange); outline-offset:
   border: 0;
   border-radius: 5px;
   background: var(--ednx-orange);
-  color: #12100d;
+  color: var(--ednx-on-brand);
   font: inherit;
   font-weight: 600;
   cursor: pointer;
@@ -79,5 +78,5 @@ input[type="url"]:focus { outline: 2px solid var(--ednx-orange); outline-offset:
 .button:focus-visible { outline: 2px solid var(--ednx-ink); outline-offset: 2px; }
 
 .status { font-size: 12.5px; }
-.status--ok { color: #6cc070; }
-.status--error { color: #e0563c; }
+.status--ok { color: var(--ednx-good); }
+.status--error { color: var(--ednx-bad); }
