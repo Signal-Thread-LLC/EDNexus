@@ -73,6 +73,14 @@ public sealed class EbsOptions
     /// </summary>
     public int ChannelStateMaxAgeHours { get; set; } = 24;
 
+    /// <summary>
+    /// Smallest non-zero <see cref="ChannelStateMaxAgeHours"/> the service starts with: two of the
+    /// desktop app's refresh periods (<c>TwitchStreamCardService.DefaultRefreshInterval</c>, 6 hours),
+    /// so one missed refresh does not take a live card down. The app talks to EBS instances it
+    /// cannot read the configuration of, so the constraint is enforced here, not there.
+    /// </summary>
+    public const int MinChannelStateMaxAgeHours = 12;
+
     /// <summary><see cref="ChannelStateMaxAgeHours"/> as a span, or null when the limit is disabled.</summary>
     public TimeSpan? ChannelStateMaxAge =>
         ChannelStateMaxAgeHours > 0 ? TimeSpan.FromHours(ChannelStateMaxAgeHours) : null;

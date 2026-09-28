@@ -160,6 +160,25 @@ public class UpdateStateEndpointTests : IClassFixture<UpdateStateEndpointTests.F
         Assert.Equal(HttpStatusCode.NotFound, (await _factory.CreateClient().GetAsync("/api/initial-state/chan-lapsed-clear")).StatusCode);
     }
 
+    [Theory]
+    [InlineData("1", false)]  // shorter than the app's refresh: live cards would vanish
+    [InlineData("11", false)]
+    [InlineData("12", true)]
+    [InlineData("0", true)]   // no limit
+    public void A_snapshot_age_limit_shorter_than_two_refreshes_is_refused_at_startup(string hours, bool starts)
+    {
+        using var factory = _factory.WithWebHostBuilder(builder =>
+            builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Ebs:ChannelStateMaxAgeHours"] = hours,
+            })));
+
+        var exception = Record.Exception(() => factory.CreateClient());
+
+        if (starts) Assert.Null(exception);
+        else Assert.Contains("ChannelStateMaxAgeHours", exception?.ToString() ?? "");
+    }
+
     [Fact]
     public async Task A_sign_out_whose_clear_fails_leaves_the_token_able_to_retry()
     {

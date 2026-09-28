@@ -24,7 +24,14 @@ builder.Services
     .ValidateOnStart();
 builder.Services
     .AddOptions<EbsOptions>()
-    .Bind(builder.Configuration.GetSection(EbsOptions.SectionName));
+    .Bind(builder.Configuration.GetSection(EbsOptions.SectionName))
+    // The desktop app refreshes an unchanged live card on a fixed schedule; a shorter limit would
+    // take live cards down between refreshes. Refuse to start rather than fail silently for viewers.
+    .Validate(
+        o => o.ChannelStateMaxAgeHours <= 0 || o.ChannelStateMaxAgeHours >= EbsOptions.MinChannelStateMaxAgeHours,
+        $"Ebs:ChannelStateMaxAgeHours must be 0 (no limit) or at least {EbsOptions.MinChannelStateMaxAgeHours}: "
+        + "the desktop app refreshes an unchanged card every 6 hours.")
+    .ValidateOnStart();
 
 builder.Services.AddSingleton(TimeProvider.System);
 // Still needed by TwitchPubSubClient to sign the EBS's own OUTBOUND JWT for the Helix PubSub call —

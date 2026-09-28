@@ -34,7 +34,9 @@ public sealed class TwitchStreamCardService : IDisposable
     /// <summary>
     /// How often an unchanged card is republished while it is on the air. The EBS stops serving a
     /// snapshot it has not heard about for a day (<c>Ebs:ChannelStateMaxAgeHours</c>), so without this
-    /// a card that simply has not changed would vanish for new viewers.
+    /// a card that simply has not changed would vanish for new viewers. The EBS refuses to start with
+    /// a limit under two of these periods (<c>EbsOptions.MinChannelStateMaxAgeHours</c>); change both
+    /// together.
     /// </summary>
     public static readonly TimeSpan DefaultRefreshInterval = TimeSpan.FromHours(6);
 
