@@ -164,7 +164,7 @@ public partial class SettingsWindow : Window
         }
     }
 
-    private void OnSave(object? sender, RoutedEventArgs e)
+    private async void OnSave(object? sender, RoutedEventArgs e)
     {
         if (_boot is not null)
         {
@@ -187,10 +187,17 @@ public partial class SettingsWindow : Window
             // The radio player owns its own persistence; the dashboard routes this to the real player.
             var radioEnabled = RadioToggle.IsChecked == true;
             if (radioEnabled != _radioEnabledAtOpen) _dashboard?.ApplyRadioEnabled(radioEnabled);
-            _boot.ApplyTwitchChoice(
+            var takeOffAir = _boot.ApplyTwitchChoice(
                 TwitchCardToggle.IsChecked == true,
                 TwitchSectionsFromToggles(),
                 TwitchEbsBox.Text);
+            // Stopping publishes is not enough: the EBS would keep serving the last card to every
+            // viewer who opens the stream. The clear is already queued for retry; sending it here
+            // as well orders it after any publish in flight, and a success saves the retry.
+            // Awaited because leaving developer mode below rebuilds the host, disposing this
+            // service and its HTTP client mid-request.
+            if (takeOffAir is { } off && _dashboard?.TwitchCard is { } card)
+                _boot.TwitchCleanup.Complete(off, await card.TakeOffAirAsync(off.Endpoint, off.Token));
             // Switching the card on (or changing which sections show) changes what viewers should
             // see without touching the commander picture, so the publisher has nothing to react to —
             // and with the game closed no journal event is coming to nudge it. Ask directly.
@@ -490,6 +497,9 @@ public partial class SettingsWindow : Window
                 StreamStatePublishStatus.Unauthorized => "The backend rejected this machine's credential — sign in again.",
                 StreamStatePublishStatus.TooLarge => "The last card was too large for Twitch — try hiding a section.",
                 StreamStatePublishStatus.RateLimited => "Publishing is being rate-limited; updates are slowing down.",
+                StreamStatePublishStatus.Cleared => "Card taken off the air.",
+                StreamStatePublishStatus.ClearedNotDelivered =>
+                    "Card taken off the air; viewers already watching will be told on the next retry.",
                 _ => $"Could not publish: {result.Error}",
             };
         });

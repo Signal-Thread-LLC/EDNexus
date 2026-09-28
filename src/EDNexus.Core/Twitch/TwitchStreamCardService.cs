@@ -31,6 +31,18 @@ public sealed class TwitchStreamCardService : IDisposable
     /// </summary>
     public const int MaxPublishRetries = 5;
 
+    /// <summary>
+    /// How often an unchanged card is republished while it is on the air. The EBS stops serving a
+    /// snapshot it has not heard about for a day (<c>Ebs:ChannelStateMaxAgeHours</c>), so without this
+    /// a card that simply has not changed would vanish for new viewers. The EBS refuses to start with
+    /// a limit under two of these periods (<c>EbsOptions.MinChannelStateMaxAgeHours</c>); change both
+    /// together.
+    /// </summary>
+    public static readonly TimeSpan DefaultRefreshInterval = TimeSpan.FromHours(6);
+
+    /// <summary>Longest <c>Retry-After</c> honoured. The EBS's own windows are a minute at most.</summary>
+    public static readonly TimeSpan MaxRetryAfter = TimeSpan.FromMinutes(2);
+
     /// <summary>Cannot occur in a URL, token or JSON, so no two key part combinations collide.</summary>
     private const string KeySeparator = "\u001f";
 
@@ -70,9 +82,13 @@ public sealed class TwitchStreamCardService : IDisposable
     private readonly TimeSpan _minInterval;
     private readonly CancellationTokenSource _cts = new();
     private readonly SemaphoreSlim _dirty = new(0, 1);
+    /// <summary>Serialises publishes and clears, so a publish already in flight cannot land after a clear.</summary>
+    private readonly SemaphoreSlim _sendGate = new(1, 1);
     private readonly Task _pump;
 
+    private readonly TimeSpan _refreshInterval;
     private string? _lastPublishedKey;
+    private DateTimeOffset _lastPublishedAt;
     private int _consecutiveFailures;
     private bool _stoppedForReauth;
     /// <summary>The token that earned the 401, so a later login with a different one can resume.</summary>
@@ -117,8 +133,10 @@ public sealed class TwitchStreamCardService : IDisposable
         Func<StreamCardVisibility>? visibility,
         Func<bool>? isSuppressed,
         TimeSpan minInterval,
-        Func<DateTimeOffset>? clock)
+        Func<DateTimeOffset>? clock,
+        TimeSpan? refreshInterval = null)
     {
+        _refreshInterval = refreshInterval ?? DefaultRefreshInterval;
         _state = state;
         _sources = sources;
         _client = client;
@@ -192,8 +210,13 @@ public sealed class TwitchStreamCardService : IDisposable
     {
         while (!ct.IsCancellationRequested)
         {
-            try { await _dirty.WaitAsync(ct).ConfigureAwait(false); }
+            bool changed;
+            try { changed = await _dirty.WaitAsync(_refreshInterval, ct).ConfigureAwait(false); }
             catch (OperationCanceledException) { return; }
+
+            // A quiet interval is a refresh, which only applies once something is on the air: before
+            // the host has replayed the journal there is nothing that should go out.
+            if (!changed && _lastPublishedKey is null) continue;
 
             var backoff = _minInterval;
             var retry = false;
@@ -205,6 +228,10 @@ public sealed class TwitchStreamCardService : IDisposable
                     // Give a struggling EBS (or a tighter-than-expected rate limit) room to recover
                     // rather than retrying at the floor interval.
                     backoff = _minInterval * 2;
+                    // The EBS says exactly how long its window has left; retrying sooner is a wasted 429.
+                    // Capped, so a misconfigured proxy's header cannot silence the card for the session.
+                    if (published.RetryAfter is { } wait && wait > backoff)
+                        backoff = wait < MaxRetryAfter ? wait : MaxRetryAfter;
                     retry = ++_consecutiveFailures <= MaxPublishRetries;
                 }
                 else if (published is not null)
@@ -253,17 +280,64 @@ public sealed class TwitchStreamCardService : IDisposable
         // EBS, or the same one after a restart wiped its in-memory tokens.
         var endpoint = _endpoint();
         var key = string.Join(KeySeparator, endpoint, token, snapshot.ContentFingerprint());
-        if (key == _lastPublishedKey) return null;
+        if (key == _lastPublishedKey && _clock() - _lastPublishedAt < _refreshInterval) return null;
 
-        var result = await _client.PublishAsync(endpoint, token!, snapshot, ct).ConfigureAwait(false);
-
-        if (result.IsSuccess) _lastPublishedKey = key;
+        StreamStatePublishResult result;
+        await _sendGate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            // The card may have been switched off while the snapshot was being built; publishing
+            // now would put it back on the air straight after the clear.
+            if (_token() != token) return null;
+            result = await _client.PublishAsync(endpoint, token!, snapshot, ct).ConfigureAwait(false);
+            if (result.IsSuccess)
+            {
+                _lastPublishedKey = key;
+                _lastPublishedAt = _clock();
+            }
+        }
+        finally { _sendGate.Release(); }
 
         if (result.RequiresReauth)
         {
             Volatile.Write(ref _rejectedToken, token);
             Volatile.Write(ref _stoppedForReauth, true);
             try { ReauthRequired?.Invoke(); } catch { /* never let a handler break the pump */ }
+        }
+
+        Raise(result);
+        return result;
+    }
+
+    /// <summary>
+    /// Takes the card off the air: the EBS forgets the last snapshot and tells viewers to hide it.
+    /// Call it when the commander switches the card off or points it at a different EBS — merely
+    /// stopping publishes would leave the last snapshot being served to every new viewer.
+    /// </summary>
+    /// <param name="updateStateEndpoint">The EBS the card was published to.</param>
+    /// <param name="token">The token it was published with (the card's token callback may already return null).</param>
+    public async Task<StreamStatePublishResult> TakeOffAirAsync(
+        string updateStateEndpoint, string token, CancellationToken ct = default)
+    {
+        StreamStatePublishResult result;
+        try
+        {
+            await _sendGate.WaitAsync(ct).ConfigureAwait(false);
+            try
+            {
+                result = await _client.ClearAsync(updateStateEndpoint, token, ct).ConfigureAwait(false);
+                // Switching back on must republish even if the commander picture has not changed.
+                _lastPublishedKey = null;
+            }
+            finally { _sendGate.Release(); }
+        }
+        catch (ObjectDisposedException)
+        {
+            result = new StreamStatePublishResult(StreamStatePublishStatus.Failed, "The stream card service has shut down.");
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            result = new StreamStatePublishResult(StreamStatePublishStatus.Failed, ex.Message);
         }
 
         Raise(result);
@@ -293,5 +367,6 @@ public sealed class TwitchStreamCardService : IDisposable
 
         _cts.Dispose();
         _dirty.Dispose();
+        _sendGate.Dispose();
     }
 }

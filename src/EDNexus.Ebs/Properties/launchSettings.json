@@ -5,7 +5,8 @@
       "commandName": "Project",
       "launchBrowser": false,
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "Twitch__OAuthRedirectUri": "https://localhost:8787/oauth/callback"
       },
       "applicationUrl": "https://localhost:8787"
     }

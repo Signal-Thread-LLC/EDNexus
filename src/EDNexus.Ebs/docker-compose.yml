@@ -44,9 +44,12 @@ services:
       start_period: 15s
       retries: 3
 
-    # The service holds broadcaster tokens in memory and writes nothing to disk, so it needs no
-    # write access to its own filesystem. Revisit when a persistent token store lands.
+    # Everything the service writes (SQLite database + Data Protection key ring) lives on the
+    # ebs-data volume, so the rest of its filesystem stays read-only. Losing this volume logs
+    # every broadcaster out; back it up like any other credential store.
     read_only: true
+    volumes:
+      - ebs-data:/data
     tmpfs:
       - /tmp
     security_opt:
@@ -81,6 +84,7 @@ services:
   #     ebs:
   #       condition: service_healthy
 
-# volumes:
-#   caddy-data:
-#   caddy-config:
+volumes:
+  ebs-data:
+  # caddy-data:
+  # caddy-config:

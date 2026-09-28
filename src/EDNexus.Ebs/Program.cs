@@ -5,6 +5,9 @@ using EDNexus.Ebs.Models;
 using EDNexus.Ebs.Options;
 using EDNexus.Ebs.Security;
 using EDNexus.Ebs.Services;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.DataProtection.KeyManagement;
+using Microsoft.AspNetCore.DataProtection.Repositories;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
 
@@ -21,7 +24,14 @@ builder.Services
     .ValidateOnStart();
 builder.Services
     .AddOptions<EbsOptions>()
-    .Bind(builder.Configuration.GetSection(EbsOptions.SectionName));
+    .Bind(builder.Configuration.GetSection(EbsOptions.SectionName))
+    // The desktop app refreshes an unchanged live card on a fixed schedule; a shorter limit would
+    // take live cards down between refreshes. Refuse to start rather than fail silently for viewers.
+    .Validate(
+        o => o.ChannelStateMaxAgeHours <= 0 || o.ChannelStateMaxAgeHours >= EbsOptions.MinChannelStateMaxAgeHours,
+        $"Ebs:ChannelStateMaxAgeHours must be 0 (no limit) or at least {EbsOptions.MinChannelStateMaxAgeHours}: "
+        + "the desktop app refreshes an unchanged card every 6 hours.")
+    .ValidateOnStart();
 
 builder.Services.AddSingleton(TimeProvider.System);
 // Still needed by TwitchPubSubClient to sign the EBS's own OUTBOUND JWT for the Helix PubSub call —
@@ -29,8 +39,47 @@ builder.Services.AddSingleton(TimeProvider.System);
 // via the EBS-issued long-lived broadcaster token (IBroadcasterTokenStore) instead of a Twitch
 // Extension JWT.
 builder.Services.AddSingleton<ITwitchExtensionJwtService, TwitchExtensionJwtService>();
-builder.Services.AddSingleton<IChannelStateStore, InMemoryChannelStateStore>();
-builder.Services.AddSingleton<IBroadcasterTokenStore, InMemoryBroadcasterTokenStore>();
+
+// Durable state (see EbsOptions.StorageProvider): broadcaster tokens + Twitch grants and each
+// channel's last published state live in one SQLite file so a crash/restart/redeploy doesn't log
+// every broadcaster out. Twitch tokens are encrypted with Data Protection, whose key ring must
+// itself be persisted — otherwise every restart would mint a fresh key and orphan the ciphertext.
+// Everything resolves through IOptions (not builder.Configuration) so test/host overrides applied
+// after this point are honoured.
+builder.Services.AddDataProtection().SetApplicationName("EDNexus.Ebs");
+builder.Services
+    .AddOptions<KeyManagementOptions>()
+    .Configure<IOptions<EbsOptions>, IHostEnvironment, ILoggerFactory>((keys, ebs, env, loggerFactory) =>
+    {
+        if (ebs.Value.StorageProvider != EbsStorageProvider.Sqlite)
+            return; // in-memory state dies with the process anyway; the default key ring is fine.
+
+        var keysDirectory = Directory.CreateDirectory(ebs.Value.ResolveDataProtectionKeysDirectory(env.ContentRootPath));
+        keys.XmlRepository = new FileSystemXmlRepository(keysDirectory, loggerFactory);
+    });
+builder.Services.AddSingleton(sp =>
+{
+    var ebs = sp.GetRequiredService<IOptions<EbsOptions>>().Value;
+    var dataDirectory = Directory.CreateDirectory(ebs.ResolveDataDirectory(sp.GetRequiredService<IHostEnvironment>().ContentRootPath));
+    return new EbsDatabase(Path.Combine(dataDirectory.FullName, EbsDatabase.FileName));
+});
+builder.Services.AddSingleton<IChannelStateStore>(sp =>
+{
+    var ebs = sp.GetRequiredService<IOptions<EbsOptions>>().Value;
+    var time = sp.GetRequiredService<TimeProvider>();
+    return ebs.StorageProvider == EbsStorageProvider.Sqlite
+        ? new SqliteChannelStateStore(sp.GetRequiredService<EbsDatabase>(), time, ebs.ChannelStateMaxAge)
+        : new InMemoryChannelStateStore(time, ebs.ChannelStateMaxAge);
+});
+builder.Services.AddSingleton<IBroadcasterTokenStore>(sp =>
+    sp.GetRequiredService<IOptions<EbsOptions>>().Value.StorageProvider == EbsStorageProvider.Sqlite
+        ? new SqliteBroadcasterTokenStore(
+            sp.GetRequiredService<EbsDatabase>(),
+            sp.GetRequiredService<IDataProtectionProvider>(),
+            sp.GetRequiredService<TimeProvider>(),
+            sp.GetRequiredService<ILogger<SqliteBroadcasterTokenStore>>())
+        : new InMemoryBroadcasterTokenStore(sp.GetRequiredService<TimeProvider>()));
+
 builder.Services.AddHttpClient<ITwitchPubSubClient, TwitchPubSubClient>(client =>
 {
     // A hanging Helix call shouldn't be able to tie up a request indefinitely (the default
@@ -64,6 +113,13 @@ builder.Services.AddCors(options =>
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    // Tell the client how long to wait, rather than leaving it to guess and retry into the same window.
+    options.OnRejected = (context, _) =>
+    {
+        if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+            context.HttpContext.Response.Headers.RetryAfter = ((int)Math.Ceiling(retryAfter.TotalSeconds)).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        return ValueTask.CompletedTask;
+    };
 
     options.AddPolicy("update-state", httpContext =>
     {
@@ -76,6 +132,21 @@ builder.Services.AddRateLimiter(options =>
         {
             PermitLimit = Math.Max(1, ebsOptions.UpdateStateRateLimit),
             Window = TimeSpan.FromSeconds(Math.Max(1, ebsOptions.UpdateStateRateLimitWindowSeconds)),
+            QueueLimit = 0,
+        });
+    });
+
+    // Separate from update-state so switching the card off straight after a publish is never
+    // rejected by that publish's window — a clear is the privacy-critical request of the two.
+    options.AddPolicy("clear-state", httpContext =>
+    {
+        var partitionKey = httpContext.Items.TryGetValue("ChannelId", out var channelId) && channelId is string id
+            ? id
+            : httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        return RateLimitPartition.GetFixedWindowLimiter(partitionKey, _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 10,
+            Window = TimeSpan.FromMinutes(1),
             QueueLimit = 0,
         });
     });
@@ -104,6 +175,11 @@ if (!urlsAlreadyConfigured && !builder.Environment.IsEnvironment("Testing"))
 
 var app = builder.Build();
 
+// Open the database (creating the data directory and migrating the schema) now, so a bad
+// Ebs:DataDirectory or an unreadable/too-new database fails the deploy instead of the first request.
+app.Services.GetRequiredService<IBroadcasterTokenStore>();
+app.Services.GetRequiredService<IChannelStateStore>();
+
 app.UseCors("extension-frontend");
 
 // Authenticates /api/update-state (via the EBS-issued long-lived broadcaster token — see
@@ -113,11 +189,14 @@ app.UseCors("extension-frontend");
 // handler, as this used to do, was always too late to affect partitioning for that same request).
 app.Use(async (context, next) =>
 {
-    if (HttpMethods.IsPost(context.Request.Method)
+    if ((HttpMethods.IsPost(context.Request.Method) || HttpMethods.IsDelete(context.Request.Method))
         && context.Request.Path.Equals("/api/update-state", StringComparison.OrdinalIgnoreCase))
     {
         var tokenStore = context.RequestServices.GetRequiredService<IBroadcasterTokenStore>();
-        if (TryAuthenticateBroadcaster(context.Request, tokenStore, out var channelId, out var failure))
+        // Taking a card down needs no Twitch grant (PubSub is signed with the extension secret), and
+        // a broadcaster whose grant lapsed must still be able to stop being shown.
+        var requireGrant = !HttpMethods.IsDelete(context.Request.Method);
+        if (TryAuthenticateBroadcaster(context.Request, tokenStore, requireGrant, out var channelId, out var failure))
         {
             context.Items["ChannelId"] = channelId;
         }
@@ -131,6 +210,10 @@ app.Use(async (context, next) =>
 });
 
 app.UseRateLimiter();
+
+// Anyone who lands on the bare EBS host (e.g. following the OAuth redirect URI's origin) gets the
+// project site rather than a 404.
+app.MapGet("/", () => Results.Redirect("https://signal-thread-llc.github.io/EDNexus/"));
 
 app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
 
@@ -182,6 +265,33 @@ app.MapPost("/api/update-state", async (
     })
     .RequireRateLimiting("update-state");
 
+// The broadcaster switched the card off or signed out: forget the stored snapshot so
+// /api/initial-state stops serving it to anyone who asks, and tell viewers already watching to hide it.
+app.MapDelete("/api/update-state", async (
+        HttpRequest httpRequest,
+        IChannelStateStore stateStore,
+        ITwitchPubSubClient pubSubClient,
+        CancellationToken cancellationToken) =>
+    {
+        if (httpRequest.HttpContext.Items["ChannelId"] is not string channelId)
+        {
+            return (IResult?)httpRequest.HttpContext.Items["BroadcasterAuthFailure"] ?? Results.Unauthorized();
+        }
+
+        // A 502, like the POST's, when viewers already watching were not told: the snapshot is gone
+        // either way, and a retry is harmless, so the client tries again rather than leave them the card.
+        if (!await ChannelStateClearing.ClearAsync(channelId, stateStore, pubSubClient, cancellationToken).ConfigureAwait(false))
+        {
+            httpRequest.HttpContext.Response.Headers[ChannelStateClearing.SnapshotRemovedHeader] = "true";
+            return Results.Problem(
+                "The card was removed, but Twitch PubSub did not deliver the offline message to viewers already watching.",
+                statusCode: StatusCodes.Status502BadGateway);
+        }
+
+        return Results.NoContent();
+    })
+    .RequireRateLimiting("clear-state");
+
 app.MapGet("/api/initial-state/{channelId}", (string channelId, IChannelStateStore stateStore) =>
     {
         if (!stateStore.TryGet(channelId, out var state))
@@ -225,7 +335,8 @@ static bool IsAllowedFrontendOrigin(string origin, HashSet<string> additionalOri
         || uri.Host.EndsWith(".ext-twitch.tv", StringComparison.OrdinalIgnoreCase);
 }
 
-static bool TryAuthenticateBroadcaster(HttpRequest request, IBroadcasterTokenStore tokenStore, out string channelId, out IResult? failure)
+static bool TryAuthenticateBroadcaster(
+    HttpRequest request, IBroadcasterTokenStore tokenStore, bool requireValidTwitchGrant, out string channelId, out IResult? failure)
 {
     channelId = "";
     var header = request.Headers.Authorization.ToString();
@@ -238,17 +349,17 @@ static bool TryAuthenticateBroadcaster(HttpRequest request, IBroadcasterTokenSto
     var token = header["Bearer ".Length..].Trim();
     if (!tokenStore.TryGetByToken(token, out var record))
     {
-        // Say which kind of 401 this is. The token store is in-memory, so the overwhelmingly common
-        // cause is that this EBS process has restarted since the client logged in — an empty 401
-        // sends people hunting through their Twitch console configuration instead.
+        // Say which kind of 401 this is: an empty 401 sends people hunting through their Twitch
+        // console configuration. Tokens survive restarts, so an unknown one was revoked, replaced by
+        // a newer login, or issued by a different EBS.
         failure = Results.Problem(
-            "This token is not known to the service. If the service has restarted, log in again — "
-            + "broadcaster tokens are held in memory and do not survive a restart.",
+            "This token is not known to the service. It was revoked, replaced by a newer sign-in, or "
+            + "issued by a different service — log in again.",
             statusCode: StatusCodes.Status401Unauthorized);
         return false;
     }
 
-    if (!record.IsTwitchGrantValid)
+    if (requireValidTwitchGrant && !record.IsTwitchGrantValid)
     {
         failure = Results.Problem(
             "The underlying Twitch grant is no longer valid — please log in again.",

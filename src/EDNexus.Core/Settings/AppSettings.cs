@@ -89,6 +89,19 @@ public sealed class TwitchSettings
 
     /// <summary>Which sections of the commander's picture the broadcaster is willing to show viewers.</summary>
     public TwitchCardSections Card { get; set; } = new();
+
+    /// <summary>
+    /// Card clears and sign-outs the EBS has not acknowledged yet, retried by
+    /// <c>EDNexus.Core.Twitch.EbsCleanupQueue</c> until it does. Each holds an EBS token, so treat
+    /// this like <see cref="Token"/>.
+    /// </summary>
+    public List<EDNexus.Core.Twitch.PendingEbsCleanup> PendingCleanups
+    {
+        get => _pendingCleanups;
+        set => _pendingCleanups = value ?? []; // a hand-edited "null" must not break the queue
+    }
+
+    private List<EDNexus.Core.Twitch.PendingEbsCleanup> _pendingCleanups = [];
 }
 
 /// <summary>

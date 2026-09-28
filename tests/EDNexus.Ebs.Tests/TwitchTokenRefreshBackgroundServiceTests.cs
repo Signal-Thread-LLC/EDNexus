@@ -68,6 +68,32 @@ public class TwitchTokenRefreshBackgroundServiceTests
     }
 
     [Fact]
+    public async Task RefreshDueTokensAsync_picks_up_persisted_grants_after_a_restart_and_writes_the_refresh_back_durably()
+    {
+        using var data = new TempEbsDataDirectory();
+        var time = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        var token = data.CreateTokenStore(time).IssueToken("channel-1", "CMDR", "old-access", "old-refresh", time.Now.AddMinutes(10)).Token;
+
+        var twitch = new FakeTwitchOAuthClient
+        {
+            OnRefresh = refreshToken =>
+            {
+                Assert.Equal("old-refresh", refreshToken); // decrypted from disk by the restarted store
+                return new TwitchTokenResponse { AccessToken = "new-access", RefreshToken = "new-refresh", ExpiresIn = 14400 };
+            },
+        };
+        var service = CreateService(data.CreateTokenStore(time), twitch, time, new EbsOptions { TwitchTokenRefreshBufferMinutes = 60 });
+
+        await service.RefreshDueTokensAsync(CancellationToken.None);
+
+        Assert.Equal(1, twitch.RefreshCalls);
+        Assert.True(data.CreateTokenStore(time).TryGetByToken(token, out var updated));
+        Assert.Equal("new-access", updated.TwitchAccessToken);
+        Assert.Equal("new-refresh", updated.TwitchRefreshToken);
+        Assert.Equal(time.Now.AddSeconds(14400), updated.TwitchExpiresAtUtc);
+    }
+
+    [Fact]
     public async Task RefreshDueTokensAsync_does_not_refresh_a_token_that_is_not_yet_within_the_buffer()
     {
         var time = new FakeTimeProvider(DateTimeOffset.UtcNow);

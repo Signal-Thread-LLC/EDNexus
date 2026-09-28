@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using EDNexus.Core.Exobio;
 using EDNexus.Core.Journal;
+using EDNexus.Core.Missions;
 using EDNexus.Core.State;
 using EDNexus.Core.Twitch;
 using Xunit;
@@ -157,6 +158,53 @@ public class StreamCardMapperTests
         Assert.Equal("Gone Sampling", carrier.Name);
         Assert.Equal("Colonia", carrier.PendingSystem);
         Assert.Equal(departure, carrier.DepartsAt);
+    }
+
+    [Fact]
+    public void Hiding_the_location_also_withholds_the_carrier_jump_destination()
+    {
+        var state = new CommanderState
+        {
+            CarrierName = "Gone Sampling",
+            CarrierCallsign = "K7Q-B3L",
+            CarrierPendingSystem = "Colonia",
+            CarrierPendingDeparture = Now.AddMinutes(15),
+        };
+
+        var card = StreamCardMapper.Map(state, visibility: StreamCardVisibility.Default with { Location = false }, now: Now);
+        var json = JsonSerializer.Serialize(card, StreamCardSnapshot.SerializerOptions);
+
+        // Where the carrier is jumping is where the commander will be in fifteen minutes.
+        Assert.Equal("Gone Sampling", card.Carrier!.Name);
+        Assert.Null(card.Carrier.PendingSystem);
+        Assert.DoesNotContain("Colonia", json, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Hiding_the_location_also_withholds_the_mission_target_faction()
+    {
+        var bus = new JournalEventBus();
+        var missions = new MissionTracker(bus);
+        Assert.True(JournalEntry.TryParse(
+            """
+            { "timestamp": "2026-09-15T17:00:00Z", "event": "MissionAccepted", "Faction": "Union of Kremata Front",
+              "Name": "Mission_MassacreWing", "LocalisedName": "Kill 42 Pirates", "TargetType": "$MissionUtil_FactionTag_Pirate;",
+              "TargetType_Localised": "Pirates", "TargetFaction": "Kremata Blue Society", "KillCount": 42,
+              "DestinationSystem": "Kremata", "Expiry": "2026-09-22T12:00:00Z", "Reward": 1000000, "MissionID": 1 }
+            """, historical: false, out var accepted));
+        bus.Publish(accepted);
+        var sources = new StreamCardSources(Missions: missions);
+
+        var shown = StreamCardMapper.Map(new CommanderState(), sources, now: Now);
+        var hidden = StreamCardMapper.Map(new CommanderState(), sources, StreamCardVisibility.Default with { Location = false }, Now);
+        var json = JsonSerializer.Serialize(hidden, StreamCardSnapshot.SerializerOptions);
+
+        // Minor factions live in a handful of systems, so the target faction narrows down where the
+        // commander is. The rest of the stack is still useful without it.
+        Assert.Equal("Kremata Blue Society", shown.Missions!.Stacks![0].Faction);
+        Assert.Null(hidden.Missions!.Stacks![0].Faction);
+        Assert.Equal(42, hidden.Missions.Stacks[0].Kills);
+        Assert.DoesNotContain("Kremata", json, StringComparison.Ordinal);
     }
 
     [Fact]

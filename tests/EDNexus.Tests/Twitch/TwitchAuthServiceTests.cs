@@ -212,6 +212,28 @@ public class TwitchAuthServiceTests : IDisposable
         Assert.Null(settings.Twitch.Token);
     }
 
+    [Fact]
+    public async Task LogoutAsync_queues_a_revoke_the_EBS_did_not_acknowledge()
+    {
+        var (settings, store) = NewStore();
+        settings.Twitch.Token = "ebs-token-1";
+        settings.Twitch.ChannelId = "1";
+        using var cleanup = new EbsCleanupQueue(settings, store, new FakeStreamStateApiClient(), new ThrowingRevokeClient());
+
+        var service = new TwitchAuthService(settings, store, Options, new ThrowingRevokeClient(), new FakeBrowserLauncher(),
+            new FakeCallbackListener(new Dictionary<string, string>()), cleanup);
+
+        await service.LogoutAsync();
+
+        // Signed out locally, but the token still works on the EBS and the card is still up there:
+        // the revoke has to be retried, with the token that is no longer anywhere else.
+        Assert.False(service.IsLoggedIn);
+        var pending = Assert.Single(new SettingsStore(SettingsPath).Load().Twitch.PendingCleanups);
+        Assert.Equal(EbsCleanupKind.Revoke, pending.Kind);
+        Assert.Equal(Options.RevokeEndpoint, pending.Endpoint);
+        Assert.Equal("ebs-token-1", pending.Token);
+    }
+
     private sealed class ThrowingRevokeClient : IEbsAuthApiClient
     {
         public Task<EbsTokenResponse> ExchangeCodeAsync(string tokenEndpoint, string code, string codeVerifier, string redirectUri, CancellationToken ct = default) =>

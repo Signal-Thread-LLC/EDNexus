@@ -45,6 +45,8 @@ public class OAuthEndpointsTests : IClassFixture<OAuthEndpointsTests.Factory>
                     ["Twitch:ExtensionSecret"] = "c3VwZXItc2VjcmV0LWV4dGVuc2lvbi1rZXktMTIzNA==",
                     ["Twitch:ClientId"] = "test-client-id",
                     ["Twitch:ExtensionId"] = "test-extension-id",
+                    // Keep the shared fixture off disk; the restart-survival tests opt into Sqlite explicitly.
+                    ["Ebs:StorageProvider"] = "InMemory",
                     ["Ebs:UpdateStateRateLimit"] = "1000",
                     ["Ebs:UpdateStateRateLimitWindowSeconds"] = "1",
                 });

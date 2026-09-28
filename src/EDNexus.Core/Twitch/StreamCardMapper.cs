@@ -50,10 +50,10 @@ public static class StreamCardMapper
             Commander: visibility.Commander ? MapCommander(state, sources, visibility) : null,
             Ship: visibility.Ship ? MapShip(state) : null,
             Location: visibility.Location ? MapLocation(state) : null,
-            Carrier: visibility.Carrier ? MapCarrier(state) : null,
+            Carrier: visibility.Carrier ? MapCarrier(state, visibility.Location) : null,
             Exobiology: visibility.Exobiology ? MapExobiology(sources, visibility.Location) : null,
             Mining: visibility.Mining ? MapMining(sources) : null,
-            Missions: visibility.Missions ? MapMissions(sources) : null,
+            Missions: visibility.Missions ? MapMissions(sources, visibility.Location) : null,
             Cargo: visibility.Cargo ? MapCargo(state) : null,
             CargoMore: visibility.Cargo ? CargoOverflow(state) : 0);
     }
@@ -132,7 +132,11 @@ public static class StreamCardMapper
             Station: state.Docked ? state.StationDisplayName : null,
             StationType: state.Docked ? state.StationType : null);
 
-    private static StreamCardCarrier? MapCarrier(CommanderState state)
+    /// <param name="showLocation">
+    /// Whether Location is shown. The jump destination is where the commander will be in fifteen
+    /// minutes, which is exactly what hiding Location withholds.
+    /// </param>
+    private static StreamCardCarrier? MapCarrier(CommanderState state, bool showLocation)
     {
         // Nothing to show until a CarrierStats event has identified one as the commander's own.
         if (string.IsNullOrWhiteSpace(state.CarrierName) && string.IsNullOrWhiteSpace(state.CarrierCallsign))
@@ -143,7 +147,7 @@ public static class StreamCardMapper
             Callsign: state.CarrierCallsign,
             Fuel: Positive(state.CarrierFuel),
             JumpRange: Positive(state.CarrierJumpRange),
-            PendingSystem: state.CarrierPendingSystem,
+            PendingSystem: showLocation ? state.CarrierPendingSystem : null,
             DepartsAt: state.CarrierPendingDeparture);
     }
 
@@ -200,7 +204,11 @@ public static class StreamCardMapper
             Refined: mining.Refined.Count);
     }
 
-    private static StreamCardMissions? MapMissions(StreamCardSources sources)
+    /// <param name="showLocation">
+    /// Whether Location is shown. Minor factions exist in only a handful of systems, so the target
+    /// faction of a massacre stack narrows down where the commander is.
+    /// </param>
+    private static StreamCardMissions? MapMissions(StreamCardSources sources, bool showLocation)
     {
         if (sources.Missions is not { } missions) return null;
 
@@ -212,7 +220,7 @@ public static class StreamCardMapper
             .Take(MaxMissionStacks)
             .Select(s => new StreamCardMissionStack(
                 Target: s.TargetType,
-                Faction: s.TargetFaction,
+                Faction: showLocation ? s.TargetFaction : null,
                 Count: s.Missions.Count,
                 Kills: s.KillsToClear,
                 Reward: s.Missions.Sum(m => m.Reward)))

@@ -145,6 +145,13 @@
       var snapshot = parseMessage(message);
       if (!snapshot) return;
       liveSeen = true;
+      // The broadcaster switched the card off or signed out (EDNexus.Ebs ChannelStateClearing):
+      // drop what is on screen, exactly as if the initial-state fetch had found nothing.
+      if (snapshot.offline === true) {
+        onStatus('offline');
+        onSnapshot(null);
+        return;
+      }
       onStatus('live');
       onSnapshot(snapshot);
     });

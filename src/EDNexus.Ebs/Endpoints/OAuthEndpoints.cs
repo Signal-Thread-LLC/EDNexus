@@ -149,8 +149,17 @@ public static class OAuthEndpoints
         return Results.Ok(new OAuthTokenIssuedResponse(record.Token, record.ChannelId, record.Username));
     }
 
-    /// <summary>Best-effort logout: revokes the broadcaster's long-lived token and their underlying Twitch grant.</summary>
-    private static async Task<IResult> HandleRevokeAsync(HttpRequest request, IBroadcasterTokenStore store, ITwitchOAuthClient twitchClient, CancellationToken ct)
+    /// <summary>
+    /// Best-effort logout: revokes the broadcaster's long-lived token and their underlying Twitch
+    /// grant, and takes their card off the air — signing out is a request to stop being shown.
+    /// </summary>
+    private static async Task<IResult> HandleRevokeAsync(
+        HttpRequest request,
+        IBroadcasterTokenStore store,
+        ITwitchOAuthClient twitchClient,
+        IChannelStateStore stateStore,
+        ITwitchPubSubClient pubSubClient,
+        CancellationToken ct)
     {
         var header = request.Headers.Authorization.ToString();
         if (string.IsNullOrWhiteSpace(header) || !header.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
@@ -159,6 +168,11 @@ public static class OAuthEndpoints
         var token = header["Bearer ".Length..].Trim();
         if (store.TryGetByToken(token, out var record))
         {
+            // Clear before revoking: if the clear throws, the token still works and the client can
+            // retry. Revoking first would leave no credential able to clear that channel. A failed
+            // offline broadcast does not hold the revoke back: the snapshot is already gone, and
+            // leaving a signed-out credential valid through a PubSub outage is the worse outcome.
+            _ = await ChannelStateClearing.ClearAsync(record.ChannelId, stateStore, pubSubClient, ct).ConfigureAwait(false);
             try { await twitchClient.RevokeTokenAsync(record.TwitchAccessToken, ct).ConfigureAwait(false); }
             catch { /* best-effort */ }
             store.Revoke(token);

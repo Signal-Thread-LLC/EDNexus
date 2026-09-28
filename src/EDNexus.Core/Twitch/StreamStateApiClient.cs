@@ -25,13 +25,23 @@ public enum StreamStatePublishStatus
 
     /// <summary>Anything else: the EBS was unreachable, timed out, or Twitch PubSub itself failed.</summary>
     Failed,
+
+    /// <summary>The EBS forgot the published card and told viewers it is offline (the card was switched off).</summary>
+    Cleared,
+
+    /// <summary>
+    /// The EBS forgot the published card, so new viewers no longer get it, but could not tell viewers
+    /// already watching. Worth retrying for their sake; nothing is left public to anyone new.
+    /// </summary>
+    ClearedNotDelivered,
 }
 
 /// <param name="Status">Whether the snapshot reached viewers, and if not, why not.</param>
 /// <param name="Error">Detail for logging/diagnostics. Null on success.</param>
-public sealed record StreamStatePublishResult(StreamStatePublishStatus Status, string? Error = null)
+/// <param name="RetryAfter">How long the EBS asked the client to wait, from a <c>429</c>'s <c>Retry-After</c>.</param>
+public sealed record StreamStatePublishResult(StreamStatePublishStatus Status, string? Error = null, TimeSpan? RetryAfter = null)
 {
-    public bool IsSuccess => Status == StreamStatePublishStatus.Published;
+    public bool IsSuccess => Status is StreamStatePublishStatus.Published or StreamStatePublishStatus.Cleared;
 
     /// <summary>
     /// True when retrying the same credential is pointless — the commander must log in again. The
@@ -40,6 +50,8 @@ public sealed record StreamStatePublishResult(StreamStatePublishStatus Status, s
     public bool RequiresReauth => Status == StreamStatePublishStatus.Unauthorized;
 
     public static readonly StreamStatePublishResult Ok = new(StreamStatePublishStatus.Published);
+
+    public static readonly StreamStatePublishResult ClearedOk = new(StreamStatePublishStatus.Cleared);
 }
 
 /// <summary>
@@ -59,6 +71,12 @@ public interface IStreamStateApiClient
     /// <param name="snapshot">What viewers should see.</param>
     Task<StreamStatePublishResult> PublishAsync(
         string updateStateEndpoint, string token, StreamCardSnapshot snapshot, CancellationToken ct = default);
+
+    /// <summary>
+    /// Takes the card off the air (<c>DELETE</c> on the same endpoint): the EBS forgets the stored
+    /// snapshot, so it stops being served to new viewers, and tells current viewers to hide it.
+    /// </summary>
+    Task<StreamStatePublishResult> ClearAsync(string updateStateEndpoint, string token, CancellationToken ct = default);
 }
 
 /// <summary>Default <see cref="IStreamStateApiClient"/> over a real (or injected, for tests) <see cref="HttpClient"/>.</summary>
@@ -73,17 +91,46 @@ public sealed class StreamStateApiClient : IStreamStateApiClient, IDisposable
         _http = http ?? new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
     }
 
-    public async Task<StreamStatePublishResult> PublishAsync(
+    /// <summary>
+    /// Most characters of an EBS error body kept. A proxy's HTML error page runs to kilobytes, and
+    /// this text reaches the log and the Settings status line.
+    /// </summary>
+    public const int MaxErrorDetailLength = 200;
+
+    /// <summary>
+    /// Header the EBS sets on a clear whose snapshot was removed but whose offline broadcast failed.
+    /// Mirrors <c>EDNexus.Ebs.Services.ChannelStateClearing.SnapshotRemovedHeader</c>.
+    /// </summary>
+    public const string SnapshotRemovedHeader = "X-EDNexus-Snapshot-Removed";
+
+    public Task<StreamStatePublishResult> PublishAsync(
         string updateStateEndpoint, string token, StreamCardSnapshot snapshot, CancellationToken ct = default)
     {
         // The EBS's body shape is { "state": <payload> } — see EDNexus.Ebs UpdateStateRequest.
         var body = JsonSerializer.Serialize(
             new StateEnvelope(snapshot), StreamCardSnapshot.SerializerOptions);
 
-        using var request = new HttpRequestMessage(HttpMethod.Post, updateStateEndpoint)
+        return SendAsync(
+            HttpMethod.Post, updateStateEndpoint, token,
+            new StringContent(body, Encoding.UTF8, "application/json"),
+            StreamStatePublishResult.Ok, ct);
+    }
+
+    public Task<StreamStatePublishResult> ClearAsync(string updateStateEndpoint, string token, CancellationToken ct = default) =>
+        SendAsync(HttpMethod.Delete, updateStateEndpoint, token, content: null, StreamStatePublishResult.ClearedOk, ct);
+
+    private async Task<StreamStatePublishResult> SendAsync(
+        HttpMethod method, string endpoint, string token, HttpContent? content, StreamStatePublishResult success, CancellationToken ct)
+    {
+        // The token is long-lived: never put it on the wire in cleartext, whatever the settings say.
+        if (!TwitchOAuthOptions.IsSecureEbsUrl(endpoint))
         {
-            Content = new StringContent(body, Encoding.UTF8, "application/json"),
-        };
+            content?.Dispose();
+            return new StreamStatePublishResult(
+                StreamStatePublishStatus.Failed, "Refusing to send the Twitch token to a non-https address.");
+        }
+
+        using var request = new HttpRequestMessage(method, endpoint) { Content = content };
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         HttpResponseMessage response;
@@ -99,15 +146,16 @@ public sealed class StreamStateApiClient : IStreamStateApiClient, IDisposable
         {
             // A stream card is best-effort telemetry: an unreachable EBS must never surface as an
             // unhandled exception on the commander's machine mid-session.
-            return new StreamStatePublishResult(StreamStatePublishStatus.Failed, ex.Message);
+            return new StreamStatePublishResult(StreamStatePublishStatus.Failed, Truncate(ex.Message));
         }
 
         using (response)
         {
-            if (response.IsSuccessStatusCode) return StreamStatePublishResult.Ok;
+            if (response.IsSuccessStatusCode) return success;
 
             var status = response.StatusCode switch
             {
+                _ when response.Headers.Contains(SnapshotRemovedHeader) => StreamStatePublishStatus.ClearedNotDelivered,
                 HttpStatusCode.Unauthorized => StreamStatePublishStatus.Unauthorized,
                 HttpStatusCode.RequestEntityTooLarge => StreamStatePublishStatus.TooLarge,
                 HttpStatusCode.TooManyRequests => StreamStatePublishStatus.RateLimited,
@@ -115,8 +163,27 @@ public sealed class StreamStateApiClient : IStreamStateApiClient, IDisposable
             };
 
             var detail = await SafeReadAsync(response, ct).ConfigureAwait(false);
-            return new StreamStatePublishResult(status, $"HTTP {(int)response.StatusCode} — {detail}");
+            return new StreamStatePublishResult(
+                status, $"HTTP {(int)response.StatusCode} — {Truncate(detail)}", RetryAfter(response));
         }
+    }
+
+    private static TimeSpan? RetryAfter(HttpResponseMessage response)
+    {
+        var header = response.Headers.RetryAfter;
+        if (header?.Delta is { } delta) return delta;
+        if (header?.Date is { } date)
+        {
+            var wait = date - DateTimeOffset.UtcNow;
+            return wait > TimeSpan.Zero ? wait : TimeSpan.Zero;
+        }
+        return null;
+    }
+
+    private static string Truncate(string text)
+    {
+        var flat = text.ReplaceLineEndings(" ").Trim();
+        return flat.Length <= MaxErrorDetailLength ? flat : string.Concat(flat.AsSpan(0, MaxErrorDetailLength), "…");
     }
 
     private static async Task<string> SafeReadAsync(HttpResponseMessage response, CancellationToken ct)

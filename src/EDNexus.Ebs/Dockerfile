@@ -10,6 +10,9 @@
 #   cd src/EDNexus.Ebs && cp .env.example .env && docker compose up -d
 #
 # CI publishes this image to ghcr.io/signal-thread-llc/ednexus-ebs.
+#
+# Broadcaster tokens, encrypted Twitch grants and the Data Protection key ring live under /data.
+# Mount a persistent volume there (the compose file does) or every restart logs every broadcaster out.
 
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
@@ -32,6 +35,11 @@ RUN apt-get update \
 COPY --from=build /app .
 
 ENV Ebs__Port=8787
+ENV Ebs__DataDirectory=/data
+# Created here, owned by the non-root user set below; a volume mounted at /data inherits the
+# ownership on first use, so the store can write without running as root.
+RUN mkdir -p /data && chown $APP_UID /data
+VOLUME /data
 EXPOSE 8787
 
 # The service validates its Twitch configuration at startup and refuses to run without a valid

@@ -31,7 +31,11 @@ public interface IBroadcasterTokenStore
     /// <summary>Marks a channel's underlying Twitch grant as no longer valid (e.g. a failed refresh), so <c>/api/update-state</c> starts rejecting it.</summary>
     void MarkTwitchGrantInvalid(string channelId);
 
-    /// <summary>All currently-issued broadcaster tokens, for the background refresh loop to walk.</summary>
+    /// <summary>
+    /// All currently-issued broadcaster tokens, for the background refresh loop to walk. A durable store
+    /// keeps only a hash of each bearer token, so callers must key off <see cref="BroadcasterToken.ChannelId"/>
+    /// — <see cref="BroadcasterToken.Token"/> may be empty here.
+    /// </summary>
     IReadOnlyCollection<BroadcasterToken> GetAllTokens();
 
     /// <summary>Revokes (removes) a broadcaster's long-lived token, e.g. on logout.</summary>

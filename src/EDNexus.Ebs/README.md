@@ -50,6 +50,10 @@ extension's own frontend — so those are fine in `appsettings.json`.
 | `Ebs:UpdateStateRateLimit` / `Ebs:UpdateStateRateLimitWindowSeconds` | `Ebs__UpdateStateRateLimit` / `Ebs__UpdateStateRateLimitWindowSeconds` | Per-channel rate limit applied to `POST /api/update-state`. Default 1 request / 2 seconds. |
 | `Ebs:OAuthSessionTtlMinutes` | `Ebs__OAuthSessionTtlMinutes` | How long a commander has to complete the Twitch consent page before the login session expires. Default 10 minutes. |
 | `Ebs:OAuthCodeTtlSeconds` | `Ebs__OAuthCodeTtlSeconds` | How long the one-time authorization code handed to the desktop client is redeemable at `/oauth/token`. Default 60 seconds. |
+| `Ebs:StorageProvider` | `Ebs__StorageProvider` | `Sqlite` (default) persists state across restarts; `InMemory` is for tests and throwaway local runs only. |
+| `Ebs:DataDirectory` | `Ebs__DataDirectory` | Directory holding the SQLite database `ebs.db`. Relative paths resolve against the content root. Default `data` (`/data` in the container). |
+| `Ebs:DataProtectionKeysDirectory` | `Ebs__DataProtectionKeysDirectory` | Data Protection key ring used to encrypt Twitch tokens at rest. Default `{DataDirectory}/keys`. |
+| `Ebs:ChannelStateMaxAgeHours` | `Ebs__ChannelStateMaxAgeHours` | Oldest snapshot `GET /api/initial-state` serves. Older ones are treated as gone and pruned, so a card whose clear never arrived does not stay public forever. The desktop app refreshes an unchanged card every 6 hours, so a live card never reaches it. Default `24`; `0` disables the limit; anything else under `12` is refused at startup. |
 | `Ebs:TwitchTokenRefreshIntervalMinutes` / `Ebs:TwitchTokenRefreshBufferMinutes` | `Ebs__TwitchTokenRefreshIntervalMinutes` / `Ebs__TwitchTokenRefreshBufferMinutes` | How often the background loop checks broadcasters' Twitch grants, and how far ahead of expiry it refreshes them. Defaults 30 / 60 minutes. |
 
 ## OAuth login flow
@@ -70,8 +74,10 @@ The desktop app never talks to Twitch directly. Instead:
    success the EBS mints a long-lived opaque token mapped server-side to the channel id and the
    underlying Twitch access/refresh tokens, and returns `{ "token", "channelId", "username" }`. This
    is the only token the desktop client ever stores.
-4. **`POST /oauth/revoke`** — best-effort logout: `Authorization: Bearer <ebs-token>` revokes both
-   the EBS token and (best-effort) the underlying Twitch grant.
+4. **`POST /oauth/revoke`** — logout: `Authorization: Bearer <ebs-token>` clears the channel's
+   stored card (the same way `DELETE /api/update-state` does), then revokes the EBS token and
+   (best-effort) the underlying Twitch grant. The clear comes first so that if it fails (`5xx`), the
+   token still works for the client to retry. An unknown token gets `200`: there is nothing to do.
 
 A background service refreshes each broadcaster's Twitch access token ahead of expiry using their
 stored refresh token, so the commander stays logged in across a multi-day gap without re-auth. If a
@@ -99,15 +105,55 @@ Called by the desktop client on behalf of the broadcaster.
   `413 Payload Too Large` if the state exceeds the size limit, `429 Too Many Requests` if
   the per-channel rate limit is exceeded, `502 Bad Gateway` if Twitch PubSub rejects the message.
 
+### `DELETE /api/update-state`
+
+Called by the desktop client when the broadcaster switches the card off. Same bearer auth as the
+`POST`, except that a lapsed Twitch grant is not required to be valid: a broadcaster must always be
+able to take their card down. It deletes the stored snapshot, so `GET /api/initial-state` answers `404` again, and
+broadcasts `{ "v": 1, "offline": true }` so viewers who are already watching hide the card. Returns
+`204`, or `502` with an `X-EDNexus-Snapshot-Removed: true` header if PubSub did not deliver that
+broadcast (the snapshot is removed either way, so the client can safely retry; the header tells it
+so, since a proxy's `502` would not carry it). `POST /oauth/revoke` revokes the token even when that broadcast fails. It has its own per-channel limit (10 per minute), so a clear sent straight after a publish is
+never rejected by that publish's window. `POST /oauth/revoke` does the same clear on sign-out.
+The desktop app queues clears and revokes the EBS did not acknowledge (in its settings) and retries
+them with backoff, including after a restart.
+
+Every `429` from the EBS carries a `Retry-After` header in seconds.
+
 ### `GET /api/initial-state/{channelId}`
 
 Called by the extension frontend on load so it doesn't have to wait for the next PubSub event.
-Returns the last state payload published for that channel, or `404` if none has been published yet.
+Returns the last state payload published for that channel, or `404` if none has been published yet,
+the card was switched off, or the snapshot is older than `Ebs:ChannelStateMaxAgeHours`.
 Unauthenticated but rate-limited per caller IP.
+
+### `GET /`
+
+Redirects to the project site, https://signal-thread-llc.github.io/EDNexus/.
 
 ### `GET /healthz`
 
 Liveness probe for container/serverless hosting.
+
+## Persistence
+
+State that has to survive a crash, restart, redeploy or host reboot is kept in a single SQLite file,
+`{Ebs:DataDirectory}/ebs.db` (WAL mode, `synchronous=FULL`):
+
+| State | Stored | Notes |
+|---|---|---|
+| Broadcaster tokens + the Twitch grants they wrap | `broadcaster_tokens` | The EBS bearer token is stored only as a SHA-256 hash; Twitch access/refresh tokens are ASP.NET Core Data Protection ciphertext. |
+| Each channel's last published state | `channel_state` | So `GET /api/initial-state/{channelId}` still answers after a restart. |
+| Pending `/oauth/authorize` sessions and one-time auth codes | memory only | Minutes/seconds-lived. A restart mid-login just means clicking "Log in" again. |
+
+The Data Protection key ring (`Ebs:DataProtectionKeysDirectory`, default `{DataDirectory}/keys`)
+must persist alongside the database. If it's lost, stored grants can't be decrypted: those
+broadcasters get `401` and have to log in again, and the EBS keeps running. For real separation
+put the key ring on a different volume or secret mount than the database. The keys are **not**
+encrypted at rest on Linux, so protect that directory's permissions.
+
+The schema version is stamped in `PRAGMA user_version`; the EBS migrates older files on startup and
+refuses to start against a file from a newer build.
 
 ## Deployment
 
@@ -130,10 +176,8 @@ service showing the shape). That split matters because Twitch requires the OAuth
 gets registered with Twitch, not this container's port.
 
 The service is also small enough to host on a serverless container platform (Azure Container Apps,
-Fly.io, etc.). **Production caveat:** both
-`IChannelStateStore` and `IBroadcasterTokenStore` currently ship with in-memory implementations,
-sufficient for a single EBS instance and for local development/testing. A multi-instance deployment
-— or any deployment where losing broadcaster tokens on a restart is unacceptable — needs a real
-persistent, shared backing store (e.g. a database or Redis) for `IBroadcasterTokenStore` in
-particular, since it holds the long-lived credentials and Twitch refresh tokens broadcasters rely on
-to stay logged in across days.
+Fly.io, etc.). Wherever it runs, mount a persistent volume at `/data` (see [Persistence](#persistence)).
+
+**Production caveat:** SQLite suits the single EBS instance we deploy. A multi-instance
+(horizontally scaled) deployment needs a shared backing store, e.g. Postgres or Redis, behind
+`IBroadcasterTokenStore` / `IChannelStateStore`, plus a shared Data Protection key ring.

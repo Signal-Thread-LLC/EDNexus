@@ -39,7 +39,11 @@ public interface IEbsAuthApiClient
     /// </summary>
     Task<EbsTokenResponse> ExchangeCodeAsync(string tokenEndpoint, string code, string codeVerifier, string redirectUri, CancellationToken ct = default);
 
-    /// <summary>Best-effort logout: asks the EBS to revoke the token (and its underlying Twitch grant).</summary>
+    /// <summary>
+    /// Logout: asks the EBS to revoke the token (and its underlying Twitch grant), which also takes
+    /// the card off the air. Throws when the EBS is unreachable or answers 5xx, so the caller can
+    /// retry; a 4xx is not an error, since the EBS answers 200 even for a token it no longer knows.
+    /// </summary>
     Task RevokeAsync(string revokeEndpoint, string token, CancellationToken ct = default);
 }
 
@@ -88,8 +92,10 @@ public sealed class EbsAuthApiClient : IEbsAuthApiClient, IDisposable
         using var request = new HttpRequestMessage(HttpMethod.Post, revokeEndpoint);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         using var response = await _http.SendAsync(request, ct).ConfigureAwait(false);
-        // Best-effort: a revoke failing shouldn't block clearing local state.
-        _ = response;
+        // The EBS answers 200 even for a token it no longer knows, so a 4xx has nothing to retry.
+        // A 5xx means it failed partway (e.g. clearing the card) and the caller should try again.
+        if ((int)response.StatusCode >= 500)
+            throw new EbsAuthApiException($"EBS revoke failed: HTTP {(int)response.StatusCode}", (int)response.StatusCode);
     }
 
     private static StringContent JsonContent(object payload) =>

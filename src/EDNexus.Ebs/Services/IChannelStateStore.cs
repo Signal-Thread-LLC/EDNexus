@@ -14,4 +14,7 @@ public interface IChannelStateStore
 
     /// <summary>Attempts to retrieve the last known state payload for a channel.</summary>
     bool TryGet(string channelId, out JsonElement state);
+
+    /// <summary>Forgets a channel's stored state, so <c>GET /api/initial-state</c> answers 404 again. No-op if none.</summary>
+    void Remove(string channelId);
 }

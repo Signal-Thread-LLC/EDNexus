@@ -60,4 +60,15 @@ public class EbsAuthApiClientTests
         await client.RevokeAsync("http://localhost:8787/oauth/revoke", "ebs-token-1");
         // Reaching here without an exception is the assertion.
     }
+
+    [Fact]
+    public async Task RevokeAsync_throws_on_a_server_error_so_the_caller_can_retry()
+    {
+        var handler = new RecordingHandler(HttpStatusCode.InternalServerError, "{}");
+        using var client = new EbsAuthApiClient(new HttpClient(handler));
+
+        var ex = await Assert.ThrowsAsync<EbsAuthApiException>(() =>
+            client.RevokeAsync("http://localhost:8787/oauth/revoke", "ebs-token-1"));
+        Assert.Equal(500, ex.StatusCode);
+    }
 }
