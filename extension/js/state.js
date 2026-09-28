@@ -24,6 +24,16 @@
   /** How long to wait for the broadcaster's configuration before falling back to the default EBS. */
   var CONFIG_WAIT_MS = 3000;
 
+  /**
+   * With a card on screen and no word from the EBS for this long, ask it again. The broadcaster's
+   * "offline" message travels over PubSub, which is best-effort: a viewer who misses it would
+   * otherwise keep a card the broadcaster has switched off until they reload.
+   */
+  var RECHECK_AFTER_MS = STALE_AFTER_MS;
+
+  /** How often to look at whether a recheck is due. Page load time staggers viewers across it. */
+  var RECHECK_TICK_MS = 60 * 1000;
+
   /** Total attempts at the one-time initial-state fetch, and the first backoff between them. */
   var INITIAL_STATE_ATTEMPTS = 3;
   var INITIAL_STATE_BACKOFF_MS = 1000;
@@ -113,6 +123,19 @@
     var channelId = null;
     var configReady = false;
 
+    // For the recheck: whether a card is on screen, when the EBS was last heard from (by either
+    // route), and a count of broadcasts so a recheck answer that raced one is thrown away.
+    var showing = false;
+    var lastHeard = Date.now();
+    var broadcasts = 0;
+    var recheckInFlight = false;
+
+    function show(snapshot) {
+      showing = !!snapshot;
+      lastHeard = Date.now();
+      onSnapshot(snapshot);
+    }
+
     // onAuthorized says nothing about whether the broadcaster's configuration has arrived; Twitch
     // delivers that through configuration.onChanged. Reading the EBS URL too early silently falls
     // back to the default, so wait for both before the one-time fetch.
@@ -137,23 +160,52 @@
       fetchInitialState(resolveEbsBase(helper), channelId, function (snapshot) {
         // A retry that resolves after a live broadcast must not roll the card backwards.
         if (liveSeen) return;
-        onSnapshot(snapshot);
+        show(snapshot);
       }, onStatus);
+      global.setInterval(recheckIfQuiet, RECHECK_TICK_MS);
+    }
+
+    function recheckIfQuiet() {
+      if (!showing || recheckInFlight || Date.now() - lastHeard < RECHECK_AFTER_MS) return;
+      recheckInFlight = true;
+      var broadcastsBefore = broadcasts;
+
+      global.fetch(resolveEbsBase(helper) + '/api/initial-state/' + encodeURIComponent(channelId), { method: 'GET' })
+        .then(function (response) {
+          if (response.status === 404) return { gone: true };
+          if (!response.ok) return null; // try again on a later tick
+          return response.json().then(function (body) { return { snapshot: normalize(body) }; });
+        })
+        .then(function (answer) {
+          // A live broadcast that landed meanwhile is newer than anything this answer says.
+          if (!answer || broadcasts !== broadcastsBefore) return;
+          if (answer.gone) {
+            // Switched off while this viewer missed the "offline" message.
+            onStatus('offline');
+            show(null);
+          } else if (answer.snapshot) {
+            onStatus('live');
+            show(answer.snapshot);
+          }
+        })
+        .catch(function () { /* unreachable EBS: keep the card, try again on a later tick */ })
+        .then(function () { recheckInFlight = false; });
     }
 
     helper.listen('broadcast', function (_target, _contentType, message) {
       var snapshot = parseMessage(message);
       if (!snapshot) return;
       liveSeen = true;
+      broadcasts++;
       // The broadcaster switched the card off or signed out (EDNexus.Ebs ChannelStateClearing):
       // drop what is on screen, exactly as if the initial-state fetch had found nothing.
       if (snapshot.offline === true) {
         onStatus('offline');
-        onSnapshot(null);
+        show(null);
         return;
       }
       onStatus('live');
-      onSnapshot(snapshot);
+      show(snapshot);
     });
   }
 
