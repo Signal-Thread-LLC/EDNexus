@@ -93,7 +93,10 @@ public sealed class TwitchStreamCardService : IDisposable
     private bool _stoppedForReauth;
     /// <summary>The token that earned the 401, so a later login with a different one can resume.</summary>
     private string? _rejectedToken;
-    private bool _disposed;
+    /// <summary>1 once disposed. Read from journal threads and the pump, so never a plain field.</summary>
+    private int _disposed;
+
+    private bool IsDisposed => Volatile.Read(ref _disposed) != 0;
 
     /// <summary>Raised after every publish attempt, successful or not, for the UI's status line and logs.</summary>
     public event Action<StreamStatePublishResult>? PublishCompleted;
@@ -200,7 +203,7 @@ public sealed class TwitchStreamCardService : IDisposable
     {
         // A service stopped for reauth stays asleep until the commander logs in again — at which
         // point the token they are publishing with is a different one, and the pump can resume.
-        if (_disposed || (StoppedForReauth && _token() == Volatile.Read(ref _rejectedToken))) return;
+        if (IsDisposed || (StoppedForReauth && _token() == Volatile.Read(ref _rejectedToken))) return;
         try { _dirty.Release(); }
         catch (SemaphoreFullException) { /* already dirty — the pump will pick up the newest state */ }
         catch (ObjectDisposedException) { /* raced with Dispose */ }
@@ -213,6 +216,7 @@ public sealed class TwitchStreamCardService : IDisposable
             bool changed;
             try { changed = await _dirty.WaitAsync(_refreshInterval, ct).ConfigureAwait(false); }
             catch (OperationCanceledException) { return; }
+            catch (ObjectDisposedException) { return; }
 
             // A quiet interval is a refresh, which only applies once something is on the air: before
             // the host has replayed the journal there is nothing that should go out.
@@ -240,6 +244,7 @@ public sealed class TwitchStreamCardService : IDisposable
                 }
             }
             catch (OperationCanceledException) { return; }
+            catch (Exception) when (IsDisposed) { return; }
             catch (Exception ex)
             {
                 // Best-effort telemetry: never let a card failure take down the engine's task.
@@ -302,7 +307,8 @@ public sealed class TwitchStreamCardService : IDisposable
         {
             Volatile.Write(ref _rejectedToken, token);
             Volatile.Write(ref _stoppedForReauth, true);
-            try { ReauthRequired?.Invoke(); } catch { /* never let a handler break the pump */ }
+            if (!IsDisposed)
+                try { ReauthRequired?.Invoke(); } catch { /* never let a handler break the pump */ }
         }
 
         Raise(result);
@@ -346,13 +352,17 @@ public sealed class TwitchStreamCardService : IDisposable
 
     private void Raise(StreamStatePublishResult result)
     {
+        // A publish that finishes after Dispose reports to a UI that has already let go of us.
+        if (IsDisposed) return;
         try { PublishCompleted?.Invoke(result); } catch { /* never let a handler break the pump */ }
     }
 
+    /// <summary>The pump's own task, so tests can see it finish cleanly after <see cref="Dispose"/>.</summary>
+    internal Task Completion => _pump;
+
     public void Dispose()
     {
-        if (_disposed) return;
-        _disposed = true;
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
 
         _state.PropertyChanged -= OnStateChanged;
         _state.CargoChanged -= MarkDirty;
@@ -365,6 +375,14 @@ public sealed class TwitchStreamCardService : IDisposable
         try { _pump.Wait(TimeSpan.FromSeconds(2)); }
         catch (AggregateException) { /* cancellation */ }
 
+        // A publish can still be in flight past the wait (an EBS that is slow to answer): the pump
+        // releases _sendGate and reads the token when it returns, so tear down only once it has.
+        if (_pump.IsCompleted) DisposeSynchronization();
+        else _pump.ContinueWith(_ => DisposeSynchronization(), TaskScheduler.Default);
+    }
+
+    private void DisposeSynchronization()
+    {
         _cts.Dispose();
         _dirty.Dispose();
         _sendGate.Dispose();
