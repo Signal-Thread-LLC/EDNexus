@@ -67,8 +67,9 @@ public sealed class EbsOptions
     /// <summary>
     /// Oldest channel snapshot <c>GET /api/initial-state</c> will serve, in hours. Snapshots are
     /// durable, so a clear the desktop never managed to send would otherwise keep a card public
-    /// forever; past this age it is treated as gone and pruned. The app republishes on every change,
-    /// so only a card left untouched this long is affected. Zero or less disables the limit.
+    /// forever; past this age it is treated as gone and pruned. The app republishes on every change
+    /// and refreshes an unchanged card every few hours, so only a card whose app has stopped
+    /// publishing is affected. Zero or less disables the limit.
     /// </summary>
     public int ChannelStateMaxAgeHours { get; set; } = 24;
 

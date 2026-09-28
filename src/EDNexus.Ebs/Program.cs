@@ -186,7 +186,10 @@ app.Use(async (context, next) =>
         && context.Request.Path.Equals("/api/update-state", StringComparison.OrdinalIgnoreCase))
     {
         var tokenStore = context.RequestServices.GetRequiredService<IBroadcasterTokenStore>();
-        if (TryAuthenticateBroadcaster(context.Request, tokenStore, out var channelId, out var failure))
+        // Taking a card down needs no Twitch grant (PubSub is signed with the extension secret), and
+        // a broadcaster whose grant lapsed must still be able to stop being shown.
+        var requireGrant = !HttpMethods.IsDelete(context.Request.Method);
+        if (TryAuthenticateBroadcaster(context.Request, tokenStore, requireGrant, out var channelId, out var failure))
         {
             context.Items["ChannelId"] = channelId;
         }
@@ -316,7 +319,8 @@ static bool IsAllowedFrontendOrigin(string origin, HashSet<string> additionalOri
         || uri.Host.EndsWith(".ext-twitch.tv", StringComparison.OrdinalIgnoreCase);
 }
 
-static bool TryAuthenticateBroadcaster(HttpRequest request, IBroadcasterTokenStore tokenStore, out string channelId, out IResult? failure)
+static bool TryAuthenticateBroadcaster(
+    HttpRequest request, IBroadcasterTokenStore tokenStore, bool requireValidTwitchGrant, out string channelId, out IResult? failure)
 {
     channelId = "";
     var header = request.Headers.Authorization.ToString();
@@ -339,7 +343,7 @@ static bool TryAuthenticateBroadcaster(HttpRequest request, IBroadcasterTokenSto
         return false;
     }
 
-    if (!record.IsTwitchGrantValid)
+    if (requireValidTwitchGrant && !record.IsTwitchGrantValid)
     {
         failure = Results.Problem(
             "The underlying Twitch grant is no longer valid — please log in again.",

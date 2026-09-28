@@ -31,6 +31,13 @@ public sealed class TwitchStreamCardService : IDisposable
     /// </summary>
     public const int MaxPublishRetries = 5;
 
+    /// <summary>
+    /// How often an unchanged card is republished while it is on the air. The EBS stops serving a
+    /// snapshot it has not heard about for a day (<c>Ebs:ChannelStateMaxAgeHours</c>), so without this
+    /// a card that simply has not changed would vanish for new viewers.
+    /// </summary>
+    public static readonly TimeSpan DefaultRefreshInterval = TimeSpan.FromHours(6);
+
     /// <summary>Longest <c>Retry-After</c> honoured. The EBS's own windows are a minute at most.</summary>
     public static readonly TimeSpan MaxRetryAfter = TimeSpan.FromMinutes(2);
 
@@ -77,7 +84,9 @@ public sealed class TwitchStreamCardService : IDisposable
     private readonly SemaphoreSlim _sendGate = new(1, 1);
     private readonly Task _pump;
 
+    private readonly TimeSpan _refreshInterval;
     private string? _lastPublishedKey;
+    private DateTimeOffset _lastPublishedAt;
     private int _consecutiveFailures;
     private bool _stoppedForReauth;
     /// <summary>The token that earned the 401, so a later login with a different one can resume.</summary>
@@ -122,8 +131,10 @@ public sealed class TwitchStreamCardService : IDisposable
         Func<StreamCardVisibility>? visibility,
         Func<bool>? isSuppressed,
         TimeSpan minInterval,
-        Func<DateTimeOffset>? clock)
+        Func<DateTimeOffset>? clock,
+        TimeSpan? refreshInterval = null)
     {
+        _refreshInterval = refreshInterval ?? DefaultRefreshInterval;
         _state = state;
         _sources = sources;
         _client = client;
@@ -197,8 +208,13 @@ public sealed class TwitchStreamCardService : IDisposable
     {
         while (!ct.IsCancellationRequested)
         {
-            try { await _dirty.WaitAsync(ct).ConfigureAwait(false); }
+            bool changed;
+            try { changed = await _dirty.WaitAsync(_refreshInterval, ct).ConfigureAwait(false); }
             catch (OperationCanceledException) { return; }
+
+            // A quiet interval is a refresh, which only applies once something is on the air: before
+            // the host has replayed the journal there is nothing that should go out.
+            if (!changed && _lastPublishedKey is null) continue;
 
             var backoff = _minInterval;
             var retry = false;
@@ -262,7 +278,7 @@ public sealed class TwitchStreamCardService : IDisposable
         // EBS, or the same one after a restart wiped its in-memory tokens.
         var endpoint = _endpoint();
         var key = string.Join(KeySeparator, endpoint, token, snapshot.ContentFingerprint());
-        if (key == _lastPublishedKey) return null;
+        if (key == _lastPublishedKey && _clock() - _lastPublishedAt < _refreshInterval) return null;
 
         StreamStatePublishResult result;
         await _sendGate.WaitAsync(ct).ConfigureAwait(false);
@@ -272,7 +288,11 @@ public sealed class TwitchStreamCardService : IDisposable
             // now would put it back on the air straight after the clear.
             if (_token() != token) return null;
             result = await _client.PublishAsync(endpoint, token!, snapshot, ct).ConfigureAwait(false);
-            if (result.IsSuccess) _lastPublishedKey = key;
+            if (result.IsSuccess)
+            {
+                _lastPublishedKey = key;
+                _lastPublishedAt = _clock();
+            }
         }
         finally { _sendGate.Release(); }
 

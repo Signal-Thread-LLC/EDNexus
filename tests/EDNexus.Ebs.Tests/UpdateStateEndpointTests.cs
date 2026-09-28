@@ -144,6 +144,23 @@ public class UpdateStateEndpointTests : IClassFixture<UpdateStateEndpointTests.F
     }
 
     [Fact]
+    public async Task A_broadcaster_whose_Twitch_grant_lapsed_can_still_take_the_card_down()
+    {
+        var record = _factory.TokenStore.IssueToken("chan-lapsed-clear", "CMDR", "access", "refresh", DateTimeOffset.UtcNow.AddHours(4));
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new("Bearer", record.Token);
+        (await client.PostAsJsonAsync("/api/update-state", new { state = new { headline = "Docked at Home" } })).EnsureSuccessStatusCode();
+
+        // A failed background refresh. Publishing now needs a new sign-in; clearing must not.
+        _factory.TokenStore.MarkTwitchGrantInvalid("chan-lapsed-clear");
+
+        Assert.Equal(HttpStatusCode.Unauthorized,
+            (await client.PostAsJsonAsync("/api/update-state", new { state = new { headline = "Still here" } })).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.DeleteAsync("/api/update-state")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await _factory.CreateClient().GetAsync("/api/initial-state/chan-lapsed-clear")).StatusCode);
+    }
+
+    [Fact]
     public async Task A_sign_out_whose_clear_fails_leaves_the_token_able_to_retry()
     {
         using var factory = _factory.WithWebHostBuilder(builder => builder.ConfigureServices(services =>

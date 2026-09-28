@@ -287,6 +287,35 @@ public class TwitchStreamCardServiceTests
     }
 
     [Fact]
+    public async Task An_unchanged_card_is_refreshed_so_the_EBS_does_not_expire_it()
+    {
+        var state = new CommanderState { StarSystem = "Nervi" };
+        var client = new FakeStreamStateApiClient();
+
+        using var service = new TwitchStreamCardService(
+            state, StreamCardSources.Empty, client, static () => Endpoint, static () => "ebs-token",
+            null, null, FastInterval, clock: null, refreshInterval: TimeSpan.FromMilliseconds(200));
+        service.RequestPublish();
+        Assert.True(await client.WaitForPublishAsync());
+
+        // No journal event, no settings change: the same card goes out again anyway.
+        Assert.True(await client.WaitForPublishAsync(TimeSpan.FromSeconds(5)));
+        Assert.Equal(client.Snapshots[0].ContentFingerprint(), client.Snapshots[1].ContentFingerprint());
+    }
+
+    [Fact]
+    public async Task The_refresh_does_not_publish_before_the_host_has_replayed_the_journal()
+    {
+        var client = new FakeStreamStateApiClient();
+
+        using var service = new TwitchStreamCardService(
+            new CommanderState(), StreamCardSources.Empty, client, static () => Endpoint, static () => "ebs-token",
+            null, null, FastInterval, clock: null, refreshInterval: TimeSpan.FromMilliseconds(50));
+
+        Assert.False(await client.WaitForPublishAsync(TimeSpan.FromMilliseconds(400)));
+    }
+
+    [Fact]
     public async Task Taking_the_card_off_the_air_clears_it_with_the_token_it_was_published_with()
     {
         var state = new CommanderState { StarSystem = "Nervi" };
