@@ -57,9 +57,13 @@ builder.Services.AddSingleton(sp =>
     return new EbsDatabase(Path.Combine(dataDirectory.FullName, EbsDatabase.FileName));
 });
 builder.Services.AddSingleton<IChannelStateStore>(sp =>
-    sp.GetRequiredService<IOptions<EbsOptions>>().Value.StorageProvider == EbsStorageProvider.Sqlite
-        ? new SqliteChannelStateStore(sp.GetRequiredService<EbsDatabase>(), sp.GetRequiredService<TimeProvider>())
-        : new InMemoryChannelStateStore());
+{
+    var ebs = sp.GetRequiredService<IOptions<EbsOptions>>().Value;
+    var time = sp.GetRequiredService<TimeProvider>();
+    return ebs.StorageProvider == EbsStorageProvider.Sqlite
+        ? new SqliteChannelStateStore(sp.GetRequiredService<EbsDatabase>(), time, ebs.ChannelStateMaxAge)
+        : new InMemoryChannelStateStore(time, ebs.ChannelStateMaxAge);
+});
 builder.Services.AddSingleton<IBroadcasterTokenStore>(sp =>
     sp.GetRequiredService<IOptions<EbsOptions>>().Value.StorageProvider == EbsStorageProvider.Sqlite
         ? new SqliteBroadcasterTokenStore(

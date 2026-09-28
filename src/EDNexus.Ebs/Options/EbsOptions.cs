@@ -65,6 +65,18 @@ public sealed class EbsOptions
     public EbsStorageProvider StorageProvider { get; set; } = EbsStorageProvider.Sqlite;
 
     /// <summary>
+    /// Oldest channel snapshot <c>GET /api/initial-state</c> will serve, in hours. Snapshots are
+    /// durable, so a clear the desktop never managed to send would otherwise keep a card public
+    /// forever; past this age it is treated as gone and pruned. The app republishes on every change,
+    /// so only a card left untouched this long is affected. Zero or less disables the limit.
+    /// </summary>
+    public int ChannelStateMaxAgeHours { get; set; } = 24;
+
+    /// <summary><see cref="ChannelStateMaxAgeHours"/> as a span, or null when the limit is disabled.</summary>
+    public TimeSpan? ChannelStateMaxAge =>
+        ChannelStateMaxAgeHours > 0 ? TimeSpan.FromHours(ChannelStateMaxAgeHours) : null;
+
+    /// <summary>
     /// Directory holding the SQLite database (<c>ebs.db</c>). Relative paths resolve against the
     /// content root. Must be on a persistent volume in a container deployment.
     /// </summary>

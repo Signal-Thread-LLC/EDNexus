@@ -31,11 +31,19 @@ public sealed class Bootstrap
     /// </summary>
     public TwitchAuthService Twitch { get; private set; }
 
+    /// <summary>
+    /// Retries card clears and sign-outs the EBS has not acknowledged. Owned here rather than by the
+    /// engine host so that neither a host rebuild nor an app restart drops one.
+    /// </summary>
+    public EbsCleanupQueue TwitchCleanup { get; }
+
     public Bootstrap(SettingsStore store, AppSettings settings, CrashReporting crash)
     {
         Store = store;
         Settings = settings;
         Crash = crash;
+        TwitchCleanup = new EbsCleanupQueue(settings, store);
+        TwitchCleanup.Start();
         Twitch = BuildTwitchAuth();
 
         // Apply the saved voice choice up front so the very first callout already uses it.
@@ -241,11 +249,13 @@ public sealed class Bootstrap
     /// leaving the app with no endpoint at all.
     /// </param>
     /// <returns>
-    /// The endpoint and token of a card that was on the air and no longer should be (switched off,
-    /// or moved to a different EBS), for the caller to pass to
-    /// <see cref="EDNexus.Core.Twitch.TwitchStreamCardService.TakeOffAirAsync"/>; otherwise null.
+    /// The clear for a card that was on the air and no longer should be (switched off, or moved to a
+    /// different EBS), otherwise null. It is already queued for retry; the caller should also send it
+    /// straight away through
+    /// <see cref="EDNexus.Core.Twitch.TwitchStreamCardService.TakeOffAirAsync"/>, which orders it after
+    /// any publish in flight, and report the result to <see cref="EbsCleanupQueue.Complete"/>.
     /// </returns>
-    public (string Endpoint, string Token)? ApplyTwitchChoice(bool enabled, TwitchCardSections sections, string? ebsBaseUrl)
+    public PendingEbsCleanup? ApplyTwitchChoice(bool enabled, TwitchCardSections sections, string? ebsBaseUrl)
     {
         var trimmed = (ebsBaseUrl ?? string.Empty).Trim().TrimEnd('/');
         var previousBaseUrl = Settings.Twitch.EbsBaseUrl;
@@ -258,8 +268,13 @@ public sealed class Bootstrap
         Store.Save(Settings);
 
         var ebsChanged = !string.Equals(previousBaseUrl, Settings.Twitch.EbsBaseUrl, StringComparison.OrdinalIgnoreCase);
-        (string, string)? takeOffAir = wasOnAir && (!enabled || ebsChanged)
-            ? (new TwitchOAuthOptions { EbsBaseUrl = previousBaseUrl }.UpdateStateEndpoint, previousToken!)
+        // Queued, and so persisted, before anything is sent: if the clear fails or the app closes
+        // first, the card would otherwise stay public with nothing left that knows to take it down.
+        var takeOffAir = wasOnAir && (!enabled || ebsChanged)
+            ? TwitchCleanup.Enqueue(
+                EbsCleanupKind.ClearCard,
+                new TwitchOAuthOptions { EbsBaseUrl = previousBaseUrl }.UpdateStateEndpoint,
+                previousToken!)
             : null;
 
         if (ebsChanged)
@@ -281,5 +296,5 @@ public sealed class Bootstrap
     }
 
     private TwitchAuthService BuildTwitchAuth() =>
-        new(Settings, Store, new TwitchOAuthOptions { EbsBaseUrl = Settings.Twitch.EbsBaseUrl });
+        new(Settings, Store, new TwitchOAuthOptions { EbsBaseUrl = Settings.Twitch.EbsBaseUrl }, cleanup: TwitchCleanup);
 }

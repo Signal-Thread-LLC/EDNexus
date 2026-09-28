@@ -168,10 +168,12 @@ public static class OAuthEndpoints
         var token = header["Bearer ".Length..].Trim();
         if (store.TryGetByToken(token, out var record))
         {
+            // Clear before revoking: if the clear throws, the token still works and the client can
+            // retry. Revoking first would leave no credential able to clear that channel.
+            await ChannelStateClearing.ClearAsync(record.ChannelId, stateStore, pubSubClient, ct).ConfigureAwait(false);
             try { await twitchClient.RevokeTokenAsync(record.TwitchAccessToken, ct).ConfigureAwait(false); }
             catch { /* best-effort */ }
             store.Revoke(token);
-            await ChannelStateClearing.ClearAsync(record.ChannelId, stateStore, pubSubClient, ct).ConfigureAwait(false);
         }
 
         return Results.Ok();

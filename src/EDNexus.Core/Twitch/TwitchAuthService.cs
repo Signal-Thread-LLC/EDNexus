@@ -30,15 +30,22 @@ public sealed class TwitchAuthService
     private readonly IEbsAuthApiClient _api;
     private readonly IBrowserLauncher _browser;
     private readonly IOAuthCallbackListener _listener;
+    private readonly EbsCleanupQueue? _cleanup;
 
+    /// <param name="cleanup">
+    /// Where a revoke the EBS did not acknowledge goes to be retried. Without one, a failed revoke
+    /// leaves the token valid on the EBS and the card on the air.
+    /// </param>
     public TwitchAuthService(
         AppSettings settings,
         SettingsStore store,
         TwitchOAuthOptions options,
         IEbsAuthApiClient? api = null,
         IBrowserLauncher? browser = null,
-        IOAuthCallbackListener? listener = null)
+        IOAuthCallbackListener? listener = null,
+        EbsCleanupQueue? cleanup = null)
     {
+        _cleanup = cleanup;
         _settings = settings;
         _store = store;
         _options = options;
@@ -139,13 +146,18 @@ public sealed class TwitchAuthService
         }
     }
 
-    /// <summary>Asks the EBS to revoke the current token (best-effort) and clears the persisted session.</summary>
+    /// <summary>
+    /// Asks the EBS to revoke the current token, which also takes the card off the air, and clears
+    /// the persisted session. Local state is cleared either way; a revoke the EBS did not
+    /// acknowledge is handed to the cleanup queue to retry.
+    /// </summary>
     public async Task LogoutAsync(CancellationToken ct = default)
     {
         if (!string.IsNullOrWhiteSpace(Twitch.Token))
         {
-            try { await _api.RevokeAsync(_options.RevokeEndpoint, Twitch.Token!, ct).ConfigureAwait(false); }
-            catch { /* best-effort; local state is cleared regardless */ }
+            var token = Twitch.Token!;
+            try { await _api.RevokeAsync(_options.RevokeEndpoint, token, ct).ConfigureAwait(false); }
+            catch { _cleanup?.Enqueue(EbsCleanupKind.Revoke, _options.RevokeEndpoint, token); }
         }
         ClearSession();
     }

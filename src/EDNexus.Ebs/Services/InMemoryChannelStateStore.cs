@@ -10,13 +10,38 @@ namespace EDNexus.Ebs.Services;
 /// </summary>
 public sealed class InMemoryChannelStateStore : IChannelStateStore
 {
-    private readonly ConcurrentDictionary<string, JsonElement> _state = new();
+    private readonly ConcurrentDictionary<string, (JsonElement State, DateTimeOffset UpdatedAt)> _state = new();
+    private readonly TimeProvider _timeProvider;
+    private readonly TimeSpan? _maxAge;
+
+    /// <param name="maxAge">Oldest snapshot served; null keeps snapshots until they are removed.</param>
+    public InMemoryChannelStateStore(TimeProvider? timeProvider = null, TimeSpan? maxAge = null)
+    {
+        _timeProvider = timeProvider ?? TimeProvider.System;
+        _maxAge = maxAge;
+    }
 
     /// <inheritdoc />
-    public void Set(string channelId, JsonElement state) => _state[channelId] = state.Clone();
+    public void Set(string channelId, JsonElement state) =>
+        _state[channelId] = (state.Clone(), _timeProvider.GetUtcNow());
 
     /// <inheritdoc />
-    public bool TryGet(string channelId, out JsonElement state) => _state.TryGetValue(channelId, out state);
+    public bool TryGet(string channelId, out JsonElement state)
+    {
+        if (_state.TryGetValue(channelId, out var entry))
+        {
+            if (_maxAge is not { } maxAge || _timeProvider.GetUtcNow() - entry.UpdatedAt <= maxAge)
+            {
+                state = entry.State;
+                return true;
+            }
+
+            _state.TryRemove(new KeyValuePair<string, (JsonElement, DateTimeOffset)>(channelId, entry));
+        }
+
+        state = default;
+        return false;
+    }
 
     /// <inheritdoc />
     public void Remove(string channelId) => _state.TryRemove(channelId, out _);

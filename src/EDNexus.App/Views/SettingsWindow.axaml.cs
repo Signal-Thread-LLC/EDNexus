@@ -192,11 +192,12 @@ public partial class SettingsWindow : Window
                 TwitchSectionsFromToggles(),
                 TwitchEbsBox.Text);
             // Stopping publishes is not enough: the EBS would keep serving the last card to every
-            // viewer who opens the stream. Best-effort — the result surfaces on the status line.
+            // viewer who opens the stream. The clear is already queued for retry; sending it here
+            // as well orders it after any publish in flight, and a success saves the retry.
             // Awaited because leaving developer mode below rebuilds the host, disposing this
             // service and its HTTP client mid-request.
             if (takeOffAir is { } off && _dashboard?.TwitchCard is { } card)
-                await card.TakeOffAirAsync(off.Endpoint, off.Token);
+                _boot.TwitchCleanup.Complete(off, await card.TakeOffAirAsync(off.Endpoint, off.Token));
             // Switching the card on (or changing which sections show) changes what viewers should
             // see without touching the commander picture, so the publisher has nothing to react to —
             // and with the game closed no journal event is coming to nudge it. Ask directly.

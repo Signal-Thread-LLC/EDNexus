@@ -144,6 +144,27 @@ public class UpdateStateEndpointTests : IClassFixture<UpdateStateEndpointTests.F
     }
 
     [Fact]
+    public async Task A_sign_out_whose_clear_fails_leaves_the_token_able_to_retry()
+    {
+        using var factory = _factory.WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<IChannelStateStore>();
+            services.AddSingleton<IChannelStateStore, FailingRemoveChannelStateStore>();
+        }));
+        var tokens = factory.Services.GetRequiredService<IBroadcasterTokenStore>();
+        var record = tokens.IssueToken("chan-failed-clear", "CMDR", "access", "refresh", DateTimeOffset.UtcNow.AddHours(4));
+        var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new("Bearer", record.Token);
+
+        // A 500 in production; TestServer rethrows the app's exception instead.
+        try { Assert.False((await client.PostAsync("/oauth/revoke", null)).IsSuccessStatusCode); }
+        catch (InvalidOperationException) { }
+
+        // The card is still up, so the credential that can take it down must survive.
+        Assert.True(tokens.TryGetByToken(record.Token, out _));
+    }
+
+    [Fact]
     public async Task A_rate_limited_update_says_when_to_retry()
     {
         using var factory = _factory.WithWebHostBuilder(builder =>
@@ -220,6 +241,18 @@ public class UpdateStateEndpointTests : IClassFixture<UpdateStateEndpointTests.F
             });
         }
     }
+}
+
+/// <summary>A channel-state store whose delete fails, standing in for a storage error mid-clear.</summary>
+public sealed class FailingRemoveChannelStateStore : IChannelStateStore
+{
+    private readonly InMemoryChannelStateStore _inner = new();
+
+    public void Set(string channelId, JsonElement state) => _inner.Set(channelId, state);
+
+    public bool TryGet(string channelId, out JsonElement state) => _inner.TryGet(channelId, out state);
+
+    public void Remove(string channelId) => throw new InvalidOperationException("simulated storage failure");
 }
 
 /// <summary>Records every broadcast call instead of making a real Helix API request.</summary>

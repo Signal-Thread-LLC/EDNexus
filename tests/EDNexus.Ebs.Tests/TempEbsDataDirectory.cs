@@ -31,7 +31,8 @@ public sealed class TempEbsDataDirectory : IDisposable
     public SqliteBroadcasterTokenStore CreateTokenStore(TimeProvider? time = null, string? keysPath = null) =>
         new(OpenDatabase(), CreateDataProtection(keysPath), time);
 
-    public SqliteChannelStateStore CreateChannelStateStore() => new(OpenDatabase());
+    public SqliteChannelStateStore CreateChannelStateStore(TimeProvider? time = null, TimeSpan? maxAge = null) =>
+        new(OpenDatabase(), time, maxAge);
 
     /// <summary>Every byte SQLite has written for the database (main file plus WAL/SHM), as Latin-1 text for substring searches.</summary>
     public string ReadAllDatabaseBytes()

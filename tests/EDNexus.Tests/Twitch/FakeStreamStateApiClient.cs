@@ -35,6 +35,9 @@ internal sealed class FakeStreamStateApiClient : IStreamStateApiClient
         return Task.FromResult(result);
     }
 
+    /// <summary>What the EBS answers a clear with. Defaults to acknowledging it.</summary>
+    public Func<StreamStatePublishResult> RespondToClear { get; set; } = () => StreamStatePublishResult.ClearedOk;
+
     /// <summary>Tokens sent to <see cref="ClearAsync"/>, in order.</summary>
     public ConcurrentQueue<string> Clears { get; } = new();
 
@@ -42,7 +45,7 @@ internal sealed class FakeStreamStateApiClient : IStreamStateApiClient
     {
         LastEndpoint = updateStateEndpoint;
         Clears.Enqueue(token);
-        return Task.FromResult(StreamStatePublishResult.ClearedOk);
+        return Task.FromResult(RespondToClear());
     }
 
     /// <summary>Waits for the next publish attempt, failing the test rather than hanging forever.</summary>

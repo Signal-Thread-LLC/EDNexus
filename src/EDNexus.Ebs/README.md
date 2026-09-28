@@ -53,6 +53,7 @@ extension's own frontend — so those are fine in `appsettings.json`.
 | `Ebs:StorageProvider` | `Ebs__StorageProvider` | `Sqlite` (default) persists state across restarts; `InMemory` is for tests and throwaway local runs only. |
 | `Ebs:DataDirectory` | `Ebs__DataDirectory` | Directory holding the SQLite database `ebs.db`. Relative paths resolve against the content root. Default `data` (`/data` in the container). |
 | `Ebs:DataProtectionKeysDirectory` | `Ebs__DataProtectionKeysDirectory` | Data Protection key ring used to encrypt Twitch tokens at rest. Default `{DataDirectory}/keys`. |
+| `Ebs:ChannelStateMaxAgeHours` | `Ebs__ChannelStateMaxAgeHours` | Oldest snapshot `GET /api/initial-state` serves. Older ones are treated as gone and pruned, so a card whose clear never arrived does not stay public forever. Default `24`; `0` disables the limit. |
 | `Ebs:TwitchTokenRefreshIntervalMinutes` / `Ebs:TwitchTokenRefreshBufferMinutes` | `Ebs__TwitchTokenRefreshIntervalMinutes` / `Ebs__TwitchTokenRefreshBufferMinutes` | How often the background loop checks broadcasters' Twitch grants, and how far ahead of expiry it refreshes them. Defaults 30 / 60 minutes. |
 
 ## OAuth login flow
@@ -73,9 +74,10 @@ The desktop app never talks to Twitch directly. Instead:
    success the EBS mints a long-lived opaque token mapped server-side to the channel id and the
    underlying Twitch access/refresh tokens, and returns `{ "token", "channelId", "username" }`. This
    is the only token the desktop client ever stores.
-4. **`POST /oauth/revoke`** — best-effort logout: `Authorization: Bearer <ebs-token>` revokes both
-   the EBS token and (best-effort) the underlying Twitch grant. It also clears the channel's stored
-   card, the same way `DELETE /api/update-state` does.
+4. **`POST /oauth/revoke`** — logout: `Authorization: Bearer <ebs-token>` clears the channel's
+   stored card (the same way `DELETE /api/update-state` does), then revokes the EBS token and
+   (best-effort) the underlying Twitch grant. The clear comes first so that if it fails (`5xx`), the
+   token still works for the client to retry. An unknown token gets `200`: there is nothing to do.
 
 A background service refreshes each broadcaster's Twitch access token ahead of expiry using their
 stored refresh token, so the commander stays logged in across a multi-day gap without re-auth. If a
@@ -110,13 +112,16 @@ Called by the desktop client when the broadcaster switches the card off. Same be
 broadcasts `{ "v": 1, "offline": true }` so viewers who are already watching hide the card. Returns
 `204`. It has its own per-channel limit (10 per minute), so a clear sent straight after a publish is
 never rejected by that publish's window. `POST /oauth/revoke` does the same clear on sign-out.
+The desktop app queues clears and revokes the EBS did not acknowledge (in its settings) and retries
+them with backoff, including after a restart.
 
 Every `429` from the EBS carries a `Retry-After` header in seconds.
 
 ### `GET /api/initial-state/{channelId}`
 
 Called by the extension frontend on load so it doesn't have to wait for the next PubSub event.
-Returns the last state payload published for that channel, or `404` if none has been published yet.
+Returns the last state payload published for that channel, or `404` if none has been published yet,
+the card was switched off, or the snapshot is older than `Ebs:ChannelStateMaxAgeHours`.
 Unauthenticated but rate-limited per caller IP.
 
 ### `GET /`
