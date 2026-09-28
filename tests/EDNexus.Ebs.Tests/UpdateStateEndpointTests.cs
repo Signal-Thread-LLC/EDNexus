@@ -180,6 +180,37 @@ public class UpdateStateEndpointTests : IClassFixture<UpdateStateEndpointTests.F
     }
 
     [Fact]
+    public async Task A_clear_whose_offline_broadcast_fails_is_a_502_so_the_client_retries()
+    {
+        var record = _factory.TokenStore.IssueToken("chan-pubsub-down", "CMDR", "access", "refresh", DateTimeOffset.UtcNow.AddHours(4));
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new("Bearer", record.Token);
+        (await client.PostAsJsonAsync("/api/update-state", new { state = new { headline = "Docked at Home" } })).EnsureSuccessStatusCode();
+        _factory.PubSubClient.RejectFor.Add("chan-pubsub-down");
+
+        Assert.Equal(HttpStatusCode.BadGateway, (await client.DeleteAsync("/api/update-state")).StatusCode);
+
+        // Removed regardless: new viewers never see it, and retrying the DELETE is harmless.
+        Assert.Equal(HttpStatusCode.NotFound, (await _factory.CreateClient().GetAsync("/api/initial-state/chan-pubsub-down")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Signing_out_revokes_the_token_even_when_the_offline_broadcast_fails()
+    {
+        var record = _factory.TokenStore.IssueToken("chan-signout-pubsub-down", "CMDR", "access", "refresh", DateTimeOffset.UtcNow.AddHours(4));
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new("Bearer", record.Token);
+        (await client.PostAsJsonAsync("/api/update-state", new { state = new { headline = "Docked at Home" } })).EnsureSuccessStatusCode();
+        _factory.PubSubClient.RejectFor.Add("chan-signout-pubsub-down");
+
+        (await client.PostAsync("/oauth/revoke", null)).EnsureSuccessStatusCode();
+
+        // A PubSub outage must not keep a signed-out credential alive.
+        Assert.False(_factory.TokenStore.TryGetByToken(record.Token, out _));
+        Assert.Equal(HttpStatusCode.NotFound, (await _factory.CreateClient().GetAsync("/api/initial-state/chan-signout-pubsub-down")).StatusCode);
+    }
+
+    [Fact]
     public async Task A_sign_out_whose_clear_fails_leaves_the_token_able_to_retry()
     {
         using var factory = _factory.WithWebHostBuilder(builder => builder.ConfigureServices(services =>
@@ -298,10 +329,13 @@ public sealed class FakeTwitchPubSubClient : ITwitchPubSubClient
 
     public Dictionary<string, JsonElement> LastMessage { get; } = new();
 
+    /// <summary>Channels whose broadcasts Twitch rejects.</summary>
+    public HashSet<string> RejectFor { get; } = new();
+
     public Task<bool> BroadcastAsync(string broadcasterId, JsonElement state, CancellationToken cancellationToken)
     {
         BroadcastCalls[broadcasterId] = BroadcastCalls.GetValueOrDefault(broadcasterId) + 1;
         LastMessage[broadcasterId] = state.Clone();
-        return Task.FromResult(true);
+        return Task.FromResult(!RejectFor.Contains(broadcasterId));
     }
 }

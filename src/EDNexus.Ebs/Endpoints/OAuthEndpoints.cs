@@ -169,8 +169,10 @@ public static class OAuthEndpoints
         if (store.TryGetByToken(token, out var record))
         {
             // Clear before revoking: if the clear throws, the token still works and the client can
-            // retry. Revoking first would leave no credential able to clear that channel.
-            await ChannelStateClearing.ClearAsync(record.ChannelId, stateStore, pubSubClient, ct).ConfigureAwait(false);
+            // retry. Revoking first would leave no credential able to clear that channel. A failed
+            // offline broadcast does not hold the revoke back: the snapshot is already gone, and
+            // leaving a signed-out credential valid through a PubSub outage is the worse outcome.
+            _ = await ChannelStateClearing.ClearAsync(record.ChannelId, stateStore, pubSubClient, ct).ConfigureAwait(false);
             try { await twitchClient.RevokeTokenAsync(record.TwitchAccessToken, ct).ConfigureAwait(false); }
             catch { /* best-effort */ }
             store.Revoke(token);

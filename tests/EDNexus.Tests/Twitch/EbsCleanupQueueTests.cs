@@ -153,6 +153,32 @@ public class EbsCleanupQueueTests : IDisposable
         Assert.Single(_state.Clears);
     }
 
+    [Fact]
+    public async Task A_clear_still_failing_after_a_day_is_given_up_but_a_revoke_is_not()
+    {
+        var time = new FakeTime(DateTimeOffset.UtcNow);
+        var store = Store;
+        var queue = new EbsCleanupQueue(store.Load(), store, _state, _auth, time);
+        queue.Enqueue(EbsCleanupKind.ClearCard, ClearEndpoint, "ebs-token");
+        queue.Enqueue(EbsCleanupKind.Revoke, RevokeEndpoint, "ebs-token");
+        _state.RespondToClear = () => new StreamStatePublishResult(StreamStatePublishStatus.Failed, "HTTP 502");
+        _auth.Fail = true;
+
+        time.Now += TimeSpan.FromHours(23);
+        Assert.Equal(2, await queue.RetryPendingAsync());
+
+        // Past the EBS's own snapshot age limit a clear achieves nothing; a revoke still matters.
+        time.Now += TimeSpan.FromHours(2);
+        Assert.Equal(1, await queue.RetryPendingAsync());
+        Assert.Equal(EbsCleanupKind.Revoke, Assert.Single(queue.Pending).Kind);
+    }
+
+    private sealed class FakeTime(DateTimeOffset now) : TimeProvider
+    {
+        public DateTimeOffset Now { get; set; } = now;
+        public override DateTimeOffset GetUtcNow() => Now;
+    }
+
     private sealed class ScriptedRevokeClient : IEbsAuthApiClient
     {
         public bool Fail { get; set; }

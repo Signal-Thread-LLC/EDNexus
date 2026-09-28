@@ -278,7 +278,15 @@ app.MapDelete("/api/update-state", async (
             return (IResult?)httpRequest.HttpContext.Items["BroadcasterAuthFailure"] ?? Results.Unauthorized();
         }
 
-        await ChannelStateClearing.ClearAsync(channelId, stateStore, pubSubClient, cancellationToken).ConfigureAwait(false);
+        // A 502, like the POST's, when viewers already watching were not told: the snapshot is gone
+        // either way, and a retry is harmless, so the client tries again rather than leave them the card.
+        if (!await ChannelStateClearing.ClearAsync(channelId, stateStore, pubSubClient, cancellationToken).ConfigureAwait(false))
+        {
+            return Results.Problem(
+                "The card was removed, but Twitch PubSub did not deliver the offline message to viewers already watching.",
+                statusCode: StatusCodes.Status502BadGateway);
+        }
+
         return Results.NoContent();
     })
     .RequireRateLimiting("clear-state");

@@ -26,6 +26,9 @@ public sealed class PendingEbsCleanup
 
     /// <summary>The EBS token the card was published with. Already on disk as <see cref="TwitchSettings.Token"/> until now.</summary>
     public string Token { get; set; } = string.Empty;
+
+    /// <summary>When the request was first queued, for <see cref="EbsCleanupQueue.MaxClearAge"/>.</summary>
+    public DateTimeOffset QueuedAt { get; set; }
 }
 
 /// <summary>
@@ -49,10 +52,19 @@ public sealed class EbsCleanupQueue : IDisposable
         TimeSpan.FromMinutes(10),
     ];
 
+    /// <summary>
+    /// How long a card clear is retried. The EBS stops serving a snapshot a day old
+    /// (<c>Ebs:ChannelStateMaxAgeHours</c>) and a failed offline broadcast only affects viewers who
+    /// already had the card open, so past this a clear has nothing left to achieve. Revokes are
+    /// never dropped: a signed-out token must not stay valid.
+    /// </summary>
+    public static readonly TimeSpan MaxClearAge = TimeSpan.FromHours(24);
+
     private readonly AppSettings _settings;
     private readonly SettingsStore _store;
     private readonly IStreamStateApiClient _stateClient;
     private readonly IEbsAuthApiClient _authClient;
+    private readonly TimeProvider _time;
     private readonly bool _ownsStateClient;
     private readonly bool _ownsAuthClient;
     private readonly object _gate = new();
@@ -64,8 +76,10 @@ public sealed class EbsCleanupQueue : IDisposable
         AppSettings settings,
         SettingsStore store,
         IStreamStateApiClient? stateClient = null,
-        IEbsAuthApiClient? authClient = null)
+        IEbsAuthApiClient? authClient = null,
+        TimeProvider? time = null)
     {
+        _time = time ?? TimeProvider.System;
         _settings = settings;
         _store = store;
         _ownsStateClient = stateClient is null;
@@ -100,7 +114,7 @@ public sealed class EbsCleanupQueue : IDisposable
                 .FirstOrDefault(p => p.Kind == kind && p.Endpoint == endpoint && p.Token == token);
             if (existing is not null) return existing;
 
-            entry = new PendingEbsCleanup { Kind = kind, Endpoint = endpoint, Token = token };
+            entry = new PendingEbsCleanup { Kind = kind, Endpoint = endpoint, Token = token, QueuedAt = _time.GetUtcNow() };
             _settings.Twitch.PendingCleanups = [.. _settings.Twitch.PendingCleanups, entry];
             _store.Save(_settings);
         }
@@ -143,6 +157,8 @@ public sealed class EbsCleanupQueue : IDisposable
         // Never send the token in cleartext. Publishing refuses the same addresses, so a card was
         // never put on the air there and there is nothing to clear.
         if (!TwitchOAuthOptions.IsSecureEbsUrl(entry.Endpoint)) return true;
+
+        if (entry.Kind == EbsCleanupKind.ClearCard && _time.GetUtcNow() - entry.QueuedAt > MaxClearAge) return true;
 
         try
         {

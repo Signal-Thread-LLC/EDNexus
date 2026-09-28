@@ -18,13 +18,15 @@ public static class ChannelStateClearing
     public static readonly JsonElement OfflineMessage = JsonSerializer.SerializeToElement(new { v = 1, offline = true });
 
     /// <summary>
-    /// Forgets the stored snapshot, then best-effort tells live viewers. A PubSub failure is not
-    /// surfaced: the stored state is what leaks to future viewers, and it is already gone.
+    /// Forgets the stored snapshot, then tells live viewers. The snapshot is removed whatever
+    /// PubSub does, since it is what leaks to future viewers; the result says whether viewers
+    /// already watching were told, so the caller can decide whether that failure is worth a retry.
     /// </summary>
-    public static async Task ClearAsync(string channelId, IChannelStateStore stateStore, ITwitchPubSubClient pubSubClient, CancellationToken ct)
+    /// <returns>True when the offline broadcast was delivered.</returns>
+    public static async Task<bool> ClearAsync(string channelId, IChannelStateStore stateStore, ITwitchPubSubClient pubSubClient, CancellationToken ct)
     {
         stateStore.Remove(channelId);
-        try { await pubSubClient.BroadcastAsync(channelId, OfflineMessage, ct).ConfigureAwait(false); }
-        catch (Exception ex) when (ex is not OperationCanceledException) { /* best-effort */ }
+        try { return await pubSubClient.BroadcastAsync(channelId, OfflineMessage, ct).ConfigureAwait(false); }
+        catch (Exception ex) when (ex is not OperationCanceledException) { return false; }
     }
 }
