@@ -108,7 +108,7 @@ public sealed class LoadedPlugin
             }
             finally
             {
-                loadContext?.Unload();
+                PluginHost.TryUnloadContext(loadContext, errors);
             }
         }
         return new PluginUnloadResult(Id, errors, weak);

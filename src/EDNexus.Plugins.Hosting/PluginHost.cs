@@ -18,7 +18,10 @@ namespace EDNexus.Plugins.Hosting;
 /// <para>
 /// Loading runs plugin code (constructors and <see cref="IEDNexusPlugin.Initialize"/>) on the
 /// calling thread. Exceptions from that code are contained; a stack overflow or an
-/// <see cref="Environment.FailFast(string)"/> cannot be, in-process.
+/// <see cref="Environment.FailFast(string)"/> cannot be, in-process. Nor can a hang: a plugin whose
+/// constructor, <see cref="IEDNexusPlugin.Initialize"/> or <see cref="IEDNexusPlugin.Shutdown"/>
+/// never returns blocks the load or unload pass that called it (timeouts and dispatch belong to
+/// the threading contract, #62).
 /// </para>
 /// <para>
 /// A load context isolates dependency <em>versions</em>; it is <strong>not a security
@@ -89,7 +92,9 @@ public sealed class PluginHost : IDisposable
     /// concurrently with <see cref="PluginInstaller.Install"/> on the same root: do not install
     /// plugins while the first load is in progress. Later calls (after <see cref="UnloadAll"/>)
     /// do not repeat recovery. Never throws for a bad plugin or an unreadable root; see the
-    /// returned report. With no plugins root, or an empty one, nothing is loaded.
+    /// returned report. With no plugins root, or an empty one, nothing is loaded. A call made
+    /// while another load pass is running (from another thread, or re-entrantly from plugin code)
+    /// throws <see cref="InvalidOperationException"/> rather than waiting for it.
     /// </summary>
     /// <exception cref="InvalidOperationException">
     /// Plugins are already loaded (call <see cref="UnloadAll"/> first), or a load pass is already
@@ -353,7 +358,7 @@ public sealed class PluginHost : IDisposable
                 }
                 finally
                 {
-                    loadContext?.Unload();
+                    TryUnloadContext(loadContext, reasons);
                 }
             }
             return new PluginLoadResult(dir, manifest, status, reasons, null);
@@ -449,6 +454,36 @@ public sealed class PluginHost : IDisposable
         catch (Exception ex)
         {
             errors.Add(Describe("Shutdown threw", ex));
+        }
+    }
+
+    /// <summary>
+    /// Unloads <paramref name="loadContext"/>, recording (never throwing) a failure.
+    /// <see cref="System.Runtime.Loader.AssemblyLoadContext.Unload"/> raises the context's
+    /// <c>Unloading</c> event synchronously, and plugin code can subscribe to it and throw.
+    /// </summary>
+    internal static void TryUnloadContext(PluginLoadContext? loadContext, List<string> errors)
+    {
+        if (loadContext is null)
+            return;
+        try
+        {
+            loadContext.Unload();
+        }
+        catch (Exception ex)
+        {
+            errors.Add(Describe("unloading the load context failed", ex));
+            // The runtime raises Unloading before it starts the unload, and only once; a handler
+            // that threw has aborted this attempt, so a second call finishes the unload without
+            // running plugin handlers again.
+            try
+            {
+                loadContext.Unload();
+            }
+            catch (Exception retry)
+            {
+                errors.Add(Describe("unloading the load context failed again", retry));
+            }
         }
     }
 
