@@ -15,6 +15,13 @@ public static class ChannelStateClearing
     /// recognises <c>offline</c>; <c>v</c> matches the snapshot schema so older frontends don't
     /// reject it as a newer, unsupported version.
     /// </summary>
+    /// <summary>
+    /// Set on a failed clear's <c>502</c> when the snapshot was removed and only the offline
+    /// broadcast failed. A proxy in front of an unreachable EBS answers <c>502</c> too, so the status
+    /// alone does not tell the desktop app its card is already gone.
+    /// </summary>
+    public const string SnapshotRemovedHeader = "X-EDNexus-Snapshot-Removed";
+
     public static readonly JsonElement OfflineMessage = JsonSerializer.SerializeToElement(new { v = 1, offline = true });
 
     /// <summary>

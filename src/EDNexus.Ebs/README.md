@@ -111,8 +111,9 @@ Called by the desktop client when the broadcaster switches the card off. Same be
 `POST`, except that a lapsed Twitch grant is not required to be valid: a broadcaster must always be
 able to take their card down. It deletes the stored snapshot, so `GET /api/initial-state` answers `404` again, and
 broadcasts `{ "v": 1, "offline": true }` so viewers who are already watching hide the card. Returns
-`204`, or `502` if PubSub did not deliver that broadcast (the snapshot is removed either way, so the
-client can safely retry). `POST /oauth/revoke` revokes the token even when that broadcast fails. It has its own per-channel limit (10 per minute), so a clear sent straight after a publish is
+`204`, or `502` with an `X-EDNexus-Snapshot-Removed: true` header if PubSub did not deliver that
+broadcast (the snapshot is removed either way, so the client can safely retry; the header tells it
+so, since a proxy's `502` would not carry it). `POST /oauth/revoke` revokes the token even when that broadcast fails. It has its own per-channel limit (10 per minute), so a clear sent straight after a publish is
 never rejected by that publish's window. `POST /oauth/revoke` does the same clear on sign-out.
 The desktop app queues clears and revokes the EBS did not acknowledge (in its settings) and retries
 them with backoff, including after a restart.

@@ -282,6 +282,7 @@ app.MapDelete("/api/update-state", async (
         // either way, and a retry is harmless, so the client tries again rather than leave them the card.
         if (!await ChannelStateClearing.ClearAsync(channelId, stateStore, pubSubClient, cancellationToken).ConfigureAwait(false))
         {
+            httpRequest.HttpContext.Response.Headers[ChannelStateClearing.SnapshotRemovedHeader] = "true";
             return Results.Problem(
                 "The card was removed, but Twitch PubSub did not deliver the offline message to viewers already watching.",
                 statusCode: StatusCodes.Status502BadGateway);

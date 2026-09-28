@@ -497,6 +497,9 @@ public partial class SettingsWindow : Window
                 StreamStatePublishStatus.Unauthorized => "The backend rejected this machine's credential — sign in again.",
                 StreamStatePublishStatus.TooLarge => "The last card was too large for Twitch — try hiding a section.",
                 StreamStatePublishStatus.RateLimited => "Publishing is being rate-limited; updates are slowing down.",
+                StreamStatePublishStatus.Cleared => "Card taken off the air.",
+                StreamStatePublishStatus.ClearedNotDelivered =>
+                    "Card taken off the air; viewers already watching will be told on the next retry.",
                 _ => $"Could not publish: {result.Error}",
             };
         });

@@ -27,8 +27,14 @@ public sealed class PendingEbsCleanup
     /// <summary>The EBS token the card was published with. Already on disk as <see cref="TwitchSettings.Token"/> until now.</summary>
     public string Token { get; set; } = string.Empty;
 
-    /// <summary>When the request was first queued, for <see cref="EbsCleanupQueue.MaxClearAge"/>.</summary>
+    /// <summary>When the request was first queued.</summary>
     public DateTimeOffset QueuedAt { get; set; }
+
+    /// <summary>
+    /// When the EBS confirmed the snapshot was removed but could not tell viewers already watching,
+    /// for <see cref="EbsCleanupQueue.MaxOfflineNotifyRetry"/>. Null until then.
+    /// </summary>
+    public DateTimeOffset? SnapshotRemovedAt { get; set; }
 }
 
 /// <summary>
@@ -53,12 +59,12 @@ public sealed class EbsCleanupQueue : IDisposable
     ];
 
     /// <summary>
-    /// How long a card clear is retried. The EBS stops serving a snapshot a day old
-    /// (<c>Ebs:ChannelStateMaxAgeHours</c>) and a failed offline broadcast only affects viewers who
-    /// already had the card open, so past this a clear has nothing left to achieve. Revokes are
-    /// never dropped: a signed-out token must not stay valid.
+    /// How long a clear keeps retrying once the EBS has confirmed the snapshot is gone and only the
+    /// offline broadcast to viewers already watching is failing. Until that confirmation a clear is
+    /// retried indefinitely: the app cannot know whether the EBS expires snapshots on its own
+    /// (<c>Ebs:ChannelStateMaxAgeHours</c> may be 0). Revokes are never dropped either.
     /// </summary>
-    public static readonly TimeSpan MaxClearAge = TimeSpan.FromHours(24);
+    public static readonly TimeSpan MaxOfflineNotifyRetry = TimeSpan.FromHours(24);
 
     private readonly AppSettings _settings;
     private readonly SettingsStore _store;
@@ -131,7 +137,7 @@ public sealed class EbsCleanupQueue : IDisposable
     /// </summary>
     public void Complete(PendingEbsCleanup entry, StreamStatePublishResult result)
     {
-        if (IsSettled(result)) Remove(entry);
+        if (Record(entry, result)) Remove(entry);
     }
 
     /// <summary>Sends every pending request once. Returns how many are still pending afterwards.</summary>
@@ -158,14 +164,14 @@ public sealed class EbsCleanupQueue : IDisposable
         // never put on the air there and there is nothing to clear.
         if (!TwitchOAuthOptions.IsSecureEbsUrl(entry.Endpoint)) return true;
 
-        if (entry.Kind == EbsCleanupKind.ClearCard && _time.GetUtcNow() - entry.QueuedAt > MaxClearAge) return true;
+        if (entry.SnapshotRemovedAt is { } removedAt && _time.GetUtcNow() - removedAt > MaxOfflineNotifyRetry) return true;
 
         try
         {
             switch (entry.Kind)
             {
                 case EbsCleanupKind.ClearCard:
-                    return IsSettled(await _stateClient.ClearAsync(entry.Endpoint, entry.Token, ct).ConfigureAwait(false));
+                    return Record(entry, await _stateClient.ClearAsync(entry.Endpoint, entry.Token, ct).ConfigureAwait(false));
 
                 case EbsCleanupKind.Revoke:
                     // Throws when the EBS is unreachable or failed; answers 200 even for a token it
@@ -182,6 +188,23 @@ public sealed class EbsCleanupQueue : IDisposable
         {
             return false;
         }
+    }
+
+    /// <summary>Notes a confirmed removal on the entry; returns whether the clear is settled.</summary>
+    private bool Record(PendingEbsCleanup entry, StreamStatePublishResult result)
+    {
+        if (IsSettled(result)) return true;
+
+        if (result.Status == StreamStatePublishStatus.ClearedNotDelivered && entry.SnapshotRemovedAt is null)
+        {
+            lock (_gate)
+            {
+                entry.SnapshotRemovedAt = _time.GetUtcNow();
+                _store.Save(_settings);
+            }
+        }
+
+        return false;
     }
 
     private void Remove(PendingEbsCleanup entry)

@@ -28,6 +28,12 @@ public enum StreamStatePublishStatus
 
     /// <summary>The EBS forgot the published card and told viewers it is offline (the card was switched off).</summary>
     Cleared,
+
+    /// <summary>
+    /// The EBS forgot the published card, so new viewers no longer get it, but could not tell viewers
+    /// already watching. Worth retrying for their sake; nothing is left public to anyone new.
+    /// </summary>
+    ClearedNotDelivered,
 }
 
 /// <param name="Status">Whether the snapshot reached viewers, and if not, why not.</param>
@@ -91,6 +97,12 @@ public sealed class StreamStateApiClient : IStreamStateApiClient, IDisposable
     /// </summary>
     public const int MaxErrorDetailLength = 200;
 
+    /// <summary>
+    /// Header the EBS sets on a clear whose snapshot was removed but whose offline broadcast failed.
+    /// Mirrors <c>EDNexus.Ebs.Services.ChannelStateClearing.SnapshotRemovedHeader</c>.
+    /// </summary>
+    public const string SnapshotRemovedHeader = "X-EDNexus-Snapshot-Removed";
+
     public Task<StreamStatePublishResult> PublishAsync(
         string updateStateEndpoint, string token, StreamCardSnapshot snapshot, CancellationToken ct = default)
     {
@@ -143,6 +155,7 @@ public sealed class StreamStateApiClient : IStreamStateApiClient, IDisposable
 
             var status = response.StatusCode switch
             {
+                _ when response.Headers.Contains(SnapshotRemovedHeader) => StreamStatePublishStatus.ClearedNotDelivered,
                 HttpStatusCode.Unauthorized => StreamStatePublishStatus.Unauthorized,
                 HttpStatusCode.RequestEntityTooLarge => StreamStatePublishStatus.TooLarge,
                 HttpStatusCode.TooManyRequests => StreamStatePublishStatus.RateLimited,

@@ -154,23 +154,50 @@ public class EbsCleanupQueueTests : IDisposable
     }
 
     [Fact]
-    public async Task A_clear_still_failing_after_a_day_is_given_up_but_a_revoke_is_not()
+    public async Task A_clear_the_EBS_never_confirmed_is_retried_indefinitely()
     {
         var time = new FakeTime(DateTimeOffset.UtcNow);
         var store = Store;
         var queue = new EbsCleanupQueue(store.Load(), store, _state, _auth, time);
         queue.Enqueue(EbsCleanupKind.ClearCard, ClearEndpoint, "ebs-token");
-        queue.Enqueue(EbsCleanupKind.Revoke, RevokeEndpoint, "ebs-token");
         _state.RespondToClear = () => new StreamStatePublishResult(StreamStatePublishStatus.Failed, "HTTP 502");
-        _auth.Fail = true;
+
+        // The EBS may not expire snapshots on its own (a limit of 0), so the card could still be
+        // public: never give up while nothing says it is gone.
+        time.Now += TimeSpan.FromDays(30);
+        Assert.Equal(1, await queue.RetryPendingAsync());
+    }
+
+    [Fact]
+    public async Task A_clear_whose_snapshot_is_gone_stops_retrying_the_broadcast_after_a_day()
+    {
+        var time = new FakeTime(DateTimeOffset.UtcNow);
+        var store = Store;
+        var queue = new EbsCleanupQueue(store.Load(), store, _state, _auth, time);
+        queue.Enqueue(EbsCleanupKind.ClearCard, ClearEndpoint, "ebs-token");
+        _state.RespondToClear = () => new StreamStatePublishResult(StreamStatePublishStatus.ClearedNotDelivered, "HTTP 502");
+
+        Assert.Equal(1, await queue.RetryPendingAsync());
+        Assert.NotNull(Store.Load().Twitch.PendingCleanups.Single().SnapshotRemovedAt);
 
         time.Now += TimeSpan.FromHours(23);
-        Assert.Equal(2, await queue.RetryPendingAsync());
-
-        // Past the EBS's own snapshot age limit a clear achieves nothing; a revoke still matters.
-        time.Now += TimeSpan.FromHours(2);
         Assert.Equal(1, await queue.RetryPendingAsync());
-        Assert.Equal(EbsCleanupKind.Revoke, Assert.Single(queue.Pending).Kind);
+
+        time.Now += TimeSpan.FromHours(2);
+        Assert.Equal(0, await queue.RetryPendingAsync());
+    }
+
+    [Fact]
+    public async Task A_revoke_is_never_given_up()
+    {
+        var time = new FakeTime(DateTimeOffset.UtcNow);
+        var store = Store;
+        var queue = new EbsCleanupQueue(store.Load(), store, _state, _auth, time);
+        queue.Enqueue(EbsCleanupKind.Revoke, RevokeEndpoint, "ebs-token");
+        _auth.Fail = true;
+
+        time.Now += TimeSpan.FromDays(30);
+        Assert.Equal(1, await queue.RetryPendingAsync());
     }
 
     private sealed class FakeTime(DateTimeOffset now) : TimeProvider

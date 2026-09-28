@@ -71,6 +71,25 @@ public class StreamStateApiClientTests
     }
 
     [Fact]
+    public async Task A_clear_the_EBS_confirms_removed_is_told_apart_from_a_proxy_502()
+    {
+        // The EBS removed the snapshot; only the offline broadcast failed.
+        var confirmed = new StubHandler(_ =>
+        {
+            var response = new HttpResponseMessage(HttpStatusCode.BadGateway);
+            response.Headers.Add(StreamStateApiClient.SnapshotRemovedHeader, "true");
+            return Task.FromResult(response);
+        });
+        using (var client = new StreamStateApiClient(new HttpClient(confirmed)))
+            Assert.Equal(StreamStatePublishStatus.ClearedNotDelivered, (await client.ClearAsync(Endpoint, "ebs-token")).Status);
+
+        // A proxy in front of an unreachable EBS: nothing says the card is gone.
+        var proxy = new StubHandler(_ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.BadGateway)));
+        using (var client = new StreamStateApiClient(new HttpClient(proxy)))
+            Assert.Equal(StreamStatePublishStatus.Failed, (await client.ClearAsync(Endpoint, "ebs-token")).Status);
+    }
+
+    [Fact]
     public async Task Cancellation_still_surfaces_to_the_caller()
     {
         var handler = new StubHandler(async (_, ct) =>

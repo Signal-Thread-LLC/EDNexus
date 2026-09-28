@@ -188,7 +188,10 @@ public class UpdateStateEndpointTests : IClassFixture<UpdateStateEndpointTests.F
         (await client.PostAsJsonAsync("/api/update-state", new { state = new { headline = "Docked at Home" } })).EnsureSuccessStatusCode();
         _factory.PubSubClient.RejectFor.Add("chan-pubsub-down");
 
-        Assert.Equal(HttpStatusCode.BadGateway, (await client.DeleteAsync("/api/update-state")).StatusCode);
+        var response = await client.DeleteAsync("/api/update-state");
+        Assert.Equal(HttpStatusCode.BadGateway, response.StatusCode);
+        // What tells the app this 502 is the EBS's own, with the card already gone.
+        Assert.Equal("true", Assert.Single(response.Headers.GetValues(ChannelStateClearing.SnapshotRemovedHeader)));
 
         // Removed regardless: new viewers never see it, and retrying the DELETE is harmless.
         Assert.Equal(HttpStatusCode.NotFound, (await _factory.CreateClient().GetAsync("/api/initial-state/chan-pubsub-down")).StatusCode);
