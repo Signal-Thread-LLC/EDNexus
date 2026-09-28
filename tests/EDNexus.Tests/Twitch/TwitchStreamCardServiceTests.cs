@@ -382,6 +382,26 @@ public class TwitchStreamCardServiceTests
         lock (reported) Assert.Empty(reported);
     }
 
+    [Fact]
+    public async Task Dispose_waits_for_a_handler_already_running()
+    {
+        var service = Create(new CommanderState { StarSystem = "Nervi" }, new FakeStreamStateApiClient());
+        using var entered = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        service.PublishCompleted += _ => { entered.Set(); release.Wait(TimeSpan.FromSeconds(10)); };
+        service.RequestPublish();
+        Assert.True(entered.Wait(TimeSpan.FromSeconds(5)));
+
+        // Once Dispose returns, the caller may tear down whatever the handler touches, so it must not
+        // return while one is still running — including past the two seconds it gives the pump.
+        var disposing = Task.Run(service.Dispose);
+        await Task.Delay(TimeSpan.FromSeconds(2.5));
+        Assert.False(disposing.IsCompleted);
+
+        release.Set();
+        await disposing.WaitAsync(TimeSpan.FromSeconds(5));
+    }
+
     /// <summary>Holds every publish until the test releases it, like an EBS that is slow to answer.</summary>
     private sealed class BlockingStreamStateApiClient : IStreamStateApiClient
     {

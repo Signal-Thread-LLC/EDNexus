@@ -34,6 +34,12 @@
   /** How often to look at whether a recheck is due. Page load time staggers viewers across it. */
   var RECHECK_TICK_MS = 60 * 1000;
 
+  /**
+   * A recheck that has not finished by now is abandoned. Only one runs at a time, so a request the
+   * network never answers would otherwise stop every later one.
+   */
+  var RECHECK_TIMEOUT_MS = 15 * 1000;
+
   /** Total attempts at the one-time initial-state fetch, and the first backoff between them. */
   var INITIAL_STATE_ATTEMPTS = 3;
   var INITIAL_STATE_BACKOFF_MS = 1000;
@@ -169,14 +175,37 @@
       if (!showing || recheckInFlight || Date.now() - lastHeard < RECHECK_AFTER_MS) return;
       recheckInFlight = true;
       var broadcastsBefore = broadcasts;
+      var settled = false;
 
-      global.fetch(resolveEbsBase(helper) + '/api/initial-state/' + encodeURIComponent(channelId), { method: 'GET' })
+      // The abort covers the body read as well as the response. The timer settles this recheck on
+      // its own, so a request that ignores the abort (or a browser without AbortController) still
+      // frees the next tick, and any answer it gives afterwards is dropped.
+      var controller = typeof global.AbortController === 'function' ? new global.AbortController() : null;
+      var timer = global.setTimeout(function () {
+        if (controller) controller.abort();
+        settle();
+      }, RECHECK_TIMEOUT_MS);
+
+      function settle() {
+        if (settled) return false;
+        settled = true;
+        global.clearTimeout(timer);
+        recheckInFlight = false;
+        return true;
+      }
+
+      var init = { method: 'GET' };
+      if (controller) init.signal = controller.signal;
+
+      global.fetch(resolveEbsBase(helper) + '/api/initial-state/' + encodeURIComponent(channelId), init)
         .then(function (response) {
           if (response.status === 404) return { gone: true };
           if (!response.ok) return null; // try again on a later tick
           return response.json().then(function (body) { return { snapshot: normalize(body) }; });
         })
         .then(function (answer) {
+          // Timed out already: whatever this says, the next recheck asks again.
+          if (!settle()) return;
           // A live broadcast that landed meanwhile is newer than anything this answer says.
           if (!answer || broadcasts !== broadcastsBefore) return;
           if (answer.gone) {
@@ -188,8 +217,8 @@
             show(answer.snapshot);
           }
         })
-        .catch(function () { /* unreachable EBS: keep the card, try again on a later tick */ })
-        .then(function () { recheckInFlight = false; });
+        // Unreachable EBS, or aborted: keep the card and try again on a later tick.
+        .catch(function () { settle(); });
     }
 
     helper.listen('broadcast', function (_target, _contentType, message) {

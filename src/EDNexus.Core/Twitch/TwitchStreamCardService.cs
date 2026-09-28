@@ -98,6 +98,13 @@ public sealed class TwitchStreamCardService : IDisposable
 
     private bool IsDisposed => Volatile.Read(ref _disposed) != 0;
 
+    /// <summary>
+    /// Held while an event is raised and while <see cref="Dispose"/> sets <see cref="_disposed"/>, so
+    /// once Dispose returns no handler is running or about to run. Handlers must not block on the
+    /// thread that disposes the service (the app's only Post to the UI thread).
+    /// </summary>
+    private readonly Lock _notifyGate = new();
+
     /// <summary>Raised after every publish attempt, successful or not, for the UI's status line and logs.</summary>
     public event Action<StreamStatePublishResult>? PublishCompleted;
 
@@ -307,8 +314,11 @@ public sealed class TwitchStreamCardService : IDisposable
         {
             Volatile.Write(ref _rejectedToken, token);
             Volatile.Write(ref _stoppedForReauth, true);
-            if (!IsDisposed)
-                try { ReauthRequired?.Invoke(); } catch { /* never let a handler break the pump */ }
+            lock (_notifyGate)
+            {
+                if (!IsDisposed)
+                    try { ReauthRequired?.Invoke(); } catch { /* never let a handler break the pump */ }
+            }
         }
 
         Raise(result);
@@ -352,9 +362,13 @@ public sealed class TwitchStreamCardService : IDisposable
 
     private void Raise(StreamStatePublishResult result)
     {
-        // A publish that finishes after Dispose reports to a UI that has already let go of us.
-        if (IsDisposed) return;
-        try { PublishCompleted?.Invoke(result); } catch { /* never let a handler break the pump */ }
+        // A publish that finishes after Dispose reports to a UI that has already let go of us. The
+        // check and the call share the gate with Dispose, so Dispose cannot land between them.
+        lock (_notifyGate)
+        {
+            if (IsDisposed) return;
+            try { PublishCompleted?.Invoke(result); } catch { /* never let a handler break the pump */ }
+        }
     }
 
     /// <summary>The pump's own task, so tests can see it finish cleanly after <see cref="Dispose"/>.</summary>
@@ -362,7 +376,10 @@ public sealed class TwitchStreamCardService : IDisposable
 
     public void Dispose()
     {
-        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+        lock (_notifyGate)
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+        }
 
         _state.PropertyChanged -= OnStateChanged;
         _state.CargoChanged -= MarkDirty;
