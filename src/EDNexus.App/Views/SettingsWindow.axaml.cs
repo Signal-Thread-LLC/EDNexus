@@ -470,8 +470,10 @@ public partial class SettingsWindow : Window
         {
             await _boot.Twitch.LogoutAsync();
             // Signing out must also stop publishing, or the card would keep going on the next login.
+            // Only that: the rest of the dialog is still unsaved and stays the commander's to save
+            // or discard.
             TwitchCardToggle.IsChecked = false;
-            _boot.ApplyTwitchChoice(false, TwitchSectionsFromToggles(), TwitchEbsBox.Text);
+            _boot.DisableTwitchCard();
             ShowTwitchAuthStatus("Signed out.");
             UpdateTwitchAccountLine();
             UpdateTwitchPreview();
