@@ -55,9 +55,16 @@ public sealed class EbsDatabase
             wal.ExecuteNonQuery();
         }
 
-        using var versionCommand = connection.CreateCommand();
-        versionCommand.CommandText = "PRAGMA user_version;";
-        var version = Convert.ToInt32(versionCommand.ExecuteScalar());
+        if (ReadVersion(connection) == SchemaVersion)
+            return;
+
+        // BEGIN IMMEDIATE takes the write lock up front, and the version is re-read under it. A rolling
+        // deploy briefly runs the old and new container against the same volume; with a deferred
+        // transaction both would read the old version and the second would fail on a table the first
+        // just created, crash-looping the new container. Serialised, the second sees the finished
+        // schema and skips. A file newer than this build is refused here too, not just on the fast path.
+        using var transaction = connection.BeginTransaction(deferred: false);
+        var version = ReadVersion(connection, transaction);
 
         if (version > SchemaVersion)
             throw new InvalidOperationException(
@@ -66,7 +73,6 @@ public sealed class EbsDatabase
         if (version == SchemaVersion)
             return;
 
-        using var transaction = connection.BeginTransaction();
         using var command = connection.CreateCommand();
         command.Transaction = transaction;
 
@@ -100,5 +106,13 @@ public sealed class EbsDatabase
         command.CommandText = $"PRAGMA user_version = {SchemaVersion};";
         command.ExecuteNonQuery();
         transaction.Commit();
+    }
+
+    private int ReadVersion(SqliteConnection connection, SqliteTransaction? transaction = null)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = "PRAGMA user_version;";
+        return Convert.ToInt32(command.ExecuteScalar());
     }
 }
